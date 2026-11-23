@@ -131,7 +131,14 @@ built in Node has neither; build through the UI when you need to see them.
 
 ## Deployment
 
-`main` is published to GitHub Pages by `.github/workflows/pages.yml`, which
-runs the typecheck, the build and the tests, then deploys `dist/`. The hosted
-page is the same single file an analyst would be emailed: it loads nothing from
-the network, and a form opened on it is read in the browser and never uploaded.
+The repository is <https://github.com/adama-njie/eom-form-analyzer> and `main`
+is published to <https://adama-njie.github.io/eom-form-analyzer/> by
+`.github/workflows/pages.yml`, which runs the tests and the build and then
+deploys `dist/`. The hosted page is the same single file an analyst would be
+emailed: it loads nothing from the network, and a form opened on it is read in
+the browser and never uploaded.
+
+Pages itself was switched on by hand once, under Settings → Pages with the
+source set to GitHub Actions. `configure-pages` cannot do it: the workflow's
+token is not allowed to change that setting, and asking it to (`enablement:
+true`) fails the run after a clean build.
