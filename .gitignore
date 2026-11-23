@@ -1,0 +1,11 @@
+node_modules
+dist
+# Mission observation data never belongs in version control.
+sample/
+public/
+
+# Scratch deck written by the pptx test.
+tmp-deck.pptx
+
+# Local editor and agent settings.
+.claude/
