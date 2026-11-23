@@ -6,7 +6,9 @@ import {
   analyse,
   buildDataset,
   coverage,
+  constituencyCoverage,
   findings,
+  isWordCloud,
   reportsByPlace,
   textValues,
   type Breakdown,
@@ -399,6 +401,69 @@ function Landing({
 
 /* ------------------------------------------------------------------ */
 
+/**
+ * Reports by constituency, under the area each belongs to.
+ *
+ * The form asks for the LGA and then the constituency inside it, and the
+ * coverage figures above only show the first. Opening an area answers the
+ * next question a deployment asks: nine reports from Kanifing, but from
+ * which parts of Kanifing, and which parts were not reached at all.
+ */
+function ConstituencyPanel({ dataset }: { dataset: Dataset }) {
+  const { groups, ungrouped } = useMemo(() => constituencyCoverage(dataset), [dataset]);
+  if (groups.length === 0 || groups.every((g) => g.constituencies.length === 0)) return null;
+
+  return (
+    <section className="card">
+      <h2>Reports by constituency</h2>
+      <p className="muted small">
+        Open an area to see the constituencies its reports name. A constituency that returned
+        nothing is not listed, which is not the same as reporting no problems.
+      </p>
+      {groups.map((g) => {
+        const named = g.reports - g.unnamed;
+        return (
+          <details key={g.area} className="byarea">
+            <summary>
+              {g.area}
+              <span className="muted">
+                {' · '}
+                {g.reports} {g.reports === 1 ? 'report' : 'reports'}
+                {' · '}
+                {g.constituencies.length} of {g.totalConstituencies} constituencies
+              </span>
+            </summary>
+            <BarList
+              counts={[
+                ...g.constituencies.map((c) => ({
+                  label: c.name,
+                  n: c.reports,
+                  pct: named ? (c.reports / named) * 100 : 0,
+                })),
+                ...(g.unnamed > 0
+                  ? [
+                      {
+                        label: 'constituency not named',
+                        n: g.unnamed,
+                        pct: g.reports ? (g.unnamed / g.reports) * 100 : 0,
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+          </details>
+        );
+      })}
+      {ungrouped > 0 && (
+        <p className="muted small">
+          {ungrouped} {ungrouped === 1 ? 'report names' : 'reports name'} no area and are not
+          counted here.
+        </p>
+      )}
+    </section>
+  );
+}
+
 function Stat({ label, value, sub }: { label: string; value: React.ReactNode; sub?: string }) {
   return (
     <div className="stat">
@@ -513,6 +578,8 @@ function Overview({
         </section>
       </div>
 
+      {dataset.geo && <ConstituencyPanel dataset={dataset} />}
+
       {ratings.length > 0 && (
         <section className="card">
           <h2>Overall assessments</h2>
@@ -596,8 +663,14 @@ function QuestionCard({
   filter?: boolean[];
 }) {
   const b: Breakdown = useMemo(() => analyse(dataset, q, filter), [dataset, q, filter]);
+  // Only prose gets a cloud. The constituency question is also a text
+  // column, and a cloud of place names sized by how often each was observed
+  // is a worse version of the bar chart it gets instead.
   const words = useMemo(
-    () => (q.kind === 'text' ? wordFrequencies(textValues(dataset, q, filter), 45) : null),
+    () =>
+      isWordCloud(dataset, q, filter)
+        ? wordFrequencies(textValues(dataset, q, filter), 45)
+        : null,
     [dataset, q, filter],
   );
   const judged = JUDGED.test(q.label);
@@ -639,7 +712,7 @@ function QuestionCard({
         <Donut counts={b.total} scale={q.scale} />
       )}
 
-      {(q.kind === 'multi' || q.kind === 'time' ||
+      {(q.kind === 'multi' || q.kind === 'time' || (q.kind === 'text' && !words) ||
         ((q.kind === 'categorical' || q.kind === 'ordinal') && b.total.length > 6)) && (
         <BarList counts={b.total} judged={judged} scale={q.scale} />
       )}

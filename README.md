@@ -259,6 +259,18 @@ many bars each has: split evenly, eight areas got the same inch and a half as
 five parties and PowerPoint printed every other area name. A polling-day form
 records no party and keeps the area breakdown alone.
 
+**The constituency is read as part of the area, not beside it.** Every form
+asks for the Local Government Area and then the constituency inside it, and
+the two are a hierarchy: Bakau and Serekunda West are in Kanifing. Flattening
+them into one list of 53 places loses that, and 53 bars is not a chart. On
+screen each area opens to the constituencies its reports name; the deck gets
+a grouped page of the same thing. "Nine reports from Kanifing" and "nine
+reports from three of Kanifing's seven constituencies" are different
+statements, and the second is the one a deployment is judged on. Answers are
+resolved against the gazetteer first, so "Serrekunda West" and "Serekunda
+west" are one place rather than two, and anything it does not recognise is
+left exactly as the observer wrote it.
+
 **A question is never broken down by itself.** "Which candidate/party/coalition
 organised this event" compared across party is five bars, each one a party
 answering with its own name, crushed into a single row; the same goes for the

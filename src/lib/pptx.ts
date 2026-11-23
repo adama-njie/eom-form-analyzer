@@ -1,6 +1,7 @@
 import PptxGenJS from 'pptxgenjs';
 import {
   analyse,
+  constituencyCoverage,
   coverage,
   displayCounts,
   findings,
@@ -32,6 +33,7 @@ import { drawFlag, euFlag, gambiaFlag } from './flags';
 import { mapPng } from './mapImage';
 import { describeFindingBody } from './narrative';
 import {
+  isConstituencyQuestion,
   needsOwnSlide,
   selectedQuestions,
   slideBreakdown,
@@ -166,6 +168,7 @@ export function buildDeck(
 
   addTitleSlide(pptx, sel);
   if (sel.coverage) addCoverageSlide(pptx, dataset, cov);
+  if (sel.coverage) addConstituencySlide(pptx, dataset, filter);
   if (canDrawMaps) addMapSlide(pptx, dataset, filter);
   if (sel.findingsTable && probs.length > 0) addFindingsSlide(pptx, probs);
   if (canDrawMaps && sel.findingsTable) {
@@ -338,6 +341,125 @@ function addCoverageSlide(
       title: 'Reports by team',
     },
   );
+}
+
+/**
+ * Which constituencies of each area were reached.
+ *
+ * The LGA and the constituency are a hierarchy - Bakau and Serekunda West
+ * are inside Kanifing - and the coverage slide before this one only shows
+ * the top of it. "Nine reports from Kanifing" is a different statement from
+ * "nine reports from three of Kanifing's seven constituencies", and it is
+ * the second one a deployment plan is judged on.
+ *
+ * A list rather than a chart: there are more places than a readable chart
+ * has rows, and the thing being shown is the grouping, which a bar chart
+ * cannot express.
+ */
+function addConstituencySlide(
+  pptx: PptxGenJS,
+  dataset: Dataset,
+  filter: boolean[] | undefined,
+): void {
+  if (!dataset.geo) return;
+  const { groups, ungrouped } = constituencyCoverage(dataset, filter);
+  if (groups.length === 0) return;
+  if (groups.every((g) => g.constituencies.length === 0)) return;
+
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  const top = heading(
+    s,
+    'Coverage by constituency',
+    'Reports from each Local Government Area, by the constituency they name.',
+  );
+
+  type Row = { label: string; value: number; head: boolean };
+  const blocks: Row[][] = groups.map((g) => {
+    const block: Row[] = [{ label: g.area, value: g.reports, head: true }];
+    for (const c of g.constituencies) {
+      block.push({ label: c.name, value: c.reports, head: false });
+    }
+    if (g.unnamed > 0) {
+      block.push({ label: 'constituency not named', value: g.unnamed, head: false });
+    }
+    return block;
+  });
+  const total = blocks.reduce((n, b) => n + b.length, 0);
+
+  const foot = ungrouped > 0 ? 0.4 : 0;
+  const space = PAD.bottom - top - foot;
+  // Three columns only when two would squeeze the rows below the type size.
+  const colCount = total / 2 > space / 0.34 ? 3 : 2;
+
+  /*
+   * An area and its constituencies stay in one column. Slicing the rows
+   * evenly split Kerewan across the gap, so the second column opened with
+   * two constituencies and no area name above them, which reads as if they
+   * belonged to whatever came next.
+   */
+  const target = Math.ceil(total / colCount);
+  const laid: { row: Row; col: number; line: number }[] = [];
+  let col = 0;
+  let line = 0;
+  for (const block of blocks) {
+    if (line > 0 && line + block.length > target && col < colCount - 1) {
+      col += 1;
+      line = 0;
+    }
+    for (const row of block) {
+      laid.push({ row, col, line });
+      line += 1;
+    }
+  }
+
+  const tallest = Math.max(...laid.map((x) => x.line)) + 1;
+  const rowH = Math.min(0.36, space / tallest);
+  const cols = columns(colCount);
+  const indent = 0.26;
+  const valueW = 0.8;
+
+  laid.forEach(({ row: r, col: c, line: l }) => {
+    const col = cols[c]!;
+    const y = top + l * rowH;
+    s.addText(r.head ? r.label : r.label, {
+      ...place(
+        {
+          x: col.x + (r.head ? 0 : indent),
+          y,
+          w: col.w - valueW - (r.head ? 0 : indent),
+          h: rowH,
+        },
+        'constituency label',
+      ),
+      fontSize: TYPE.body,
+      bold: r.head,
+      color: r.head ? INK : MUTED,
+      fontFace: FONT,
+      valign: 'middle',
+    });
+    s.addText(String(r.value), {
+      ...place({ x: col.x + col.w - valueW, y, w: valueW, h: rowH }, 'constituency count'),
+      fontSize: TYPE.body,
+      bold: r.head,
+      color: r.head ? INK : MUTED,
+      fontFace: FONT,
+      align: 'right',
+      valign: 'middle',
+    });
+  });
+
+  if (ungrouped > 0) {
+    s.addText(
+      `${ungrouped} ${ungrouped === 1 ? 'report names' : 'reports name'} no area and are not counted above.`,
+      {
+        ...place({ x: PAD.x, y: PAD.bottom - 0.36, w: CONTENT.w, h: 0.36 }, 'ungrouped note'),
+        fontSize: TYPE.caption,
+        color: MUTED,
+        fontFace: FONT,
+        valign: 'middle',
+      },
+    );
+  }
 }
 
 /**
@@ -540,7 +662,9 @@ interface Planned {
 
 function plan(dataset: Dataset, q: Question, filter: boolean[] | undefined): Planned | null {
   const b = analyse(dataset, q, filter);
-  if (q.kind === 'text') {
+  // The constituency question is a list of places: it is charted, in
+  // geographic order, not turned into a cloud of place names.
+  if (q.kind === 'text' && !isConstituencyQuestion(dataset, q)) {
     // Clouds are drawn on a canvas, so a Node build has none to draw on.
     if (typeof document === 'undefined') return null;
     const words = wordFrequencies(textValues(dataset, q, filter));

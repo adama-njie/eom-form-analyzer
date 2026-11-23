@@ -102,7 +102,12 @@ export default function ExportDialog({
     () => countOwnSlides(dataset, selectedQuestions(dataset, sel)),
     [dataset, sel],
   );
-  const slides = estimateSlides(sel, chosen.size, heavy);
+  const slides = estimateSlides(
+    sel,
+    chosen.size,
+    heavy,
+    dataset.geo && dataset.constituencies.length > 0,
+  );
   const nothingChosen =
     !sel.coverage && !sel.maps && !sel.findingsTable && !sel.ratings && chosen.size === 0;
 

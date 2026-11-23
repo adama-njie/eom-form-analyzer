@@ -327,6 +327,9 @@ export function analyse(dataset: Dataset, question: Question, rowFilter?: boolea
     dataset.partyColumn !== null && question.columns.includes(dataset.partyColumn);
   const isAreaColumn =
     dataset.areaColumn !== null && question.columns.includes(dataset.areaColumn);
+  const isConstituencyColumn =
+    dataset.constituencyColumn !== null &&
+    question.columns.includes(dataset.constituencyColumn);
 
   /*
    * The area question answers in the names this tool uses everywhere else.
@@ -337,9 +340,20 @@ export function analyse(dataset: Dataset, question: Question, rowFilter?: boolea
    * eight places reads as sixteen.
    */
   const label = (value: string): string => {
-    if (!isAreaColumn || !dataset.geo) return value;
-    const code = resolveLga(value);
-    return code ? lgaName(code) : value;
+    if (!dataset.geo) return value;
+    if (isAreaColumn) {
+      const code = resolveLga(value);
+      return code ? lgaName(code) : value;
+    }
+    /*
+     * The same for the constituency question, where it matters more: the
+     * live export spells one constituency "Serrekunda West" on one report
+     * and "Serekunda west" on the next, and counting those as two places
+     * understates both. Anything the gazetteer does not recognise is left
+     * exactly as the observer wrote it rather than guessed at.
+     */
+    if (isConstituencyColumn) return resolveConstituency(value)?.name ?? value;
+    return value;
   };
 
   const tally = new Map<string, number>();
@@ -395,6 +409,8 @@ export function analyse(dataset: Dataset, question: Question, rowFilter?: boolea
 
   const order =
     question.scale ??
+    // North bank to upper river, as the country is laid out, not by count.
+    (isConstituencyColumn && dataset.geo ? dataset.constituencies : undefined) ??
     (question.kind === 'binary' ? ['Yes', 'No'] : undefined) ??
     (question.kind === 'multi' ? question.options.map((o) => o.label) : undefined) ??
     // Hours read chronologically, never by frequency.
@@ -650,6 +666,80 @@ export function reportsByPlace(
 /* ------------------------------------------------------------------ */
 /* Coverage                                                            */
 /* ------------------------------------------------------------------ */
+
+export interface ConstituencyGroup {
+  /** The Local Government Area, named by its administrative capital. */
+  area: string;
+  /** Reports from this LGA, whether or not their constituency was named. */
+  reports: number;
+  /** Its constituencies that returned reports, in geographic order. */
+  constituencies: { name: string; reports: number }[];
+  /** How many constituencies the area has in all, reported or not. */
+  totalConstituencies: number;
+  /** Reports from the LGA whose constituency could not be read. */
+  unnamed: number;
+}
+
+/**
+ * Reports per constituency, under the LGA each belongs to.
+ *
+ * The two questions at the top of every form are the LGA and the
+ * constituency, and they are a hierarchy: Bakau and Serekunda West are
+ * inside Kanifing. Flattening them into one list of 53 places loses that,
+ * and 53 bars is not a chart. Grouped, it answers the question a mission
+ * actually asks - "we have nine reports from Kanifing, but from where in
+ * Kanifing?" - and shows which constituencies of an observed area were not
+ * reached at all.
+ *
+ * Grouping is by the LGA the report itself gives, not by the LGA the
+ * constituency belongs to, so these figures reconcile with every other
+ * coverage number in the tool.
+ */
+export function constituencyCoverage(
+  dataset: Dataset,
+  rowFilter?: boolean[],
+): { groups: ConstituencyGroup[]; ungrouped: number } {
+  const perArea = new Map<string, Map<string, number>>();
+  const totals = new Map<string, number>();
+  const unnamed = new Map<string, number>();
+  let ungrouped = 0;
+
+  dataset.table.rows.forEach((_row, i) => {
+    if (rowFilter && !rowFilter[i]) return;
+    const area = dataset.rowGroup[i];
+    if (!area) {
+      ungrouped += 1;
+      return;
+    }
+    totals.set(area, (totals.get(area) ?? 0) + 1);
+    const c = dataset.rowConstituency[i];
+    if (!c) {
+      unnamed.set(area, (unnamed.get(area) ?? 0) + 1);
+      return;
+    }
+    const m = perArea.get(area) ?? new Map<string, number>();
+    m.set(c, (m.get(c) ?? 0) + 1);
+    perArea.set(area, m);
+  });
+
+  const groups = LGAS.filter((a) => totals.has(a.name)).map((a) => {
+    const counts = perArea.get(a.name) ?? new Map<string, number>();
+    const known = a.constituencies.filter((c) => counts.has(c));
+    const other = [...counts.keys()].filter((c) => !a.constituencies.includes(c)).sort();
+    return {
+      area: a.name,
+      reports: totals.get(a.name) ?? 0,
+      constituencies: [...known, ...other].map((name) => ({
+        name,
+        reports: counts.get(name) ?? 0,
+      })),
+      totalConstituencies: a.constituencies.length,
+      unnamed: unnamed.get(a.name) ?? 0,
+    };
+  });
+
+  return { groups, ungrouped };
+}
 
 export interface Coverage {
   reports: number;

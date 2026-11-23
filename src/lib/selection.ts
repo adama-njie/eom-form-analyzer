@@ -52,16 +52,24 @@ export function questionKey(q: Question): string {
 /**
  * Questions that can appear in an export, in the order the form asks them.
  *
- * Text questions are in only when their answers are prose, which gets a word
- * cloud. A text column holding a constituency or a station code is an
+ * Text questions are in when their answers are prose, which gets a word
+ * cloud, and when they name a constituency, which gets a chart in
+ * geographic order. A text column holding a station code or a date is an
  * identifier and has nothing to show.
  */
 export function exportableQuestions(dataset: Dataset): Question[] {
   return dataset.questions.filter((q) => {
     if (q.kind === 'meta' || q.columns.length === 0) return false;
-    if (q.kind === 'text') return isWordCloud(dataset, q);
+    if (q.kind === 'text') return isConstituencyQuestion(dataset, q) || isWordCloud(dataset, q);
     return true;
   });
+}
+
+/** Whether this question is the one naming the constituency. */
+export function isConstituencyQuestion(dataset: Dataset, q: Question): boolean {
+  return (
+    dataset.constituencyColumn !== null && q.columns.includes(dataset.constituencyColumn)
+  );
 }
 
 /**
@@ -232,9 +240,11 @@ export function estimateSlides(
   selection: ExportSelection,
   questionCount: number,
   heavy = 0,
+  /** True where the form has constituencies, which add a coverage page. */
+  constituencies = false,
 ): number {
   let n = 1; // cover
-  if (selection.coverage) n += 1;
+  if (selection.coverage) n += constituencies ? 2 : 1;
   if (selection.maps) n += 2;
   if (selection.findingsTable) n += 1 + 3; // table plus mapped findings
   if (selection.ratings) n += 1;

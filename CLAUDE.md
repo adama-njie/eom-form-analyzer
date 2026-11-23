@@ -111,6 +111,11 @@ geography.
   similarity — two spellings of a name stay apart.
 - **Multi-answer blocks** are matched on the *last* bracketed group in the
   header, so "B.15 Language(s) of the speeches (Mandinka)" keeps its block.
+- **Constituencies belong under their LGA.** The area question and the
+  constituency question are a hierarchy, not two lists: the screen gives each
+  area a drill-down and the deck a grouped page, and a group never splits
+  across a column. Constituency answers are resolved against the gazetteer so
+  spelling variants collapse; unrecognised answers stay as written.
 - **Nothing on a slide is set below 18pt**, and a question title below 24pt.
   `typefloor.test.ts` enforces it.
 
