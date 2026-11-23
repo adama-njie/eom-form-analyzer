@@ -6,6 +6,12 @@ chart for every question, broken down by administrative area.
 Built for the EU EOM Gambia 2026 data team, to remove the manual rebuild that a long form currently
 needs before it can be read.
 
+**Open it:** <https://adama-njie.github.io/eom-form-analyzer/>
+
+The page loads nothing from the network once it is open, and the form you drop on it is read in the
+browser and never uploaded. To work with no connection at all, save the page (Ctrl+S) and open the
+saved file, or take `dist/index.html` from a local build: it is the same single file.
+
 ---
 
 ## Why it exists
