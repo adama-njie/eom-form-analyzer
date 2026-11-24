@@ -7,12 +7,12 @@
  * are two different questions, and the data team wants to ask both of the
  * same file without keeping two files.
  *
- * This is a dashboard lens, not an export setting. The deck and the Word
- * report are built from the whole file, because a deck that silently
- * covered three weeks or two depending on a dropdown somebody left set is
- * a document nobody can check. If a period-only deck is ever wanted it
- * should say so on its cover, which is a decision for the mission and not
- * for a dropdown.
+ * The exports follow what is on screen, as they already do for the area
+ * and team filters, and every one of them says on its cover which period
+ * it covers. A deck that silently covered three weeks or two depending on
+ * a dropdown somebody left set would be a document nobody could check; a
+ * deck that says "Campaign period only: events from 16 November 2026" is
+ * one anybody can.
  *
  * A report whose date cannot be read belongs to no period. It is shown
  * under "All period" and excluded from the other two, and the count of
@@ -29,19 +29,59 @@ import type { Dataset } from './analyse';
  */
 export const CAMPAIGN_START = Date.UTC(2026, 10, 16);
 
+/** The day before it, which is where the earlier period ends. */
+const CAMPAIGN_EVE = CAMPAIGN_START - 86_400_000;
+
+const short = (ms: number) =>
+  new Date(ms).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  });
+
+const long = (ms: number) =>
+  new Date(ms).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+
 /** How that date reads in the interface. */
-export const CAMPAIGN_START_LABEL = '16 Nov';
+export const CAMPAIGN_START_LABEL = short(CAMPAIGN_START);
 
 export type Period = 'all' | 'campaign' | 'before';
 
 export const PERIODS: { id: Period; label: string }[] = [
   { id: 'all', label: 'All period' },
   { id: 'campaign', label: `Campaign period (from ${CAMPAIGN_START_LABEL})` },
-  { id: 'before', label: `Before the campaign (to 15 Nov)` },
+  { id: 'before', label: `Before the campaign (to ${short(CAMPAIGN_EVE)})` },
 ];
 
 export function periodLabel(period: Period): string {
   return PERIODS.find((p) => p.id === period)?.label ?? PERIODS[0]!.label;
+}
+
+/**
+ * The line an export carries on its cover, or an empty string for the
+ * whole file.
+ *
+ * Written out in full, because a cover is read on its own, months later,
+ * by somebody who was not looking at the dropdown. It also carries the
+ * reports it had to leave out: a deck built from 26 of 36 reports must say
+ * which 10 are missing and why.
+ */
+export function periodNote(dataset: Dataset, period: Period): string {
+  if (period === 'all') return '';
+  const head =
+    period === 'campaign'
+      ? `Campaign period only: events from ${long(CAMPAIGN_START)}`
+      : `Before the campaign period: events to ${long(CAMPAIGN_EVE)}`;
+  const { undated } = periodCounts(dataset);
+  if (undated === 0) return head;
+  return undated === 1
+    ? `${head}. One report whose date could not be read is not included.`
+    : `${head}. ${undated} reports whose dates could not be read are not included.`;
 }
 
 /** Whether a report of this day falls inside the chosen period. */

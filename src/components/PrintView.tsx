@@ -50,6 +50,7 @@ export default function PrintView({
           {cov.reports} observer reports · {cov.groupsCovered} of {cov.groupsTotal} areas ·{' '}
           {new Date().toLocaleDateString('en-GB')}
         </p>
+        {selection.period && <p className="lede">{selection.period}</p>}
         <p className="print-warning">
           These are observer reports, not election results. Only the electoral commission can
           declare a result.

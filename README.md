@@ -302,11 +302,13 @@ form asks for one and by the date it was filed where it does not - an event on t
 filed on the 17th, and it is the event that belongs to a period. A report whose date is blank
 or unreadable belongs to neither side and is left out of both, with the count of them put on
 screen rather than quietly absorbed. The dropdown appears only when the file actually straddles
-the 16th; a polling-day form is one day's work and has nothing to split. What it does not touch
-is the exports: the deck, the report, the printed view and the tables are built from the whole
-file, because a document that silently covered three weeks or two depending on a dropdown
-somebody left set is a document nobody can check. The area and team filters do flow into them,
-as they always have, and the screen says so while a period is chosen.
+the 16th; a polling-day form is one day's work and has nothing to split. The exports follow the
+screen, as they already did for the area and team filters, and the price of that is that every
+one of them says which period it covers: "Campaign period only: events from 16 November 2026"
+on the cover of the deck, of the Word report and of the printed view, with the count of the
+reports that had to be left out. A deck that silently covered two weeks of a three-week file
+would be unanswerable six months later; a deck that says so is one anybody can check against
+the file it came from.
 
 **The constituency is read as part of the area, not beside it.** Every form
 asks for the Local Government Area and then the constituency inside it, and

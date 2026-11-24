@@ -17,9 +17,9 @@ import {
 import {
   PERIODS,
   canSplitByPeriod,
-  periodCounts,
   periodLabel,
   periodMask,
+  periodNote,
   type Period,
 } from '@/lib/period';
 import { inferSchema, toTable, type Question } from '@/lib/schema';
@@ -89,13 +89,7 @@ export default function App() {
     }
   }, []);
 
-  /*
-   * The place and team filter, which the exports share.
-   *
-   * Picking an area and then building a deck has always produced a deck of
-   * that area, and that is still true.
-   */
-  const exportFilter = useMemo(() => {
+  const placeFilter = useMemo(() => {
     if (!dataset) return undefined;
     if (!group && !team) return undefined;
     // `group` may be an area or a constituency, depending on what was
@@ -111,16 +105,19 @@ export default function App() {
   }, [dataset, group, team]);
 
   /*
-   * What the screen shows: the place and team filter, narrowed to the
-   * chosen period. The period is deliberately not in `exportFilter`; see
-   * `lib/period.ts`.
+   * The place and team filter, narrowed to the chosen period.
+   *
+   * Everything follows it, the exports included: picking an area and then
+   * building a deck has always produced a deck of that area, and a period
+   * works the same way. What that costs is a document that has to say what
+   * it covers, which every cover now does - see `lib/period.ts`.
    */
   const rowFilter = useMemo(() => {
     if (!dataset) return undefined;
     const days = periodMask(dataset, period);
-    if (!days) return exportFilter;
-    return days.map((inside, i) => inside && (!exportFilter || exportFilter[i]!));
-  }, [dataset, exportFilter, period]);
+    if (!days) return placeFilter;
+    return days.map((inside, i) => inside && (!placeFilter || placeFilter[i]!));
+  }, [dataset, placeFilter, period]);
 
   const cov = useMemo(
     () => (dataset ? coverage(dataset, rowFilter) : null),
@@ -147,7 +144,13 @@ export default function App() {
 
   const openExport = (kind: ExportKind) => {
     if (!dataset) return;
-    setSelection((current) => current ?? defaultSelection(dataset, formName));
+    // The period is the dashboard's, not the dialogue's: whatever is on
+    // screen is what the export covers, and the cover says which that is.
+    const note = periodNote(dataset, period);
+    setSelection((current) => ({
+      ...(current ?? defaultSelection(dataset, formName)),
+      period: note,
+    }));
     setExporting(kind);
   };
 
@@ -157,9 +160,9 @@ export default function App() {
     setBusy(true);
     try {
       if (kind === 'pptx') {
-        await exportPptx(dataset, exportFilter, { selection: sel });
+        await exportPptx(dataset, rowFilter, { selection: sel });
       } else if (kind === 'report') {
-        await exportReport(dataset, exportFilter, { selection: sel });
+        await exportReport(dataset, rowFilter, { selection: sel });
       } else {
         // Render a print-only view holding exactly the chosen content, so
         // what prints does not depend on which tab happens to be open.
@@ -186,7 +189,6 @@ export default function App() {
 
   const teams = [...new Set(dataset.rowTeam.filter(Boolean))].sort();
   const periodic = canSplitByPeriod(dataset);
-  const undated = periodCounts(dataset).undated;
 
   return (
     <div className="app">
@@ -248,7 +250,7 @@ export default function App() {
           </button>
           <button
             type="button"
-            onClick={() => exportAllTables(dataset, exportFilter)}
+            onClick={() => exportAllTables(dataset, rowFilter)}
           >
             Export tables
           </button>
@@ -303,12 +305,7 @@ export default function App() {
             clear
           </button>
           {period !== 'all' && (
-            <span className="muted">
-              {undated > 0
-                ? ` ${undated} ${undated === 1 ? 'report has' : 'reports have'} no readable date and ${undated === 1 ? 'is' : 'are'} not shown. `
-                : ' '}
-              The period is a view of this screen: exports use the whole file.
-            </span>
+            <span className="muted"> {periodNote(dataset, period)}</span>
           )}
         </p>
       )}
@@ -368,7 +365,7 @@ export default function App() {
       {printing && (
         <PrintView
           dataset={dataset}
-          filter={exportFilter}
+          filter={rowFilter}
           selection={printing}
           questions={selectedQuestions(dataset, printing)}
         />

@@ -157,7 +157,7 @@ export async function buildReport(
       ],
     }),
     new Paragraph({
-      spacing: { after: 600 },
+      spacing: { after: sel.period ? 80 : 600 },
       children: [
         new TextRun({
           text: `${cov.reports} observer reports  ·  ${cov.groupsCovered} of ${cov.groupsTotal} areas  ·  generated ${new Date().toLocaleDateString('en-GB')}`,
@@ -166,6 +166,16 @@ export async function buildReport(
         }),
       ],
     }),
+    ...(sel.period
+      ? [
+          // The report follows the dashboard's period filter, so it has to
+          // say which period it is.
+          new Paragraph({
+            spacing: { after: 600 },
+            children: [new TextRun({ text: sel.period, bold: true, size: 22, color: BRAND })],
+          }),
+        ]
+      : []),
     new Paragraph({
       border: { top: { style: BorderStyle.SINGLE, size: 6, color: BRAND, space: 8 } },
       spacing: { after: 200 },

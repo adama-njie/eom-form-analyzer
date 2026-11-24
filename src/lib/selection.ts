@@ -28,6 +28,13 @@ export interface ExportSelection {
   election: string;
   /** Polling day, written how it should read. Blank omits the line. */
   electionDate: string;
+  /**
+   * Which stretch of the calendar this export covers, written out, or
+   * blank for the whole file. Set from the dashboard's period filter, and
+   * printed on the cover of every output so a document can always be
+   * checked against the file it came from.
+   */
+  period: string;
   /** Section blocks, in the order they appear in the output. */
   coverage: boolean;
   maps: boolean;
@@ -218,6 +225,7 @@ export function defaultSelection(dataset: Dataset, formName: string): ExportSele
     preparedBy: 'Data Analysis team',
     election: 'Presidential Election - The Gambia',
     electionDate: '5 December 2026',
+    period: '',
     coverage: true,
     maps: true,
     findingsTable: true,

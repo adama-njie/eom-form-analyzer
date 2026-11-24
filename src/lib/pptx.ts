@@ -233,6 +233,22 @@ function addTitleSlide(pptx: PptxGenJS, sel: ExportSelection): void {
     });
   }
 
+  /*
+   * Which stretch of the calendar this deck covers.
+   *
+   * The dashboard can be narrowed to the campaign period, and the deck
+   * follows it. A deck that quietly covered two weeks of a three-week file
+   * would be unanswerable six months later, so when the period is anything
+   * other than the whole file the cover says so, in full.
+   */
+  if (sel.period) {
+    s.addText(sel.period, {
+      ...place({ x: 0.9, y: 4.6, w: SLIDE.w - 1.8, h: 0.6 }, 'period'),
+      fontSize: TYPE.coverSubtitle, color: INK,
+      fontFace: FONT, align: 'center', valign: 'middle',
+    });
+  }
+
   s.addText('Updated', {
     ...place({ x: 0.9, y: SLIDE.h - 1.25, w: SLIDE.w - 1.8, h: 0.35 }, 'updated label'),
     fontSize: TYPE.coverStamp, color: INK,

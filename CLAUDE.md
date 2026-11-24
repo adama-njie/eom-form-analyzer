@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 182 tests
+npm test           # vitest, 186 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 139 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 143 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -120,14 +120,16 @@ geography.
   ordinal question with two to five answers and at least three areas also gets
   a pie map after its own slide, with the pies sized by report count and
   nudged apart where they would overlap.
-- **The period filter is a dashboard lens, not an export setting.** The
-  header offers all period / campaign period / before it, and only when the
-  file straddles the start. Reports are placed by the date of the event
-  where the form asks for one and by the submission date otherwise; one
-  whose date cannot be read belongs to no period and the count is shown. The
-  deck, the Word report, print and the table exports are built from the whole
-  file - the area and team filters still flow into them, the period does not.
-  `CAMPAIGN_START` in `period.ts` is the one place the date is written.
+- **An export says which period it covers.** The header offers all period /
+  campaign period / before it, and only when the file straddles the start.
+  Reports are placed by the date of the event where the form asks for one
+  and by the submission date otherwise; one whose date cannot be read
+  belongs to no period and the count is shown. The deck, the Word report and
+  print all follow the filter, as they do for area and team, and all three
+  print `sel.period` on their cover - a document that covered a different
+  stretch of time than its reader assumes is the one failure mode here, so
+  nothing may take the filter without printing the line. `CAMPAIGN_START` in
+  `period.ts` is the one place the date is written.
 - **Constituencies belong under their LGA.** The area question and the
   constituency question are a hierarchy, not two lists: the screen gives each
   area a drill-down and the deck a grouped page, and a group never splits

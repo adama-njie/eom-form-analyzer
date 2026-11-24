@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import JSZip from 'jszip';
 import { buildDataset, parseDay } from './analyse';
+import { buildDeck } from './pptx';
 import { inferSchema, toTable } from './schema';
+import { defaultSelection } from './selection';
 import {
   CAMPAIGN_START,
   canSplitByPeriod,
   periodCounts,
   periodMask,
+  periodNote,
 } from './period';
 
 const day = (y: number, m: number, d: number) => Date.UTC(y, m - 1, d);
@@ -138,5 +142,64 @@ describe('the campaign period filter', () => {
     // nothing to split, so no dropdown.
     expect(canSplitByPeriod(form(ROWS.slice(2)))).toBe(false);
     expect(canSplitByPeriod(form(ROWS.slice(0, 2)))).toBe(false);
+  });
+});
+
+describe('an export of one period', () => {
+  async function cover(period: 'all' | 'campaign' | 'before'): Promise<string> {
+    const ds = form();
+    const deck = buildDeck(ds, periodMask(ds, period), {
+      selection: {
+        ...defaultSelection(ds, 'Campaign report'),
+        period: periodNote(ds, period),
+        maps: false,
+        questions: [],
+      },
+      includeMaps: false,
+    });
+    const buf = (await deck.write({ outputType: 'nodebuffer' })) as Buffer;
+    const zip = await JSZip.loadAsync(buf);
+    return zip.files['ppt/slides/slide1.xml']!.async('string');
+  }
+
+  it('says on its cover which period it covers', async () => {
+    // A deck built from 26 of 36 reports is unanswerable six months later
+    // unless it says so itself.
+    expect(await cover('campaign')).toContain(
+      'Campaign period only: events from 16 November 2026',
+    );
+  });
+
+  it('says how many reports it had to leave out', async () => {
+    expect(periodNote(form(), 'campaign')).toContain(
+      'One report whose date could not be read is not included',
+    );
+  });
+
+  it('counts only that period', async () => {
+    // Three of the six reports are in the campaign period, and the tile on
+    // the coverage slide has to say three.
+    const ds = form();
+    const sel = {
+      ...defaultSelection(ds, 'Campaign report'),
+      period: periodNote(ds, 'campaign'),
+      maps: false,
+      questions: [],
+    };
+    const deck = buildDeck(ds, periodMask(ds, 'campaign'), {
+      selection: sel,
+      includeMaps: false,
+    });
+    const buf = (await deck.write({ outputType: 'nodebuffer' })) as Buffer;
+    const zip = await JSZip.loadAsync(buf);
+    const coverage = await zip.files['ppt/slides/slide2.xml']!.async('string');
+    expect(coverage).toContain('Coverage');
+    expect(coverage).toContain('<a:t>3</a:t>');
+    expect(coverage).not.toContain('<a:t>6</a:t>');
+  });
+
+  it('leaves the cover alone when the whole file is in', async () => {
+    expect(periodNote(form(), 'all')).toBe('');
+    expect(await cover('all')).not.toContain('Campaign period only');
   });
 });

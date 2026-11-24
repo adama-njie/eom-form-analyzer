@@ -134,6 +134,11 @@ export default function ExportDialog({
         </header>
 
         <div className="modal-body">
+          {sel.period && (
+            // Set from the dashboard, not here: the export covers what the
+            // screen covers, and this is where that is said before it runs.
+            <p className="filter-note">{sel.period}</p>
+          )}
           <div className="field-row">
             <label>
               <span className="muted small">Title</span>
