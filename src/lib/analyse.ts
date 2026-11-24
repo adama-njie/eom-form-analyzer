@@ -16,7 +16,14 @@ import {
   type LgaCode,
   type MapUnit,
 } from './gambia';
-import { NON_ANSWERS, clean, isBlank, type Question, type Table } from './schema';
+import {
+  NON_ANSWERS,
+  clean,
+  isBlank,
+  parseCode,
+  type Question,
+  type Table,
+} from './schema';
 import { isProse } from './text';
 
 export interface Count {
@@ -78,6 +85,18 @@ export interface Dataset {
   rowConstituency: (string | null)[];
   /** Constituencies that appear in the data, in geographic order. */
   constituencies: string[];
+  /**
+   * Column index holding the date each report is about, if the form has one.
+   * The event's own date where the form asks for it, and otherwise the date
+   * the report was submitted.
+   */
+  dateColumn: number | null;
+  /**
+   * The day each report is about, as UTC midnight, where it could be read.
+   * Null for a report whose date is blank or unreadable, which must be
+   * excluded from any view of a period rather than guessed at.
+   */
+  rowDay: (number | null)[];
   /** Column index holding the team type, if found. */
   teamColumn: number | null;
   rowTeam: string[];
@@ -117,6 +136,66 @@ const TEAM_HINTS = /\bteam\b|observer type/i;
  */
 const PARTY_HINTS =
   /(candidate\s*\/\s*party|party\s*\/\s*coalition|which (candidate|party)|political party|party supported|organised or was supported)/i;
+/** A column that might hold a date. Its values decide whether it does. */
+const DATE_HINTS = /\bdate\b/i;
+/**
+ * A date column that is about the thing observed rather than about the form.
+ *
+ * Every export carries a submission timestamp in a column called "Date",
+ * and the campaign form also asks "B.1 Date of the Event". They differ: an
+ * event on the 15th can be filed on the 17th, and it is the event that
+ * belongs to a period.
+ */
+const EVENT_DATE_HINTS = /\b(event|poll|polling|visit|observation|meeting|rally)\b/i;
+
+/**
+ * The day a date answer names, as UTC midnight, or null if it is not a date.
+ *
+ * Three formats reach here. The mission's own exports write ISO
+ * ("2026-11-16", or "2026-11-16 09:12:33" for a submission timestamp). A
+ * workbook holding a real date cell arrives as an Excel serial number,
+ * because the sheet is read without `cellDates` and a serial is what that
+ * leaves. And a date typed into a text column is written day first
+ * ("16/11/2026"), as the mission's forms do everywhere else; "11/16/2026"
+ * reads as the same day, because a second component above twelve can only
+ * be a day.
+ *
+ * Everything is reduced to the day, in UTC. A timestamp's clock time is
+ * dropped rather than converted: which day an event happened on must not
+ * depend on the time zone of the laptop the file is opened on.
+ */
+export function parseDay(value: string): number | null {
+  const s = value.trim();
+  if (!s) return null;
+
+  const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})(?![\d-])/.exec(s);
+  if (iso) return utcDay(+iso[1]!, +iso[2]!, +iso[3]!);
+
+  const written = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})(?!\d)/.exec(s);
+  if (written) {
+    const first = +written[1]!;
+    const second = +written[2]!;
+    const monthFirst = first <= 12 && second > 12;
+    return monthFirst
+      ? utcDay(+written[3]!, first, second)
+      : utcDay(+written[3]!, second, first);
+  }
+
+  if (/^\d+(\.\d+)?$/.test(s)) {
+    const ms = Date.UTC(1899, 11, 30) + Math.floor(Number(s)) * 86_400_000;
+    const year = new Date(ms).getUTCFullYear();
+    return year >= 1990 && year <= 2100 ? ms : null;
+  }
+  return null;
+}
+
+function utcDay(year: number, month: number, day: number): number | null {
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const ms = Date.UTC(year, month - 1, day);
+  const d = new Date(ms);
+  // Date.UTC rolls 31 April into 1 May. A date that rolls was never a date.
+  return d.getUTCMonth() === month - 1 && d.getUTCDate() === day ? ms : null;
+}
 
 export function buildDataset(table: Table, questions: Question[]): Dataset {
   const { headers, rows } = table;
@@ -197,6 +276,38 @@ export function buildDataset(table: Table, questions: Question[]): Dataset {
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .map(([name]) => name);
 
+  /*
+   * The date column, if the form has one.
+   *
+   * A header naming a date is not enough - "A.2 Time of arrival" and "D.2
+   * Total number of voters" both mention neither, but a column called
+   * "Updated" might hold anything - so the values have to read as dates
+   * too. Where a form has both the event's date and the submission
+   * timestamp, the event wins, and a coded question beats an uncoded
+   * administrative column.
+   */
+  const dateColumn = (() => {
+    const candidates = headers
+      .map((h, i) => {
+        if (!DATE_HINTS.test(h)) return null;
+        const filled = rows
+          .map((r) => clean(r[i] ?? ''))
+          .filter((v) => !isBlank(v));
+        if (filled.length < rows.length * 0.5) return null;
+        const read = filled.filter((v) => parseDay(v) !== null).length;
+        if (filled.length === 0 || read / filled.length < 0.8) return null;
+        const rank = EVENT_DATE_HINTS.test(h) ? 2 : parseCode(h).code ? 1 : 0;
+        return { i, rank };
+      })
+      .filter((c): c is { i: number; rank: number } => c !== null);
+    if (candidates.length === 0) return null;
+    return candidates.sort((a, b) => b.rank - a.rank || a.i - b.i)[0]!.i;
+  })();
+
+  const rowDay = rows.map((r) =>
+    dateColumn === null ? null : parseDay(clean(r[dateColumn] ?? '')),
+  );
+
   const rowArea = rows.map((r) =>
     areaColumn === null ? null : resolveLga(clean(r[areaColumn] ?? '')),
   );
@@ -239,6 +350,8 @@ export function buildDataset(table: Table, questions: Question[]): Dataset {
     constituencyColumn,
     rowConstituency,
     constituencies,
+    dateColumn,
+    rowDay,
     teamColumn,
     rowTeam,
     partyColumn,

@@ -41,8 +41,8 @@ That is the whole workflow. To share the tool, email the HTML file.
 
 Four tabs:
 
-- **Overview** — reports, areas covered, share of the electorate reached, reports by team and area,
-  and the mean of each overall assessment question.
+- **Overview** — reports, areas and constituencies covered, reports by team and area, and the
+  mean of each overall assessment question.
 - **Map** — the real map of The Gambia, shaded by *any* question and *any* answer, at Local
   Government Area or district level. Pick "C.3 problem in the vicinity" and "Yes" and the map shows
   where that problem clusters. Click a place to filter the whole report to it. Places that returned
@@ -56,7 +56,7 @@ Four tabs:
 - **Data quality** — what the tool detected, which columns it could not map, and which rows had an
   area it could not match. Check this first when something looks wrong.
 
-Filter the entire report by area and team from the header.
+Filter the entire report by area, team and period from the header.
 
 **Every export asks first.** A full form produces a 44-slide deck, which is right for the data
 team and wrong for almost every audience it gets shown to. Pressing PowerPoint, Build report or
@@ -292,6 +292,21 @@ name and a number written on each needs neither; the one thing those lines
 carried that the picture did not - that hatching means a place that returned
 nothing, which is not the same as a place that reported nothing - is now a key
 drawn on the map itself.
+
+**The campaign period is a view of the screen, not a setting of the deck.** Parties were
+allowed to campaign early and observers reported on those events, but the official campaign
+period began on 16 November. "What did we see during the campaign" and "what did we see
+altogether" are both worth asking of one file, so the header offers all three: the whole
+period, from the 16th, and before it. A report is placed by the date of the event where the
+form asks for one and by the date it was filed where it does not - an event on the 15th can be
+filed on the 17th, and it is the event that belongs to a period. A report whose date is blank
+or unreadable belongs to neither side and is left out of both, with the count of them put on
+screen rather than quietly absorbed. The dropdown appears only when the file actually straddles
+the 16th; a polling-day form is one day's work and has nothing to split. What it does not touch
+is the exports: the deck, the report, the printed view and the tables are built from the whole
+file, because a document that silently covered three weeks or two depending on a dropdown
+somebody left set is a document nobody can check. The area and team filters do flow into them,
+as they always have, and the screen says so while a period is chosen.
 
 **The constituency is read as part of the area, not beside it.** Every form
 asks for the Local Government Area and then the constituency inside it, and

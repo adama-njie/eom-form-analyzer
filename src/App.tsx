@@ -14,6 +14,14 @@ import {
   type Breakdown,
   type Dataset,
 } from '@/lib/analyse';
+import {
+  PERIODS,
+  canSplitByPeriod,
+  periodCounts,
+  periodLabel,
+  periodMask,
+  type Period,
+} from '@/lib/period';
 import { inferSchema, toTable, type Question } from '@/lib/schema';
 import { wordFrequencies } from '@/lib/text';
 import { downloadCsv, exportAllTables } from '@/lib/export';
@@ -42,6 +50,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('overview');
   const [group, setGroup] = useState<string>('');
   const [team, setTeam] = useState<string>('');
+  const [period, setPeriod] = useState<Period>('all');
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState<ExportKind | null>(null);
@@ -72,6 +81,7 @@ export default function App() {
       setFormName(`${file.name} — ${best.n}`);
       setGroup('');
       setTeam('');
+      setPeriod('all');
       setTab('overview');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not read that file.');
@@ -79,7 +89,13 @@ export default function App() {
     }
   }, []);
 
-  const rowFilter = useMemo(() => {
+  /*
+   * The place and team filter, which the exports share.
+   *
+   * Picking an area and then building a deck has always produced a deck of
+   * that area, and that is still true.
+   */
+  const exportFilter = useMemo(() => {
     if (!dataset) return undefined;
     if (!group && !team) return undefined;
     // `group` may be an area or a constituency, depending on what was
@@ -93,6 +109,18 @@ export default function App() {
         (!team || dataset.rowTeam[i] === team),
     );
   }, [dataset, group, team]);
+
+  /*
+   * What the screen shows: the place and team filter, narrowed to the
+   * chosen period. The period is deliberately not in `exportFilter`; see
+   * `lib/period.ts`.
+   */
+  const rowFilter = useMemo(() => {
+    if (!dataset) return undefined;
+    const days = periodMask(dataset, period);
+    if (!days) return exportFilter;
+    return days.map((inside, i) => inside && (!exportFilter || exportFilter[i]!));
+  }, [dataset, exportFilter, period]);
 
   const cov = useMemo(
     () => (dataset ? coverage(dataset, rowFilter) : null),
@@ -129,9 +157,9 @@ export default function App() {
     setBusy(true);
     try {
       if (kind === 'pptx') {
-        await exportPptx(dataset, rowFilter, { selection: sel });
+        await exportPptx(dataset, exportFilter, { selection: sel });
       } else if (kind === 'report') {
-        await exportReport(dataset, rowFilter, { selection: sel });
+        await exportReport(dataset, exportFilter, { selection: sel });
       } else {
         // Render a print-only view holding exactly the chosen content, so
         // what prints does not depend on which tab happens to be open.
@@ -157,6 +185,8 @@ export default function App() {
   }
 
   const teams = [...new Set(dataset.rowTeam.filter(Boolean))].sort();
+  const periodic = canSplitByPeriod(dataset);
+  const undated = periodCounts(dataset).undated;
 
   return (
     <div className="app">
@@ -186,6 +216,19 @@ export default function App() {
               </optgroup>
             )}
           </select>
+          {periodic && (
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value as Period)}
+              title="Reports are placed by the date of the event, where the form records one"
+            >
+              {PERIODS.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          )}
           <select value={team} onChange={(e) => setTeam(e.target.value)}>
             <option value="">All teams</option>
             {teams.map((t) => (
@@ -205,7 +248,7 @@ export default function App() {
           </button>
           <button
             type="button"
-            onClick={() => exportAllTables(dataset, rowFilter)}
+            onClick={() => exportAllTables(dataset, exportFilter)}
           >
             Export tables
           </button>
@@ -242,18 +285,45 @@ export default function App() {
         ))}
       </nav>
 
-      {(group || team) && (
+      {(group || team || period !== 'all') && (
         <p className="filter-note no-print">
-          Filtered to {group || 'all areas'}
-          {team ? ` · ${team} teams` : ''} · {cov!.reports} reports
-          <button type="button" className="link" onClick={() => { setGroup(''); setTeam(''); }}>
+          {cov!.reports} of {dataset.table.rows.length} reports
+          {period === 'all' ? '' : ` · ${periodLabel(period)}`}
+          {group ? ` · ${group}` : ''}
+          {team ? ` · ${team} teams` : ''}
+          <button
+            type="button"
+            className="link"
+            onClick={() => {
+              setGroup('');
+              setTeam('');
+              setPeriod('all');
+            }}
+          >
             clear
           </button>
+          {period !== 'all' && (
+            <span className="muted">
+              {undated > 0
+                ? ` ${undated} ${undated === 1 ? 'report has' : 'reports have'} no readable date and ${undated === 1 ? 'is' : 'are'} not shown. `
+                : ' '}
+              The period is a view of this screen: exports use the whole file.
+            </span>
+          )}
         </p>
       )}
 
       <main>
-        {tab === 'overview' && cov && <Overview dataset={dataset} cov={cov} onGroup={setGroup} group={group} />}
+        {tab === 'overview' && cov && (
+          <Overview
+            dataset={dataset}
+            cov={cov}
+            filter={rowFilter}
+            periodFilter={periodMask(dataset, period)}
+            onGroup={setGroup}
+            group={group}
+          />
+        )}
         {tab === 'map' && (
           <MapTab
             dataset={dataset}
@@ -298,7 +368,7 @@ export default function App() {
       {printing && (
         <PrintView
           dataset={dataset}
-          filter={rowFilter}
+          filter={exportFilter}
           selection={printing}
           questions={selectedQuestions(dataset, printing)}
         />
@@ -409,8 +479,17 @@ function Landing({
  * next question a deployment asks: nine reports from Kanifing, but from
  * which parts of Kanifing, and which parts were not reached at all.
  */
-function ConstituencyPanel({ dataset }: { dataset: Dataset }) {
-  const { groups, ungrouped } = useMemo(() => constituencyCoverage(dataset), [dataset]);
+function ConstituencyPanel({
+  dataset,
+  filter,
+}: {
+  dataset: Dataset;
+  filter?: boolean[];
+}) {
+  const { groups, ungrouped } = useMemo(
+    () => constituencyCoverage(dataset, filter),
+    [dataset, filter],
+  );
   if (groups.length === 0 || groups.every((g) => g.constituencies.length === 0)) return null;
 
   return (
@@ -477,11 +556,20 @@ function Stat({ label, value, sub }: { label: string; value: React.ReactNode; su
 function Overview({
   dataset,
   cov,
+  filter,
+  periodFilter,
   onGroup,
   group,
 }: {
   dataset: Dataset;
   cov: ReturnType<typeof coverage>;
+  filter?: boolean[];
+  /**
+   * The period alone. The map is how an area is chosen, so it keeps showing
+   * every area whichever one is selected - but it must still count only the
+   * period on screen, or the tile above it and the map below it disagree.
+   */
+  periodFilter?: boolean[];
   onGroup: (g: string) => void;
   group: string;
 }) {
@@ -527,7 +615,7 @@ function Overview({
           <section className="card">
             <h2>Reports by Local Government Area</h2>
             <GambiaMap
-              rates={reportsByPlace(dataset, 'lga', undefined)}
+              rates={reportsByPlace(dataset, 'lga', periodFilter)}
               unit="lga"
               suffix=""
               selected={group || null}
@@ -578,14 +666,14 @@ function Overview({
         </section>
       </div>
 
-      {dataset.geo && <ConstituencyPanel dataset={dataset} />}
+      {dataset.geo && <ConstituencyPanel dataset={dataset} filter={filter} />}
 
       {ratings.length > 0 && (
         <section className="card">
           <h2>Overall assessments</h2>
           <div className="statrow">
             {ratings.map((q) => {
-              const b = analyse(dataset, q);
+              const b = analyse(dataset, q, filter);
               return (
                 <Stat
                   key={q.code}
