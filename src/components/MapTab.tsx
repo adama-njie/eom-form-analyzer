@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { GambiaMap, MapTable } from './GambiaMap';
 import { analyse, rateByPlace, reportsByPlace, type Dataset } from '@/lib/analyse';
-import { UNMAPPED_CONSTITUENCIES, type MapUnit } from '@/lib/gambia';
+import {
+  placeLabel,
+  SHAPES_WITHOUT_CONSTITUENCY,
+  UNMAPPED_CONSTITUENCIES,
+  type MapUnit,
+} from '@/lib/gambia';
 import { downloadCsv } from '@/lib/export';
 import { JUDGED } from '@/lib/pptx';
 
@@ -122,12 +127,12 @@ export default function MapTab({
               disabled={!constituencyReady}
               title={
                 constituencyReady
-                  ? 'Show the 48 districts'
+                  ? 'Show the constituencies, on district boundaries'
                   : 'No constituency column was found in this file'
               }
               onClick={() => setLevel('district')}
             >
-              Districts
+              Constituencies
             </button>
           </div>
 
@@ -136,10 +141,22 @@ export default function MapTab({
             className="ghost"
             onClick={() =>
               downloadCsv(
-                `map-${showingCoverage ? 'coverage' : `${question!.code}-${answer}`}-${level}.csv`,
+                `map-${showingCoverage ? 'coverage' : `${question!.code}-${answer}`}-${
+                  level === 'lga' ? 'lga' : 'constituency'
+                }.csv`,
                 [
-                  [level === 'lga' ? 'LGA' : 'District', 'Matching', 'Reports', suffix === '%' ? 'Rate %' : 'Count'],
-                  ...rates.map((r) => [r.place, r.n, r.total, r.pct === null ? '' : r.pct.toFixed(1)]),
+                  [
+                    level === 'lga' ? 'LGA' : 'Constituency',
+                    'Matching',
+                    'Reports',
+                    suffix === '%' ? 'Rate %' : 'Count',
+                  ],
+                  ...rates.map((r) => [
+                    placeLabel(level, r.place),
+                    r.n,
+                    r.total,
+                    r.pct === null ? '' : r.pct.toFixed(1),
+                  ]),
                 ],
               )
             }
@@ -164,7 +181,7 @@ export default function MapTab({
       </section>
 
       <section className="card">
-        <h2>{level === 'lga' ? 'By Local Government Area' : 'By district'}</h2>
+        <h2>{level === 'lga' ? 'By Local Government Area' : 'By constituency'}</h2>
         <MapTable
           rates={rates}
           unit={level}
@@ -173,10 +190,13 @@ export default function MapTab({
         />
         {level === 'district' && UNMAPPED_CONSTITUENCIES.length > 0 && (
           <p className="muted small mt">
-            The 53 constituencies and the 48 districts are different divisions.{' '}
-            {UNMAPPED_CONSTITUENCIES.length} constituencies have no matching district and are left
-            out of this map: {UNMAPPED_CONSTITUENCIES.join(', ')}. They are included in the LGA map
-            and everywhere else in the tool.
+            Constituencies have no published boundaries, so this map is drawn on the 48 districts,
+            which are a different division of the same country.{' '}
+            {UNMAPPED_CONSTITUENCIES.length} constituencies have no district of their name and are
+            left out of the picture: {UNMAPPED_CONSTITUENCIES.join(', ')}. They are counted in the
+            LGA map and everywhere else in the tool. {SHAPES_WITHOUT_CONSTITUENCY.length} shapes
+            hold no constituency of their own and are left blank:{' '}
+            {SHAPES_WITHOUT_CONSTITUENCY.join(', ')}.
           </p>
         )}
       </section>

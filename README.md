@@ -302,6 +302,18 @@ other - and the date. The title itself starts as the form's own name, read off t
 rather than the workbook's file name: it is printed on a cover as well as on a file, and
 neither wants to read "campaign-report-20261124-143212.xlsx".
 
+**The second map is of constituencies.** It used to be titled "Reports by district", which
+is what it is drawn on and not what it counts: every figure on it comes from the
+constituency an observer wrote down. The 53 constituencies have no published boundaries,
+the 48 districts do, and the two divisions nearly line up - so the shape is a district and
+the name written on it is the constituency's, in the register's spelling rather than the
+boundary file's "Serrekunda West" and "Lower Niumi". The eleven constituencies that have no
+district of their name are the urban ones, where most of the reports come from, so the map
+says underneath which they are instead of leaving a reader to count areas off it and
+undercount the coverage. The six districts that hold no constituency are drawn flat and
+unnamed rather than hatched, because hatching means a place that returned no reports and
+those were never a place that could.
+
 **Coverage by constituency is a table.** A list with the count hanging off the right of each
 line reads well enough down one column and not at all across three. The table rules the
 columns, gives each area a banded row of its own, and has room for the register beside the

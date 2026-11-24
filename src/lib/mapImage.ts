@@ -8,7 +8,7 @@
  */
 
 import type { PlaceRate } from './analyse';
-import { DISTRICT_SHAPES, LGA_SHAPES, type MapUnit } from './gambia';
+import { DISTRICT_SHAPES, LGA_SHAPES, placeLabel, type MapUnit } from './gambia';
 import { labelPoint, makeProjector, shapeWidth } from './projection';
 import type { BoundaryShape } from '@/data/boundaries';
 
@@ -206,7 +206,11 @@ export function mapPng(
     const r = byPlace.get(key);
     const has = r && r.pct !== null;
     trace(ctx, shape, project);
-    if (has) {
+    // A district with no constituency of its own name: flat, so it is not
+    // read as a constituency that returned nothing. See `CONSTITUENCY_SHAPES`.
+    if (!r) {
+      ctx.fillStyle = '#EEF1F3';
+    } else if (has) {
       ctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, ${0.14 + (r.pct! / max) * 0.86})`;
     } else {
       ctx.fillStyle = hatch;
@@ -217,7 +221,7 @@ export function mapPng(
     ctx.stroke();
   }
 
-  // LGA outlines over the districts, so the eight areas stay legible.
+  // LGA outlines over the constituencies, so the eight areas stay legible.
   if (unit === 'district') {
     ctx.strokeStyle = 'rgba(93, 107, 118, 0.55)';
     ctx.lineWidth = 1.6;
@@ -260,7 +264,7 @@ export function mapPng(
    * depends on how many there are. The eight LGAs are all worth naming, and
    * Banjul and Kanifing are small and adjacent, so theirs are moved into the
    * empty space below the country and joined to the place by a line. The 48
-   * districts are a different matter: most of them cannot hold a label at
+   * constituencies are a different matter: most of them cannot hold a label at
    * this size and forty callouts would be worse than none, so on that map
    * the colour scale carries it alone.
    */
@@ -268,9 +272,10 @@ export function mapPng(
 
   for (const { key, shape } of shapes) {
     const r = byPlace.get(key);
-    const has = r && r.pct !== null;
+    if (!r) continue;
+    const has = r.pct !== null;
     const [cx, cy] = labelPoint(shape, projector);
-    const name = unit === 'lga' ? key : short(key);
+    const name = unit === 'lga' ? key : short(placeLabel(unit, key));
     const value = has ? `${r!.pct!.toFixed(0)}${suffix}` : '–';
 
     ctx.font = `700 ${size}px Arial, "Segoe UI", system-ui, sans-serif`;

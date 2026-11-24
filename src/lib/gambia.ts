@@ -390,6 +390,54 @@ export const UNMAPPED_CONSTITUENCIES: string[] = ALL_CONSTITUENCIES.filter(
   (c) => !(c in CONSTITUENCY_TO_DISTRICT),
 );
 
+/**
+ * The constituency a district shape stands for, where one does.
+ *
+ * The second map is drawn on district boundaries because the 53
+ * constituencies have none published, but what it counts is the
+ * constituency an observer named - so the shape is a district and the name
+ * written on it is the constituency's. The boundary file spells several of
+ * them its own way ("Serrekunda West", "Lower Niumi", "Wuli East") where
+ * the register has Serekunda West, Lower Nuimi and Wulli East, and a
+ * briefing should not have to explain which is which.
+ */
+export const DISTRICT_TO_CONSTITUENCY: Record<string, string> = (() => {
+  const out: Record<string, string> = {};
+  for (const [constituency, district] of Object.entries(CONSTITUENCY_TO_DISTRICT)) {
+    out[district] = constituency;
+  }
+  return out;
+})();
+
+/**
+ * The shapes the constituency map can report on.
+ *
+ * Six districts carry no constituency of their own name - Kombo North and
+ * Kombo Central among them, where the constituencies were split - so
+ * nothing can ever be counted into them. They are drawn, because a hole in
+ * the country reads as a fault, but they are not listed: "no reports"
+ * against a place that was never a constituency reads as a coverage gap
+ * and is not one.
+ */
+export const CONSTITUENCY_SHAPES = DISTRICT_SHAPES.filter(
+  (d) => d.key in DISTRICT_TO_CONSTITUENCY,
+);
+
+/** Shapes with no constituency behind them, named as the boundary file has them. */
+export const SHAPES_WITHOUT_CONSTITUENCY: string[] = DISTRICT_SHAPES.filter(
+  (d) => !(d.key in DISTRICT_TO_CONSTITUENCY),
+).map((d) => d.key);
+
+/**
+ * What to write on a shape.
+ *
+ * The area's own name on the LGA map; on the other, the constituency the
+ * shape stands for, since that is what was counted.
+ */
+export function placeLabel(unit: MapUnit, shapeKey: string): string {
+  return unit === 'lga' ? shapeKey : (DISTRICT_TO_CONSTITUENCY[shapeKey] ?? shapeKey);
+}
+
 /** Which LGA a district belongs to, so districts can be grouped and coloured. */
 export const DISTRICT_TO_LGA: Record<string, LgaCode> = (() => {
   const out: Record<string, LgaCode> = {};

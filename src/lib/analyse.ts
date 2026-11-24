@@ -7,8 +7,8 @@
 
 import {
   ALL_CONSTITUENCIES,
+  CONSTITUENCY_SHAPES,
   CONSTITUENCY_TO_DISTRICT,
-  DISTRICT_SHAPES,
   LGAS,
   TOTAL_REGISTERED_2026,
   lgaName,
@@ -849,12 +849,13 @@ export function bandingFor(
 /* ------------------------------------------------------------------ */
 
 /**
- * The district a row falls in, via its constituency.
+ * The shape a row's constituency is drawn on.
  *
- * The 53 constituencies and the 48 districts are different divisions, so
- * some constituencies have no district. Those rows are left out of the
- * district map and counted by `unmappedDistrictRows`, never folded into a
- * neighbour.
+ * The constituency map is drawn on district boundaries, which are the only
+ * published ones, and the 53 constituencies and the 48 districts are
+ * different divisions: eleven constituencies have no district of their
+ * name. Those rows are left out of that map and counted by
+ * `unmappedDistrictRows`, never folded into a neighbour.
  */
 function districtOf(dataset: Dataset, i: number): string | null {
   const c = dataset.rowConstituency[i];
@@ -888,7 +889,7 @@ export function rateByPlace(
   rowFilter?: boolean[],
 ): PlaceRate[] {
   const places =
-    level === 'lga' ? LGAS.map((a) => a.name) : DISTRICT_SHAPES.map((d) => d.key);
+    level === 'lga' ? LGAS.map((a) => a.name) : CONSTITUENCY_SHAPES.map((d) => d.key);
   const keyOf = (i: number) =>
     level === 'lga'
       ? (dataset.rowArea[i] ? lgaName(dataset.rowArea[i]!) : null)
@@ -928,7 +929,7 @@ export function reportsByPlace(
   rowFilter?: boolean[],
 ): PlaceRate[] {
   const places =
-    level === 'lga' ? LGAS.map((a) => a.name) : DISTRICT_SHAPES.map((d) => d.key);
+    level === 'lga' ? LGAS.map((a) => a.name) : CONSTITUENCY_SHAPES.map((d) => d.key);
   const counts = new Map<string, number>();
   dataset.table.rows.forEach((_row, i) => {
     if (rowFilter && !rowFilter[i]) return;

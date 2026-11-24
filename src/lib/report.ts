@@ -35,6 +35,7 @@ import {
   type Dataset,
 } from './analyse';
 import { barChartPng, meanBarsPng, stackedByAreaPng, wordCloudPng } from './chartImage';
+import { UNMAPPED_CONSTITUENCIES } from './gambia';
 import { wordFrequencies } from './text';
 import { mapPng } from './mapImage';
 import { describe, describeFinding, executiveSummary } from './narrative';
@@ -225,7 +226,7 @@ export async function buildReport(
       );
       children.push(
         caption(
-          `Figure 2. Reports by district. ${dataset.constituencies.length} of 53 constituencies returned reports.`,
+          `Figure 2. Reports by constituency, drawn on district boundaries. ${dataset.constituencies.length} of 53 constituencies returned reports; ${UNMAPPED_CONSTITUENCIES.length} constituencies have no boundary of their own and are not shown on this map.`,
         ),
       );
     }

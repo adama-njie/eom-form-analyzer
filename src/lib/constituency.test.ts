@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import JSZip from 'jszip';
-import { analyse, buildDataset, constituencyCoverage } from './analyse';
+import { analyse, buildDataset, constituencyCoverage, reportsByPlace } from './analyse';
+import { SHAPES_WITHOUT_CONSTITUENCY, placeLabel } from './gambia';
 import { buildDeck } from './pptx';
 import { inferSchema, toTable } from './schema';
 import { defaultSelection, exportableQuestions, questionKey } from './selection';
@@ -33,6 +34,8 @@ function form() {
   const table = toTable([HEADER, ...ROWS]);
   return buildDataset(table, inferSchema(table));
 }
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe('the constituency question', () => {
   it('is found, and is not mistaken for the area column', () => {
@@ -159,5 +162,67 @@ describe('the deck', () => {
     expect(page).toContain('51,522');
     // And what the report that named no constituency actually wrote.
     expect(page).toContain('Westfield');
+  });
+});
+
+describe('the second map is of constituencies', () => {
+  it('writes the constituency on a shape, in the register spelling', () => {
+    // The boundary file is the only published source of shapes and spells
+    // several places its own way. A briefing should not have to explain
+    // why the map says Serrekunda and the register says Serekunda.
+    expect(placeLabel('district', 'Serrekunda West')).toBe('Serekunda West');
+    expect(placeLabel('district', 'Lower Niumi')).toBe('Lower Nuimi');
+    expect(placeLabel('lga', 'Kanifing')).toBe('Kanifing');
+  });
+
+  it('leaves out shapes that are not a constituency at all', () => {
+    // "No reports" against Kombo North reads as a gap in coverage. It is
+    // not one: no constituency of that name exists to report from.
+    const places = reportsByPlace(form(), 'district').map((r) => r.place);
+    expect(places).not.toContain('Kombo North');
+    expect(SHAPES_WITHOUT_CONSTITUENCY.every((s) => !places.includes(s))).toBe(true);
+    expect(places).toContain('Serrekunda West');
+  });
+
+  it('is titled by constituency in the deck, not by district', async () => {
+    // The map is rasterised on a canvas, which Node has not got. The deck
+    // only has to be built far enough to carry its titles.
+    const ctx = new Proxy(
+      {
+        measureText: () => ({ width: 40 }),
+        createLinearGradient: () => ({ addColorStop: () => undefined }),
+        createPattern: () => null,
+        canvas: null,
+      },
+      { get: (t, k) => (k in t ? (t as never)[k] : () => undefined) },
+    );
+    vi.stubGlobal('document', {
+      createElement: () => ({
+        width: 0,
+        height: 0,
+        getContext: () => ctx,
+        toDataURL: () =>
+          'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      }),
+    });
+    vi.stubGlobal('btoa', (x: string) => Buffer.from(x, 'binary').toString('base64'));
+    const ds = form();
+    const deck = buildDeck(ds, undefined, {
+      selection: {
+        ...defaultSelection(ds, 'test'),
+        coverage: false,
+        maps: true,
+        findingsTable: false,
+        ratings: false,
+        questions: [],
+      },
+      includeMaps: true,
+    });
+    const buf = (await deck.write({ outputType: 'nodebuffer' })) as Buffer;
+    const zip = await JSZip.loadAsync(buf);
+    const slides = Object.keys(zip.files).filter((f) => /ppt\/slides\/slide\d+\.xml$/.test(f));
+    const texts = await Promise.all(slides.map((f) => zip.files[f]!.async('string')));
+    expect(texts.some((x) => x.includes('Reports by constituency'))).toBe(true);
+    expect(texts.some((x) => x.includes('Reports by district'))).toBe(false);
   });
 });

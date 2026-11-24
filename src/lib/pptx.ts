@@ -33,7 +33,7 @@ import {
   TYPE,
 } from './theme';
 import { drawFlag, euFlag, gambiaFlag } from './flags';
-import { ALL_CONSTITUENCIES, REGISTERED_2026 } from './gambia';
+import { ALL_CONSTITUENCIES, REGISTERED_2026, UNMAPPED_CONSTITUENCIES } from './gambia';
 import { mapPng, pieMapPng } from './mapImage';
 import {
   isConstituencyQuestion,
@@ -610,7 +610,7 @@ function addMapSlide(
     ['lga', 'Reports by Local Government Area'],
   ];
   if (dataset.constituencies.length > 0) {
-    maps.push(['district', 'Reports by district']);
+    maps.push(['district', 'Reports by constituency']);
   }
 
   for (const [unit, title] of maps) {
@@ -623,6 +623,30 @@ function addMapSlide(
       data: `data:image/png;base64,${toBase64(img.data)}`,
       ...place({ x: PAD.x, y: top, w, h }, `${unit} map`),
     });
+
+    /*
+     * What the constituency map cannot show.
+     *
+     * The rule on these slides is a key and no prose, because a line
+     * restating the picture is chrome. This is not that: constituencies
+     * have no published boundaries, so the map is drawn on the districts,
+     * and eleven constituencies - the urban ones, where most of the
+     * reports come from - have no district of their name and are missing
+     * from the picture entirely. A reader counting areas off the map
+     * would otherwise undercount the coverage.
+     */
+    if (unit === 'district' && UNMAPPED_CONSTITUENCIES.length > 0 && top + h + 0.7 < PAD.bottom) {
+      s.addText(
+        `Drawn on district boundaries, the closest published division. ${UNMAPPED_CONSTITUENCIES.length} constituencies have none of their own and are not shown: ${UNMAPPED_CONSTITUENCIES.join(', ')}. Their reports are counted everywhere else.`,
+        {
+          ...place({ x: PAD.x, y: top + h + 0.12, w, h: 0.56 }, 'constituency map note'),
+          fontSize: TYPE.caption,
+          color: MUTED,
+          fontFace: FONT,
+          valign: 'top',
+        },
+      );
+    }
   }
 }
 

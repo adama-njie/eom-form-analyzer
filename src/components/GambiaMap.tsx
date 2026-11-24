@@ -6,6 +6,7 @@ import {
   LGAS,
   LGA_SHAPES,
   lgaName,
+  placeLabel,
   type MapUnit,
 } from '@/lib/gambia';
 import { labelPoint, makeProjector, pathFor, shapeWidth } from '@/lib/projection';
@@ -82,8 +83,9 @@ export function GambiaMap({
         onMouseLeave={() => setHover(null)}
       >
         <title id={titleId}>
-          Map of The Gambia by {unit === 'lga' ? 'Local Government Area' : 'district'}. The same
-          figures appear in the table beside the map.
+          Map of The Gambia by {unit === 'lga' ? 'Local Government Area' : 'constituency'}, drawn
+          on {unit === 'lga' ? 'area' : 'district'} boundaries. The same figures appear in the
+          table beside the map.
         </title>
         <defs>
           <pattern
@@ -100,7 +102,28 @@ export function GambiaMap({
 
         {drawn.map(({ key, d }) => {
           const r = byPlace.get(key);
-          const has = r && r.pct !== null;
+          /*
+           * A shape the map has nothing to say about: on the constituency
+           * map, one of the six districts that holds no constituency of
+           * its own name. It is drawn flat and unnamed, because a hole in
+           * the country reads as a fault and hatching it would put it
+           * among the places that returned no reports, which it never
+           * could.
+           */
+          if (!r) {
+            return (
+              <path
+                key={key}
+                d={d}
+                fill="#EEF1F3"
+                stroke="#FFFFFF"
+                strokeWidth={0.9}
+                strokeLinejoin="round"
+                pointerEvents="none"
+              />
+            );
+          }
+          const has = r.pct !== null;
           const intensity = has ? 0.14 + (r.pct! / max) * 0.86 : 0;
           const isSel = selected === key;
           const isHot = active === key;
@@ -118,8 +141,8 @@ export function GambiaMap({
               aria-pressed={isSel}
               aria-label={
                 has
-                  ? `${key}: ${r!.pct!.toFixed(1)}${suffix}, ${r!.n} of ${r!.total} reports`
-                  : `${key}: no reports`
+                  ? `${placeLabel(unit, key)}: ${r!.pct!.toFixed(1)}${suffix}, ${r!.n} of ${r!.total} reports`
+                  : `${placeLabel(unit, key)}: no reports`
               }
               className="map-shape"
               onMouseEnter={() => setHover(key)}
@@ -136,7 +159,7 @@ export function GambiaMap({
           );
         })}
 
-        {/* LGA outlines over the districts, so the eight areas stay legible. */}
+        {/* LGA outlines over the constituencies, so the eight areas stay legible. */}
         {unit === 'district' &&
           LGA_SHAPES.map(({ key, shape }) => (
             <path
@@ -153,8 +176,9 @@ export function GambiaMap({
         {!compact &&
           drawn.map(({ key, label, width }) => {
             const r = byPlace.get(key);
-            const has = r && r.pct !== null;
-            // Districts are small and numerous; only label where it fits.
+            if (!r) return null;
+            const has = r.pct !== null;
+            // Constituencies are small and numerous; only label where it fits.
             const minWidth = unit === 'lga' ? 0 : 54;
             if (width < minWidth) return null;
             const size = unit === 'lga' ? 15 : 10;
@@ -167,7 +191,7 @@ export function GambiaMap({
                   className="map-name"
                   style={{ fontSize: size }}
                 >
-                  {unit === 'lga' ? key : short(key)}
+                  {unit === 'lga' ? key : short(placeLabel(unit, key))}
                 </text>
                 <text
                   x={label[0]}
@@ -185,7 +209,7 @@ export function GambiaMap({
 
       {activeRate && (
         <div className="card map-readout" role="status">
-          <strong>{activeRate.place}</strong>
+          <strong>{placeLabel(unit, activeRate.place)}</strong>
           {unit === 'district' && DISTRICT_TO_LGA[activeRate.place] && (
             <span className="muted"> · {lgaName(DISTRICT_TO_LGA[activeRate.place]!)}</span>
           )}
@@ -230,7 +254,7 @@ function Legend({ colour, max, suffix }: { colour: string; max: number; suffix: 
   );
 }
 
-/** District names are long and the shapes are small. */
+/** Constituency names are long and the shapes are small. */
 function short(name: string): string {
   if (name.length <= 12) return name;
   const parts = name.split(' ');
@@ -258,7 +282,7 @@ export function MapTable({
       <table className="plain">
         <thead>
           <tr>
-            <th>{unit === 'lga' ? 'Local Government Area' : 'District'}</th>
+            <th>{unit === 'lga' ? 'Local Government Area' : 'Constituency'}</th>
             {unit === 'district' && <th>LGA</th>}
             <th style={{ textAlign: 'right' }}>{answerLabel}</th>
             <th style={{ textAlign: 'right' }}>Reports</th>
@@ -268,7 +292,7 @@ export function MapTable({
         <tbody>
           {withData.map((r) => (
             <tr key={r.place}>
-              <th scope="row">{r.place}</th>
+              <th scope="row">{placeLabel(unit, r.place)}</th>
               {unit === 'district' && (
                 <td className="muted">
                   {DISTRICT_TO_LGA[r.place] ? lgaName(DISTRICT_TO_LGA[r.place]!) : '—'}
@@ -287,7 +311,7 @@ export function MapTable({
                 No reports
               </th>
               <td colSpan={unit === 'district' ? 4 : 3} className="muted">
-                {without.map((r) => r.place).join(', ')}
+                {without.map((r) => placeLabel(unit, r.place)).join(', ')}
               </td>
             </tr>
           )}

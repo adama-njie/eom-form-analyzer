@@ -918,7 +918,7 @@ function DataQuality({ dataset, cov }: { dataset: Dataset; cov: ReturnType<typeo
               <td>
                 {cov.ungroupedRows}
                 {cov.ungroupedRows > 0 && (
-                  <span className="muted"> · check the spelling in the district column</span>
+                  <span className="muted"> · check the spelling in the area column</span>
                 )}
               </td>
             </tr>
