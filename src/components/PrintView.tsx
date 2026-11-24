@@ -77,7 +77,15 @@ export default function PrintView({
                 {cov.groupsCovered} / {cov.groupsTotal}
               </span>
             </div>
-            {cov.registerShare !== null && (
+            {cov.constituenciesTotal > 0 && (
+            <div className="stat">
+              <span className="stat-label">Constituencies covered</span>
+              <span className="stat-value">
+                {cov.constituenciesCovered} / {cov.constituenciesTotal}
+              </span>
+            </div>
+          )}
+          {cov.registerShare !== null && (
               <div className="stat">
                 <span className="stat-label">Electorate reached</span>
                 <span className="stat-value">{fmtPct(cov.registerShare)}</span>

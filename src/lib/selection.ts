@@ -79,7 +79,12 @@ export function isConstituencyQuestion(dataset: Dataset, q: Question): boolean {
  * across eight groups produces a chart that is coloured in rather than read.
  */
 function stackable(q: Question, b: Breakdown): boolean {
-  if (q.kind !== 'binary' && q.kind !== 'ordinal' && q.kind !== 'categorical') return false;
+  // Numeric too, now that its answers are counted in bands: "what share of
+  // participants were women, by party" is one of the comparisons the
+  // mission's other teams asked for, and it was not possible while the
+  // breakdown held one entry per distinct number.
+  const kinds = ['binary', 'ordinal', 'categorical', 'numeric'];
+  if (!kinds.includes(q.kind)) return false;
   return b.total.length <= 5;
 }
 

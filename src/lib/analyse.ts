@@ -6,6 +6,7 @@
  */
 
 import {
+  ALL_CONSTITUENCIES,
   CONSTITUENCY_TO_DISTRICT,
   DISTRICT_SHAPES,
   LGAS,
@@ -356,6 +357,15 @@ export function analyse(dataset: Dataset, question: Question, rowFilter?: boolea
     return value;
   };
 
+  // Numbers are counted in bands, everywhere: the question's own chart and
+  // every breakdown of it use the same ones.
+  const banding = bandingFor(dataset, question, rowFilter);
+  const band = (value: string): string => {
+    if (!banding) return value;
+    const n = Number(value);
+    return Number.isFinite(n) ? banding.of(n) : value;
+  };
+
   const tally = new Map<string, number>();
   const perGroup = new Map<string, Map<string, number>>();
   const perParty = new Map<string, Map<string, number>>();
@@ -386,7 +396,7 @@ export function analyse(dataset: Dataset, question: Question, rowFilter?: boolea
      * report all divide by `answered`, which counts real answers only.
      */
     for (const raw of answers) {
-      const a = label(raw);
+      const a = band(label(raw));
       tally.set(a, (tally.get(a) ?? 0) + 1);
       const group = isAreaColumn ? null : dataset.rowGroup[i];
       if (group) {
@@ -401,7 +411,7 @@ export function analyse(dataset: Dataset, question: Question, rowFilter?: boolea
         perParty.set(party, m);
       }
       if (question.kind === 'numeric') {
-        const num = Number(a);
+        const num = Number(raw);
         if (Number.isFinite(num)) numbers.push(num);
       }
     }
@@ -409,6 +419,7 @@ export function analyse(dataset: Dataset, question: Question, rowFilter?: boolea
 
   const order =
     question.scale ??
+    banding?.labels ??
     // North bank to upper river, as the country is laid out, not by count.
     (isConstituencyColumn && dataset.geo ? dataset.constituencies : undefined) ??
     (question.kind === 'binary' ? ['Yes', 'No'] : undefined) ??
@@ -440,7 +451,9 @@ export function analyse(dataset: Dataset, question: Question, rowFilter?: boolea
     breakdown.numeric = {
       n: numbers.length,
       sum: numbers.reduce((a, b) => a + b, 0),
-      bins: histogram(numbers),
+      // The same bands the chart is drawn from, so the written sentence and
+      // the chart beside it cannot disagree.
+      bins: breakdown.total.filter((c) => !NON_ANSWERS.has(c.label)),
     };
   }
 
@@ -493,15 +506,6 @@ export function isWordCloud(
 }
 
 /**
- * The counts to chart for a question.
- *
- * Identical to the raw breakdown for every question type but one. A numeric
- * question tallied literally gives a bar per distinct answer, so a form that
- * recorded forty different queue lengths produced forty one-report bars and
- * read as noise; its banded distribution is the same data at a resolution a
- * reader can use.
- */
-/**
  * The reports behind a set of counts, excluding NA and DK.
  *
  * The denominator for any rate. NA appears in the counts so a reader can
@@ -512,8 +516,17 @@ export function realTotal(counts: Count[]): number {
   return counts.filter((c) => !NON_ANSWERS.has(c.label)).reduce((s, c) => s + c.n, 0);
 }
 
-export function displayCounts(q: Question, b: Breakdown): Count[] {
-  return q.kind === 'numeric' && b.numeric ? b.numeric.bins : b.total;
+/**
+ * The counts to chart for a question.
+ *
+ * The breakdown itself, now that a numeric question is counted in bands
+ * from the start. It used to band the answers here and nowhere else, which
+ * left the by-area and by-party breakdowns holding raw values that no chart
+ * could line up with - and so a numeric question could not be compared
+ * across anything.
+ */
+export function displayCounts(_q: Question, b: Breakdown): Count[] {
+  return b.total;
 }
 
 /* ------------------------------------------------------------------ */
@@ -523,24 +536,34 @@ export function displayCounts(q: Question, b: Breakdown): Count[] {
 /** Bin widths that read as a number a person would choose themselves. */
 const NICE_WIDTHS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000];
 
+export interface Bands {
+  /** Every band, in order, whether or not anything fell in it. */
+  labels: string[];
+  /** The band a value belongs to. */
+  of: (value: number) => string;
+}
+
 /**
- * Group numeric answers into bands.
+ * Bands for a set of numeric answers.
  *
  * Few distinct values, and each one becomes its own band: a question answered
  * 0, 1, 2 or 3 should read as those four answers and not as "0 to 1". Many
  * distinct values, and a round width is chosen so the bands are ones a person
  * would have picked, which matters because these labels go on a slide.
+ *
+ * `unit` is carried into the label, so "Estimated % of female participants"
+ * reads "20 to 39%" rather than "20 to 39" - a band that could be a count,
+ * a share or a number of people, on a slide where nothing else says which.
  */
-export function histogram(values: number[], target = 6): Count[] {
+export function bandsFor(values: number[], target = 6, unit = ''): Bands {
   const distinct = [...new Set(values)].sort((a, b) => a - b);
-  const label = (v: number) =>
-    Number.isInteger(v) ? v.toLocaleString('en-GB') : v.toFixed(1);
+  const fmt = (v: number) => (Number.isInteger(v) ? v.toLocaleString('en-GB') : v.toFixed(1));
+  // The unit goes on the end of the whole label, so a range reads
+  // "20 to 39%" rather than "20% to 39%".
+  const label = (v: number) => `${fmt(v)}${unit}`;
 
   if (distinct.length <= 8) {
-    const tally = new Map<string, number>();
-    for (const v of distinct) tally.set(label(v), 0);
-    for (const v of values) tally.set(label(v), (tally.get(label(v)) ?? 0) + 1);
-    return toCounts(tally, [...tally.keys()]);
+    return { labels: distinct.map(label), of: label };
   }
 
   const min = distinct[0]!;
@@ -549,24 +572,54 @@ export function histogram(values: number[], target = 6): Count[] {
   const width = NICE_WIDTHS.find((w) => w >= rough) ?? Math.ceil(rough / 5000) * 5000;
   const start = Math.floor(min / width) * width;
 
-  const bands: { from: number; to: number; label: string }[] = [];
+  const labels: string[] = [];
   for (let from = start; from <= max; from += width) {
-    const to = from + width - 1;
-    bands.push({
-      from,
-      to,
-      label: width === 1 ? label(from) : `${label(from)} to ${label(to)}`,
-    });
+    labels.push(width === 1 ? label(from) : `${fmt(from)} to ${fmt(from + width - 1)}${unit}`);
   }
 
+  return {
+    labels,
+    of: (v: number) =>
+      labels[Math.min(labels.length - 1, Math.max(0, Math.floor((v - start) / width)))]!,
+  };
+}
+
+/** The distribution of a set of numeric answers across its bands. */
+export function histogram(values: number[], target = 6, unit = ''): Count[] {
+  const bands = bandsFor(values, target, unit);
   const tally = new Map<string, number>();
-  for (const b of bands) tally.set(b.label, 0);
-  for (const v of values) {
-    const i = Math.min(bands.length - 1, Math.floor((v - start) / width));
-    const b = bands[i]!;
-    tally.set(b.label, (tally.get(b.label) ?? 0) + 1);
-  }
-  return toCounts(tally, bands.map((b) => b.label));
+  for (const l of bands.labels) tally.set(l, 0);
+  for (const v of values) tally.set(bands.of(v), (tally.get(bands.of(v)) ?? 0) + 1);
+  return toCounts(tally, bands.labels);
+}
+
+/**
+ * How a question's answers are counted: in bands, if they are numbers.
+ *
+ * One bar per distinct answer is useless for a number - forty queue lengths
+ * gave forty bars of one - so a numeric question is counted in bands all the
+ * way through, and not only in its own chart. Before, the bands existed for
+ * the chart while the by-party and by-area breakdowns still held raw values,
+ * which is why a numeric question could not be compared across anything.
+ */
+export function bandingFor(
+  dataset: Dataset,
+  question: Question,
+  rowFilter?: boolean[],
+): Bands | null {
+  if (question.kind !== 'numeric') return null;
+  const numbers: number[] = [];
+  dataset.table.rows.forEach((row, i) => {
+    if (rowFilter && !rowFilter[i]) return;
+    for (const a of answersFor(question, row)) {
+      const n = Number(a);
+      if (Number.isFinite(n)) numbers.push(n);
+    }
+  });
+  if (numbers.length === 0) return null;
+  // A question that asks for a percentage says so in its own wording.
+  const unit = /%|percent/i.test(question.label) ? '%' : '';
+  return bandsFor(numbers, 6, unit);
 }
 
 /* ------------------------------------------------------------------ */
@@ -621,12 +674,18 @@ export function rateByPlace(
 
   const totals = new Map<string, number>();
   const hits = new Map<string, number>();
+  // The answer being mapped comes from the breakdown, so a numeric question
+  // asks for a band and the rows have to be banded the same way to match.
+  const banding = bandingFor(dataset, question, rowFilter);
 
   dataset.table.rows.forEach((row, i) => {
     if (rowFilter && !rowFilter[i]) return;
     const place = keyOf(i);
     if (!place) return;
-    const answers = answersFor(question, row);
+    const answers = answersFor(question, row).map((a) => {
+      const n = Number(a);
+      return banding && Number.isFinite(n) ? banding.of(n) : a;
+    });
     const real = answers.filter((a) => !NON_ANSWERS.has(a));
     if (real.length === 0) return;
     totals.set(place, (totals.get(place) ?? 0) + 1);
@@ -747,6 +806,10 @@ export interface Coverage {
   groupsTotal: number;
   /** Share of the 2021 register in observed areas. Only meaningful in geo mode. */
   registerShare: number | null;
+  /** Constituencies that returned at least one report. */
+  constituenciesCovered: number;
+  /** Constituencies in the country. Zero where the form has none. */
+  constituenciesTotal: number;
   byGroup: { label: string; reports: number; registered: number | null }[];
   byTeam: { team: string; reports: number }[];
   ungroupedRows: number;
@@ -790,11 +853,20 @@ export function coverage(dataset: Dataset, rowFilter?: boolean[]): Coverage {
     registerShare = total > 0 ? (observed / total) * 100 : 0;
   }
 
+  const seen = new Set<string>();
+  dataset.table.rows.forEach((_row, i) => {
+    if (!include(i)) return;
+    const c = dataset.rowConstituency[i];
+    if (c) seen.add(c);
+  });
+
   return {
     reports,
     groupsCovered: byGroup.filter((g) => g.reports > 0).length,
     groupsTotal: universe.length,
     registerShare,
+    constituenciesCovered: seen.size,
+    constituenciesTotal: dataset.geo ? ALL_CONSTITUENCIES.length : 0,
     byGroup,
     byTeam: [...teams.entries()]
       .map(([team, n]) => ({ team, reports: n }))

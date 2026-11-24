@@ -30,8 +30,7 @@ import {
   TYPE,
 } from './theme';
 import { drawFlag, euFlag, gambiaFlag } from './flags';
-import { mapPng } from './mapImage';
-import { describeFindingBody } from './narrative';
+import { mapPng, pieMapPng } from './mapImage';
 import {
   isConstituencyQuestion,
   needsOwnSlide,
@@ -176,7 +175,7 @@ export function buildDeck(
   }
   if (sel.ratings) addRatingsSlide(pptx, dataset, filter);
 
-  addQuestionSlides(pptx, dataset, selectedQuestions(dataset, sel), filter);
+  addQuestionSlides(pptx, dataset, selectedQuestions(dataset, sel), filter, canDrawMaps);
 
   return pptx;
 }
@@ -272,15 +271,22 @@ function addCoverageSlide(
   const s = pptx.addSlide({ masterName: 'BASE' });
   const top = heading(s, 'Coverage', 'What was observed, and where.');
 
+  /*
+   * Four figures, and the third used to be the share of the register in
+   * observed areas. With reports from all eight LGAs that reads 100%, which
+   * says only what the figure beside it already said. How much of the
+   * country was actually reached is the constituency count: all eight areas,
+   * sixteen of fifty-three constituencies.
+   */
   const tiles: [string, string][] = [
     ['Reports', String(cov.reports)],
     [dataset.geo ? 'Areas covered' : 'Districts', `${cov.groupsCovered} / ${cov.groupsTotal}`],
-    [
-      cov.registerShare !== null ? 'Electorate reached' : 'Mean per district',
-      cov.registerShare !== null
-        ? `${cov.registerShare.toFixed(0)}%`
-        : (cov.reports / Math.max(1, cov.groupsCovered)).toFixed(1),
-    ],
+    cov.constituenciesTotal > 0
+      ? ['Constituencies', `${cov.constituenciesCovered} / ${cov.constituenciesTotal}`]
+      : [
+          'Mean per district',
+          (cov.reports / Math.max(1, cov.groupsCovered)).toFixed(1),
+        ],
     ['Teams', String(cov.byTeam.length)],
   ];
   const tileCols = columns(4);
@@ -474,30 +480,28 @@ function addMapSlide(
   dataset: Dataset,
   filter: boolean[] | undefined,
 ): void {
-  const maps: [string, 'lga' | 'district', string][] = [
-    ['Reports by Local Government Area', 'lga', 'All eight LGAs. Hatched areas returned no reports.'],
+  /*
+   * Title only. A map of eight shaded areas, each with its name and its
+   * number written on it, does not need a line of explanation above it and
+   * another below; the one thing those lines carried that the picture did
+   * not - that hatching means no reports - is now a key on the map itself.
+   */
+  const maps: ['lga' | 'district', string][] = [
+    ['lga', 'Reports by Local Government Area'],
   ];
   if (dataset.constituencies.length > 0) {
-    maps.push([
-      'Reports by district',
-      'district',
-      `${dataset.constituencies.length} of the 53 constituencies returned reports. Hatched districts returned none.`,
-    ]);
+    maps.push(['district', 'Reports by district']);
   }
 
-  for (const [title, unit, note] of maps) {
+  for (const [unit, title] of maps) {
     const s = pptx.addSlide({ masterName: 'BASE' });
-    const top = heading(s, title, note);
+    const top = heading(s, title);
     const img = mapPng(reportsByPlace(dataset, unit, filter), unit, '', ACCENT_DEEP, 1400);
     const w = CONTENT.w;
     const h = (w / img.width) * img.height;
     s.addImage({
       data: `data:image/png;base64,${toBase64(img.data)}`,
       ...place({ x: PAD.x, y: top, w, h }, `${unit} map`),
-    });
-    s.addText('Filtering by area and district is available in the tool.', {
-      ...place({ x: PAD.x, y: top + h + 0.22, w: CONTENT.w, h: 0.32 }, 'map note'),
-      fontSize: TYPE.caption, color: MUTED, fontFace: FONT,
     });
   }
 }
@@ -527,10 +531,6 @@ function addFindingMapSlide(
   s.addImage({
     data: `data:image/png;base64,${toBase64(img.data)}`,
     ...place({ x: PAD.x, y: top, w, h }, 'finding map'),
-  });
-  s.addText(describeFindingBody(f), {
-    ...place({ x: PAD.x, y: top + h + 0.18, w: CONTENT.w, h: PAD.bottom - top - h - 0.18 }, 'finding note'),
-    fontSize: TYPE.body, color: INK, fontFace: FONT, valign: 'top',
   });
 }
 
@@ -681,6 +681,7 @@ function addQuestionSlides(
   dataset: Dataset,
   questions: Question[],
   filter: boolean[] | undefined,
+  canDrawMaps = false,
 ): void {
   const planned = questions
     .map((q) => plan(dataset, q, filter))
@@ -693,16 +694,80 @@ function addQuestionSlides(
     const pair = !first.full && second && !second.full ? second : undefined;
 
     const slide = pptx.addSlide({ masterName: 'BASE' });
+    const drawn = [first];
     if (pair) {
       const cols = columns(2);
       drawQuestion(pptx, slide, dataset, first, cols[0]!);
       drawQuestion(pptx, slide, dataset, pair, cols[1]!);
+      drawn.push(pair);
       i += 2;
     } else {
       drawQuestion(pptx, slide, dataset, first, { x: PAD.x, w: CONTENT.w });
       i += 1;
     }
+
+    // The same answers on the country, straight after the chart of them.
+    if (canDrawMaps) {
+      for (const p of drawn) addPieMapSlide(pptx, dataset, p);
+    }
   }
+}
+
+/**
+ * Whether a question is worth a pie map.
+ *
+ * Two to five answers, because six slices of a pie the size of Banjul is a
+ * pattern of colour rather than a chart, and at least three areas, because
+ * a map of one pie is a pie. Binary questions are left out: a yes/no rate
+ * is better shaded than sliced, and the ones that matter already get a
+ * shaded map of their own from the findings section.
+ */
+function wantsPieMap(dataset: Dataset, planned: Planned): boolean {
+  if (!dataset.geo) return false;
+  if (planned.q.kind !== 'categorical' && planned.q.kind !== 'ordinal') return false;
+  const answers = planned.b.total.filter((c) => !NON_ANSWERS.has(c.label));
+  if (answers.length < 2 || answers.length > 5) return false;
+  return Object.keys(planned.b.byArea).length >= 3;
+}
+
+/**
+ * One question, as a pie on each area.
+ *
+ * "Type of event by Local Government Area" is already on the question's own
+ * slide as a stacked bar, which answers it precisely and says nothing about
+ * where the areas are. The map answers a different question - whether the
+ * caravans are a coastal thing and the rallies upriver - which a list of
+ * area names in alphabetical order cannot.
+ */
+function addPieMapSlide(pptx: PptxGenJS, dataset: Dataset, planned: Planned): void {
+  if (!wantsPieMap(dataset, planned)) return;
+  const { q, b } = planned;
+
+  const order = b.total.filter((c) => !NON_ANSWERS.has(c.label)).map((c) => c.label);
+  const colours = fillsFor(b.total, {
+    judged: JUDGED.test(q.label),
+    scale: q.scale,
+    perMark: true,
+  })
+    .slice(0, order.length)
+    .map((c) => `#${c}`);
+
+  const data = Object.entries(b.byArea).map(([place, counts]) => ({
+    place,
+    counts: counts.filter((c) => !NON_ANSWERS.has(c.label)),
+  }));
+  if (data.length === 0) return;
+
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  const top = heading(s, `${q.code} ${q.label}`.trim());
+  const img = pieMapPng(data, order, colours, 1400);
+  const w = CONTENT.w;
+  const h = (w / img.width) * img.height;
+  if (top + h > PAD.bottom) return;
+  s.addImage({
+    data: `data:image/png;base64,${toBase64(img.data)}`,
+    ...place({ x: PAD.x, y: top, w, h }, `pie map ${q.code}`),
+  });
 }
 
 /**
@@ -774,7 +839,13 @@ function drawQuestion(
    * a constant for its title and legend, which is roughly what it needs.
    */
   const gap = 0.18;
-  const weights = comparisons.map((c, i) => c.groups.length + (i === 0 ? 3 : 2));
+  // The top chart also carries the legend, which wraps: five answers take
+  // two lines, and with five parties under them PowerPoint started
+  // printing every other party name again.
+  const legendLines = Math.max(1, Math.ceil(b.total.length / 3));
+  const weights = comparisons.map(
+    (c, i) => c.groups.length + (i === 0 ? 2 + legendLines : 2),
+  );
   const totalWeight = weights.reduce((a, w) => a + w, 0);
   const free = height - gap * (comparisons.length - 1);
 

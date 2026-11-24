@@ -497,11 +497,11 @@ function Overview({
             value={`${cov.groupsCovered} / ${cov.groupsTotal}`}
             sub={dataset.geo ? 'administrative areas' : 'as named in the file'}
           />
-          {cov.registerShare !== null ? (
+          {cov.constituenciesTotal > 0 ? (
             <Stat
-              label="Electorate reached"
-              value={fmtPct(cov.registerShare)}
-              sub="share of the 2021 register in observed areas"
+              label="Constituencies covered"
+              value={`${cov.constituenciesCovered} / ${cov.constituenciesTotal}`}
+              sub="returned at least one report"
             />
           ) : (
             <Stat

@@ -111,6 +111,14 @@ geography.
   similarity — two spellings of a name stay apart.
 - **Multi-answer blocks** are matched on the *last* bracketed group in the
   header, so "B.15 Language(s) of the speeches (Mandinka)" keeps its block.
+- **Numbers are counted in bands from the start**, not banded at the chart.
+  The bands are what `byArea` and `byParty` hold, so a numeric question can be
+  compared across party and area; a question whose wording asks for a
+  percentage carries `%` into every band label.
+- **Maps carry a key and no prose.** Title, picture, key. A categorical or
+  ordinal question with two to five answers and at least three areas also gets
+  a pie map after its own slide, with the pies sized by report count and
+  nudged apart where they would overlap.
 - **Constituencies belong under their LGA.** The area question and the
   constituency question are a hierarchy, not two lists: the screen gives each
   area a drill-down and the deck a grouped page, and a group never splits

@@ -124,6 +124,11 @@ Bands are chosen to be ones a person would have picked. Eight or fewer distinct
 answers and each value is its own band; more than that and a round width is
 chosen so the labels read `0 to 999`, not `0 to 827.4`.
 
+Coverage is reported as areas and constituencies, not as a share of the
+electorate. With reports from all eight LGAs that share reads 100%, which says
+only what the figure beside it already said; "17 of 53 constituencies" says how
+much of the country was actually reached.
+
 `NA` and `DK` are **charted**, last and in orange, and held apart from the substantive answers
 everywhere a rate is quoted. Dropping them was worse than distorting a percentage: "Did any speaker
 use inflammatory language?" was answered No on 18 reports and NA on 15, and the slide read "100%
@@ -258,6 +263,35 @@ not fit a four-inch column. Height is shared between them in proportion to how
 many bars each has: split evenly, eight areas got the same inch and a half as
 five parties and PowerPoint printed every other area name. A polling-day form
 records no party and keeps the area breakdown alone.
+
+**A number is counted in bands, everywhere.** One bar per distinct answer
+is useless for a number - forty queue lengths gave forty bars of one - so a
+numeric question is charted as bands. It used to be banded for its own chart
+and nowhere else, which left the by-party and by-area breakdowns holding raw
+values that no chart could line up with, and so a number could not be
+compared across anything. Now the bands are the answer, and "what share of
+participants were women, by party" is a chart like any other. A question that
+asks for a percentage says so in its own wording, and the bands carry it:
+"20 to 39%", not "20 to 39", which on a slide could be a count, a share or a
+number of people.
+
+**A question with a handful of answers also goes on the map.** A shaded map
+can show one answer at a time, so "what type of event was it" needs four maps
+or none. A pie on each area shows the whole answer at once, sized by the
+reports behind it, because an area with one report should not look as certain
+as an area with twelve. It answers a different question from the stacked bar
+beside it - whether the caravans are a coastal thing and the rallies upriver -
+which a list of area names in alphabetical order cannot. Pies that would cover
+each other are pushed apart and joined back to their area by a line; Banjul
+and Kanifing are too small to hold one at all, so theirs sit below the country
+on a leader, as their labels do on the shaded map.
+
+**A map carries its own key, and nothing else.** The deck used to explain each
+map in a line above it and another below. A map of eight shaded areas with a
+name and a number written on each needs neither; the one thing those lines
+carried that the picture did not - that hatching means a place that returned
+nothing, which is not the same as a place that reported nothing - is now a key
+drawn on the map itself.
 
 **The constituency is read as part of the area, not beside it.** Every form
 asks for the Local Government Area and then the constituency inside it, and
