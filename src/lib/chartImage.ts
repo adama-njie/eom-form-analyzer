@@ -9,7 +9,7 @@
  * Drawn on a canvas at 2x and scaled down, so they stay sharp in print.
  */
 
-import type { Count } from './analyse';
+import type { Count, GroupMean } from './analyse';
 
 const SCALE = 2;
 // Arial, as the mission's reference report is set, and a size that survives
@@ -67,6 +67,53 @@ function truncate(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
  * every question type, because one consistent shape reads faster down a
  * long report than a mix of pies and columns.
  */
+/**
+ * A percentage question's averages, one bar per group.
+ *
+ * The track is 0 to 100 and the bar is the average itself, not its share
+ * of the largest: these are percentages, and scaling them to each other
+ * would make 30% and 95% look alike on two charts side by side.
+ */
+export function meanBarsPng(
+  rows: GroupMean[],
+  colour = '#12239E',
+  width = 560,
+): ChartImage {
+  const rowH = 26;
+  const padTop = 8;
+  const padBottom = 8;
+  const height = padTop + padBottom + rows.length * rowH;
+  const [canvas, ctx] = canvasOf(width, height);
+
+  const widest = rows.length ? Math.max(...rows.map((r) => ctx.measureText(r.label).width)) : 0;
+  const labelW = Math.min(190, widest + 12);
+  const valueW = 92;
+  const trackX = labelW + 10;
+  const trackW = width - trackX - valueW;
+
+  rows.forEach((row, i) => {
+    const y = padTop + i * rowH + rowH / 2;
+
+    ctx.fillStyle = '#16202A';
+    ctx.textAlign = 'left';
+    ctx.fillText(truncate(ctx, row.label, labelW - 4), 0, y);
+
+    ctx.fillStyle = '#ECEFF2';
+    ctx.fillRect(trackX, y - 8, trackW, 16);
+
+    const w = Math.max(2, (Math.max(0, Math.min(100, row.mean)) / 100) * trackW);
+    ctx.fillStyle = colour;
+    ctx.fillRect(trackX, y - 8, w, 16);
+
+    ctx.fillStyle = '#16202A';
+    ctx.fillText(`${Math.round(row.mean)}%`, trackX + trackW + 10, y);
+    ctx.fillStyle = '#5D6B76';
+    ctx.fillText(`of ${row.n}`, trackX + trackW + 52, y);
+  });
+
+  return { data: toBytes(canvas), width, height };
+}
+
 export function barChartPng(
   counts: Count[],
   colours: string[],

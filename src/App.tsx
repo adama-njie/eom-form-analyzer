@@ -1,6 +1,13 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { BarList, Donut, StackedByArea, WordCloud, fmtPct } from '@/components/charts';
+import {
+  BarList,
+  Donut,
+  PercentPanel,
+  StackedByArea,
+  WordCloud,
+  fmtPct,
+} from '@/components/charts';
 import { GambiaMap } from '@/components/GambiaMap';
 import {
   analyse,
@@ -519,7 +526,14 @@ function ConstituencyPanel({
                 ...(g.unnamed > 0
                   ? [
                       {
-                        label: 'constituency not named',
+                        // What those reports actually wrote. "Not named"
+                        // reads as missing data when the field was filled
+                        // in with a neighbourhood or a region.
+                        label: g.unrecognised.length
+                          ? `not a constituency: ${g.unrecognised
+                              .map((u) => (u.reports > 1 ? `${u.text} (${u.reports})` : u.text))
+                              .join(', ')}`
+                          : 'constituency not given',
                         n: g.unnamed,
                         pct: g.reports ? (g.unnamed / g.reports) * 100 : 0,
                       },
@@ -784,7 +798,9 @@ function QuestionCard({
 
       {words && <WordCloud words={words} />}
 
-      {q.kind === 'numeric' && b.numeric && (
+      {b.percent && <PercentPanel p={b.percent} />}
+
+      {q.kind === 'numeric' && !b.percent && b.numeric && (
         <>
           <BarList counts={b.numeric.bins} />
           <p className="muted small">

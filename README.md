@@ -275,6 +275,24 @@ asks for a percentage says so in its own wording, and the bands carry it:
 "20 to 39%", not "20 to 39", which on a slide could be a count, a share or a
 number of people.
 
+**A question that asks for a percentage is averaged.** B.8 asks for the estimated share
+of participants who were women, and the answer is already a rate. Banding it answered a
+question nobody asked - how many events were between 40 and 59% female - and could not be
+compared across parties without reading twenty numbers off a stacked bar. So a percentage
+question gets the figure, the figure by party and the figure by Local Government Area, with
+the number of reports on every bar, because an average of two estimates and an average of
+twelve look identical otherwise. The bars run against a fixed 0 to 100 track rather than
+against the longest of them. The mean is one report one vote: the form records an estimated
+share and not a headcount, so an event of two thousand and an event of fifty count the same,
+and there is nothing to weight by that would not be invented.
+
+**Coverage by constituency is a table.** A list with the count hanging off the right of each
+line reads well enough down one column and not at all across three. The table rules the
+columns, gives each area a banded row of its own, and has room for the register beside the
+reports - which is the next thing a reader wants, since Serekunda West is fifty-one thousand
+voters and Janjanbureh is under two. It spreads over as many columns as it takes and
+continues on a second slide rather than shrinking below the type floor.
+
 **A question with a handful of answers also goes on the map.** A shaded map
 can show one answer at a time, so "what type of event was it" needs four maps
 or none. A pie on each area shows the whole answer at once, sized by the
@@ -335,6 +353,24 @@ only the first, so a campaign export matched nothing, every report fell into
 a bucket called "Unspecified", and the coverage slide reported one team where
 there were eight. A form that genuinely has no team column now shows no team
 breakdown, rather than one row that says nothing.
+
+**The constituencies and the register are the IEC's own.** Both come from "Total Number of
+Registered Voters Per Polling Station 2026": 53 constituencies under seven reporting regions,
+1,119,143 voters, summed from every stream of every station. Central River is split back into
+Kuntaur and Janjanbureh, because an observer reports against an LGA and there are eight of
+them. The register is held per constituency and an LGA's electorate is the sum of its own, so
+there is one number to check rather than two.
+
+**A constituency name resolves exactly, by unique prefix, or by one letter - and otherwise
+not at all.** Observers write what they write: "Kantoro" for Kantora, "Foni Jarol" for Foni
+Jarrol, "Latrikunda" for Latrikunda Sabiji, "Serrekunda West" and "Serekunda west" for the
+same place. Those all resolve. "Brikama" is the start of both Brikama North and Brikama
+South, so it names the area rather than a constituency and used to be filed under whichever
+of the two the lookup reached first - a report placed in a constituency nobody reported from.
+It now resolves to neither. And an entry that is a neighbourhood ("Westfield"), a region
+("URR") or an area ("Kanifing") is left alone and shown as written, on screen and under the
+deck's table, because "constituency not named" reads as a gap in the data when the field was
+filled in on every one of them.
 
 **An LGA is named by its administrative capital.** Brikama, Kerewan, Mansa
 Konko and Basse, not West Coast, North Bank, Lower River and Upper River.

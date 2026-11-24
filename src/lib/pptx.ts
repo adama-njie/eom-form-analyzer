@@ -9,6 +9,8 @@ import {
   reportsByPlace,
   textValues,
   type Dataset,
+  type GroupMean,
+  type Percentage,
 } from './analyse';
 import { wordCloudPng } from './chartImage';
 import { wordFrequencies, type WordCount } from './text';
@@ -30,6 +32,7 @@ import {
   TYPE,
 } from './theme';
 import { drawFlag, euFlag, gambiaFlag } from './flags';
+import { ALL_CONSTITUENCIES, REGISTERED_2026 } from './gambia';
 import { mapPng, pieMapPng } from './mapImage';
 import {
   isConstituencyQuestion,
@@ -388,101 +391,201 @@ function addConstituencySlide(
   if (groups.length === 0) return;
   if (groups.every((g) => g.constituencies.length === 0)) return;
 
-  const s = pptx.addSlide({ masterName: 'BASE' });
-  const top = heading(
-    s,
-    'Coverage by constituency',
-    'Reports from each Local Government Area, by the constituency they name.',
-  );
-
-  type Row = { label: string; value: number; head: boolean };
-  const blocks: Row[][] = groups.map((g) => {
-    const block: Row[] = [{ label: g.area, value: g.reports, head: true }];
-    for (const c of g.constituencies) {
-      block.push({ label: c.name, value: c.reports, head: false });
-    }
-    if (g.unnamed > 0) {
-      block.push({ label: 'constituency not named', value: g.unnamed, head: false });
-    }
-    return block;
+  /*
+   * A table rather than a list.
+   *
+   * The list this replaced had the count hanging at the right of each
+   * line, which reads well enough down one column and not at all across
+   * three. A table rules the columns, gives each area a banded row of its
+   * own instead of a bold line that has to be taken on trust, and leaves
+   * room for the register beside the reports - the thing a reader wants
+   * next, which is how much of the electorate a constituency is.
+   */
+  const cell = (
+    text: string,
+    options: PptxGenJS.TableCellProps = {},
+  ): PptxGenJS.TableCell => ({
+    text,
+    options: { fontSize: TYPE.table, fontFace: FONT, color: INK, ...options },
   });
-  const total = blocks.reduce((n, b) => n + b.length, 0);
 
-  const foot = ungrouped > 0 ? 0.4 : 0;
-  const space = PAD.bottom - top - foot;
-  // Three columns only when two would squeeze the rows below the type size.
-  const colCount = total / 2 > space / 0.34 ? 3 : 2;
+  const blocks: PptxGenJS.TableRow[][] = groups.map((g) => {
+    const rows: PptxGenJS.TableRow[] = [
+      [
+        {
+          text: `${g.area}  -  ${g.reports} ${g.reports === 1 ? 'report' : 'reports'}, ${g.constituencies.length} of ${g.totalConstituencies}`,
+          options: {
+            fontSize: TYPE.table,
+            fontFace: FONT,
+            color: INK,
+            bold: true,
+            fill: { color: PANEL },
+            colspan: 3,
+          },
+        },
+      ],
+    ];
+    for (const c of g.constituencies) {
+      rows.push([
+        cell(c.name, { color: MUTED }),
+        cell(String(c.reports), { align: 'right', color: MUTED }),
+        cell((REGISTERED_2026[c.name] ?? 0).toLocaleString('en-GB'), {
+          align: 'right',
+          color: MUTED,
+        }),
+      ]);
+    }
+    return rows;
+  });
 
   /*
-   * An area and its constituencies stay in one column. Slicing the rows
-   * evenly split Kerewan across the gap, so the second column opened with
-   * two constituencies and no area name above them, which reads as if they
-   * belonged to whatever came next.
+   * What the unplaced reports wrote, in a line under the table.
+   *
+   * "Constituency not named" reads as missing data; the field was filled
+   * in on every one of them, with a neighbourhood, an area or a region.
+   * Printing the entries is the difference between a reader thinking the
+   * data is missing and the data team knowing which answers to go back
+   * to. It sits under the table rather than in it because an entry can be
+   * anything an observer typed, and a cell that wraps to two lines pushes
+   * every row below it off the foot of the slide.
    */
-  const target = Math.ceil(total / colCount);
-  const laid: { row: Row; col: number; line: number }[] = [];
-  let col = 0;
-  let line = 0;
-  for (const block of blocks) {
-    if (line > 0 && line + block.length > target && col < colCount - 1) {
-      col += 1;
-      line = 0;
+  const strays = groups
+    .filter((g) => g.unnamed > 0)
+    .map((g) => {
+      const wrote = g.unrecognised.map((u) => u.text).join(', ');
+      return wrote ? `${g.area}: ${wrote}` : `${g.area}: ${g.unnamed} not given`;
+    });
+
+  const notes = [
+    strays.length > 0 ? `Named no constituency - ${strays.join('; ')}.` : '',
+    ungrouped > 0
+      ? `${ungrouped} ${ungrouped === 1 ? 'report names' : 'reports name'} no area and are not counted above.`
+      : '',
+  ].filter(Boolean);
+
+  // A row of 18pt type is about a third of an inch however small the
+  // table is told to be, so the rows that fit are counted rather than
+  // squeezed.
+  const ROW = 0.34;
+  const footH = notes.length * 0.3;
+  const PER_SLIDE = 2;
+
+  // Where `heading` leaves the content when it has a subtitle. The tables
+  // are laid out before the first slide exists, so it is stated rather
+  // than measured; `place` throws if it ever stops being true.
+  const top = 1.43;
+  const space = PAD.bottom - top - footH;
+  // One row of each table is its header.
+  const perColumn = Math.max(3, Math.floor(space / ROW) - 1);
+
+  /*
+   * Areas are spread evenly over as many columns as it takes.
+   *
+   * Filling each column to the brim and letting the rest fall onto a
+   * second page gave two crowded columns and then a page holding Basse by
+   * itself. Counting the columns first and then dividing the areas
+   * between them keeps the pages looking like each other. An area and its
+   * constituencies always stay together.
+   */
+  const spread = (parts: number): PptxGenJS.TableRow[][][] => {
+    const total = blocks.reduce((n, b) => n + b.length, 0);
+    const target = Math.ceil(total / parts);
+    const out: PptxGenJS.TableRow[][][] = [[]];
+    let n = 0;
+    for (const block of blocks) {
+      const current = out[out.length - 1]!;
+      const over = n + block.length > target || n + block.length > perColumn;
+      if (current.length > 0 && over && out.length < parts) {
+        out.push([block]);
+        n = block.length;
+      } else {
+        current.push(block);
+        n += block.length;
+      }
     }
-    for (const row of block) {
-      laid.push({ row, col, line });
-      line += 1;
-    }
+    return out;
+  };
+
+  let parts = 1;
+  while (
+    parts < 12 &&
+    spread(parts).some((part) => part.reduce((n, b) => n + b.length, 0) > perColumn)
+  ) {
+    parts += 1;
   }
+  const laid = spread(Math.ceil(parts / PER_SLIDE) * PER_SLIDE);
 
-  const tallest = Math.max(...laid.map((x) => x.line)) + 1;
-  const rowH = Math.min(0.36, space / tallest);
-  const cols = columns(colCount);
-  const indent = 0.26;
-  const valueW = 0.8;
+  for (let page = 0; page * PER_SLIDE < laid.length; page += 1) {
+    const s = pptx.addSlide({ masterName: 'BASE' });
+    const covered = groups.reduce((n, g) => n + g.constituencies.length, 0);
+    heading(
+      s,
+      page === 0 ? 'Coverage by constituency' : 'Coverage by constituency, continued',
+      page === 0
+        ? `${covered} of ${ALL_CONSTITUENCIES.length} constituencies returned a report.`
+        : ' ',
+    );
 
-  laid.forEach(({ row: r, col: c, line: l }) => {
-    const col = cols[c]!;
-    const y = top + l * rowH;
-    s.addText(r.head ? r.label : r.label, {
-      ...place(
-        {
-          x: col.x + (r.head ? 0 : indent),
-          y,
-          w: col.w - valueW - (r.head ? 0 : indent),
-          h: rowH,
-        },
-        'constituency label',
-      ),
-      fontSize: TYPE.body,
-      bold: r.head,
-      color: r.head ? INK : MUTED,
-      fontFace: FONT,
-      valign: 'middle',
-    });
-    s.addText(String(r.value), {
-      ...place({ x: col.x + col.w - valueW, y, w: valueW, h: rowH }, 'constituency count'),
-      fontSize: TYPE.body,
-      bold: r.head,
-      color: r.head ? INK : MUTED,
-      fontFace: FONT,
-      align: 'right',
-      valign: 'middle',
-    });
-  });
+    const taken = laid.slice(page * PER_SLIDE, page * PER_SLIDE + PER_SLIDE).filter(
+      (part) => part.length > 0,
+    );
+    const last = (page + 1) * PER_SLIDE >= laid.length;
+    const bottom = last ? PAD.bottom - footH : PAD.bottom;
+    const cols = columns(PER_SLIDE);
+    // One row height for the page, so two tables of different lengths
+    // beside each other still line up row for row.
+    const tallest = Math.max(...taken.map((part) => part.flat().length + 1));
+    const rowH = Math.min(0.55, Math.max(ROW, (bottom - top) / tallest));
 
-  if (ungrouped > 0) {
-    s.addText(
-      `${ungrouped} ${ungrouped === 1 ? 'report names' : 'reports name'} no area and are not counted above.`,
-      {
-        ...place({ x: PAD.x, y: PAD.bottom - 0.36, w: CONTENT.w, h: 0.36 }, 'ungrouped note'),
-        fontSize: TYPE.caption,
-        color: MUTED,
+    taken.forEach((part, i) => {
+      const col = cols[i]!;
+      const head: PptxGenJS.TableRow = ['Constituency', 'Reports', 'Registered'].map(
+        (t, j) => ({
+          text: t,
+          options: {
+            color: ON_FILL,
+            fill: { color: ACCENT_DEEP },
+            fontSize: TYPE.table,
+            fontFace: FONT,
+            align: j === 0 ? 'left' : 'right',
+          },
+        }),
+      );
+      const rows = [head, ...part.flat()];
+      s.addTable(rows, {
+        ...place(
+          { x: col.x, y: top, w: col.w, h: Math.min(bottom - top, rowH * rows.length) },
+          'constituency table',
+        ),
+        // Wide enough for the words in the header row. At 18pt "Reports"
+        // and "Registered" wrapped to two lines in a narrower column, and
+        // a two-line header row pushes every row below it down.
+        colW: [col.w - 3.0, 1.25, 1.75],
+        rowH,
+        fontSize: TYPE.table,
         fontFace: FONT,
         valign: 'middle',
-      },
-    );
+        border: { type: 'none' },
+      });
+    });
+
+    if (last && notes.length > 0) {
+      notes.forEach((text, i) => {
+        s.addText(text, {
+          ...place(
+            { x: PAD.x, y: PAD.bottom - footH + i * 0.3, w: CONTENT.w, h: 0.3 },
+            'constituency note',
+          ),
+          fontSize: TYPE.caption,
+          color: MUTED,
+          fontFace: FONT,
+          valign: 'middle',
+        });
+      });
+    }
   }
 }
+
 
 /**
  * Where the reports came from.
@@ -826,6 +929,12 @@ function drawQuestion(
     return;
   }
 
+  // A percentage is averaged, not banded. See `percentageOf`.
+  if (b.percent) {
+    drawPercentage(pptx, slide, q, b.percent, { x: col.x, y: top, w: col.w, h: height });
+    return;
+  }
+
   /*
    * The question's own answers on the left, the comparisons on the right.
    *
@@ -897,6 +1006,93 @@ function drawWordCloud(
 }
 
 /** The question's own answers: a ring for a few, bars for more. */
+/**
+ * A question that asks for a percentage.
+ *
+ * The figure, then the same figure by party and by Local Government Area.
+ * It used to be drawn as bands - how many events were 40 to 59% female -
+ * which answers a question nobody asked of it and cannot be compared
+ * across parties without reading twenty numbers off a stacked bar.
+ *
+ * Both charts are drawn to a fixed 0-100 axis. Left to themselves they
+ * would each scale to their own largest bar, and a party averaging 30%
+ * would fill as much width as one averaging 95%.
+ */
+function drawPercentage(
+  pptx: PptxGenJS,
+  slide: PptxGenJS.Slide,
+  q: Question,
+  p: Percentage,
+  box: { x: number; y: number; w: number; h: number },
+): void {
+  const headH = 0.78;
+  slide.addText(
+    [
+      { text: `${Math.round(p.mean)}%`, options: { fontSize: TYPE.figure, bold: true, color: INK } },
+      {
+        text: `   mean of ${p.n} ${p.n === 1 ? 'estimate' : 'estimates'}`,
+        options: { fontSize: TYPE.body, color: MUTED },
+      },
+    ],
+    {
+      ...place({ x: box.x, y: box.y, w: box.w, h: headH }, 'percentage mean'),
+      fontFace: FONT,
+      align: 'center',
+      valign: 'middle',
+    },
+  );
+
+  const charts: { title: string; rows: GroupMean[] }[] = [];
+  if (p.byParty.length > 1) charts.push({ title: 'By party', rows: p.byParty });
+  if (p.byArea.length > 1) {
+    charts.push({ title: 'By Local Government Area', rows: p.byArea });
+  }
+  if (charts.length === 0) return;
+
+  const top = box.y + headH + 0.1;
+  const h = box.h - headH - 0.1;
+  const gap = PAD.gap;
+  const w = (box.w - gap * (charts.length - 1)) / charts.length;
+
+  charts.forEach((c, i) => {
+    const x = box.x + i * (w + gap);
+    slide.addText(c.title, {
+      ...place({ x, y: top, w, h: 0.4 }, 'percentage chart title'),
+      fontSize: TYPE.chartTitleSmall,
+      color: INK,
+      fontFace: FONT,
+      align: 'center',
+      valign: 'middle',
+    });
+    slide.addChart(
+      pptx.ChartType.bar,
+      [
+        {
+          name: q.code || 'Percentage',
+          labels: topDown(c.rows.map((r) => `${r.label} (${r.n})`)),
+          values: topDown(c.rows.map((r) => Math.round(r.mean))),
+        },
+      ],
+      {
+        ...place({ x, y: top + 0.42, w, h: h - 0.42 }, 'percentage chart'),
+        ...BARE,
+        barDir: 'bar',
+        chartColors: [ACCENT_DEEP],
+        barGapWidthPct: 55,
+        valAxisMaxVal: 100,
+        valAxisMinVal: 0,
+        showValue: true,
+        dataLabelPosition: 'outEnd',
+        dataLabelFormatCode: '0"%"',
+        dataLabelColor: MUTED,
+        dataLabelFontSize: TYPE.dataLabel,
+        catAxisLabelFontSize: TYPE.category,
+        showLegend: false,
+      },
+    );
+  });
+}
+
 function drawAnswerChart(
   pptx: PptxGenJS,
   slide: PptxGenJS.Slide,

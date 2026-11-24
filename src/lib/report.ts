@@ -34,7 +34,7 @@ import {
   reportsByPlace,
   type Dataset,
 } from './analyse';
-import { barChartPng, stackedByAreaPng, wordCloudPng } from './chartImage';
+import { barChartPng, meanBarsPng, stackedByAreaPng, wordCloudPng } from './chartImage';
 import { wordFrequencies } from './text';
 import { mapPng } from './mapImage';
 import { describe, describeFinding, executiveSummary } from './narrative';
@@ -357,6 +357,22 @@ export async function buildReport(
         children.push(chartParagraph(wordCloudPng(words, CAT.map((c) => `#${c}`), 640, 330)));
         children.push(caption(`Figure ${figure}. ${q.code} ${q.label}`.trim()));
         figure += 1;
+        continue;
+      }
+
+      // A percentage question is averaged, not banded: the figure, then
+      // the same figure by party and by area.
+      if (b.percent) {
+        const p = b.percent;
+        for (const [title, rows] of [
+          ['by party', p.byParty],
+          [`by ${dataset.geo ? 'Local Government Area' : 'district'}`, p.byArea],
+        ] as const) {
+          if (rows.length < 2) continue;
+          children.push(chartParagraph(meanBarsPng(rows, `#${ACCENT_DEEP}`)));
+          children.push(caption(`Figure ${figure}. ${q.code} ${title}.`));
+          figure += 1;
+        }
         continue;
       }
 

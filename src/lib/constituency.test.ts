@@ -90,6 +90,13 @@ describe('constituencies under their area', () => {
     expect(kmc.totalConstituencies).toBe(7);
   });
 
+  it('says what the unplaced reports wrote instead', () => {
+    // "Constituency not named" reads as missing data. The field was
+    // filled in; what it held was a neighbourhood.
+    const kmc = constituencyCoverage(form()).groups.find((g) => g.area === 'Kanifing')!;
+    expect(kmc.unrecognised).toEqual([{ text: 'Westfield', reports: 1 }]);
+  });
+
   it('shows how much of an area was reached, not just that it was', () => {
     const { groups } = constituencyCoverage(form());
     const basse = groups.find((g) => g.area === 'Basse')!;
@@ -127,5 +134,30 @@ describe('the deck', () => {
     expect(page, 'the constituency page is in the deck').toBeDefined();
     expect(page).toContain('Serekunda West');
     expect(page).toContain('Kanifing');
+  });
+
+  it('sets it as a table, with the register beside the reports', async () => {
+    const ds = form();
+    const deck = buildDeck(ds, undefined, {
+      selection: {
+        ...defaultSelection(ds, 'test'),
+        maps: false,
+        findingsTable: false,
+        ratings: false,
+        questions: [],
+      },
+      includeMaps: false,
+    });
+    const buf = (await deck.write({ outputType: 'nodebuffer' })) as Buffer;
+    const zip = await JSZip.loadAsync(buf);
+    const slides = Object.keys(zip.files).filter((f) => /ppt\/slides\/slide\d+\.xml$/.test(f));
+    const texts = await Promise.all(slides.map((f) => zip.files[f]!.async('string')));
+    const page = texts.find((x) => x.includes('Coverage by constituency'))!;
+    expect(page).toContain('<a:tbl>');
+    expect(page).toContain('Registered');
+    // Serekunda West's 2026 register, from the IEC's own figures.
+    expect(page).toContain('51,522');
+    // And what the report that named no constituency actually wrote.
+    expect(page).toContain('Westfield');
   });
 });

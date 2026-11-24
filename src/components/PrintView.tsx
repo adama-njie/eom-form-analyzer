@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { BarList, Donut, StackedByArea, WordCloud, fmtPct } from './charts';
+import { BarList, Donut, PercentPanel, StackedByArea, WordCloud, fmtPct } from './charts';
 import { GambiaMap } from './GambiaMap';
 import {
   analyse,
@@ -213,6 +213,17 @@ function PrintQuestion({
           <span className="qcode">{q.code}</span> {q.label}
         </h3>
         <WordCloud words={words} />
+      </article>
+    );
+  }
+  if (b.percent) {
+    return (
+      <article className="print-q">
+        <h3>
+          <span className="qcode">{q.code}</span> {q.label}
+        </h3>
+        <PercentPanel p={b.percent} />
+        <p className="muted small">{describe(q, b, dataset.geo)}</p>
       </article>
     );
   }

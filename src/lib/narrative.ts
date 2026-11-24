@@ -30,6 +30,34 @@ export function describe(q: Question, b: Breakdown, geo: boolean): string {
   if (b.answered === 0) return 'No reports answered this question.';
   const area = geo ? 'area' : 'district';
 
+  if (b.percent) {
+    // A percentage is already a rate, so the thing to report is its
+    // average and where it is highest - not which band most events fell in.
+    const p = b.percent;
+    const sentences = [
+      `Observers estimated ${Math.round(p.mean)}% on average, across ${p.n} ${
+        p.n === 1 ? 'report' : 'reports'
+      }.`,
+    ];
+    const top = (rows: typeof p.byParty) =>
+      rows.reduce((a, c) => (c.mean > a.mean ? c : a), rows[0]!);
+    if (p.byParty.length > 1) {
+      const t = top(p.byParty);
+      sentences.push(
+        `It was highest for ${t.label}, at ${Math.round(t.mean)}% across ${t.n} ${
+          t.n === 1 ? 'report' : 'reports'
+        }.`,
+      );
+    }
+    if (p.byArea.length > 1) {
+      const t = top(p.byArea);
+      sentences.push(
+        `By ${area}, the highest was ${t.label} at ${Math.round(t.mean)}%.`,
+      );
+    }
+    return sentences.join(' ');
+  }
+
   if (q.kind === 'numeric' && b.numeric) {
     // Deliberately not the mean. Where the answers cluster, and how heavy the
     // top band is, is what a reader can act on; an average of a count with a

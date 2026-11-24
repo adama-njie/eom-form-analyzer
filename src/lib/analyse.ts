@@ -10,7 +10,9 @@ import {
   CONSTITUENCY_TO_DISTRICT,
   DISTRICT_SHAPES,
   LGAS,
+  TOTAL_REGISTERED_2026,
   lgaName,
+  registeredOf,
   resolveConstituency,
   resolveLga,
   type LgaCode,
@@ -59,6 +61,33 @@ export interface Breakdown {
   numeric?: { n: number; sum: number; bins: Count[] };
   /** For ordinal questions scored 1..k, the mean score. */
   meanScore?: number;
+  /**
+   * For a question that asks for a percentage, the percentage.
+   *
+   * Set only for those. Every other number is a count of something, and a
+   * mean count is the figure this tool refuses to print; but "estimated %
+   * of female participants" is already a rate, and the thing a reader
+   * wants from thirty-six of them is their average, by party and by area.
+   * Bands answered a different question - how many events were between 40
+   * and 59% - which is not what was asked.
+   */
+  percent?: Percentage;
+}
+
+/** One group's average, and how many reports it rests on. */
+export interface GroupMean {
+  label: string;
+  mean: number;
+  n: number;
+}
+
+export interface Percentage {
+  /** The mean of the observers' estimates. */
+  mean: number;
+  /** How many reports gave one. */
+  n: number;
+  byParty: GroupMean[];
+  byArea: GroupMean[];
 }
 
 export interface Dataset {
@@ -424,6 +453,69 @@ export function answersFor(question: Question, row: string[]): string[] {
   return [question.kind === 'time' ? bucketTime(v) : v];
 }
 
+/**
+ * Whether a numeric question asks for a percentage.
+ *
+ * Read from the question's own wording, which is where the form says it:
+ * "B.8 Estimated % of female participants" asks for one, "B.11 Total
+ * number of speakers" does not.
+ */
+export function isPercentageQuestion(question: Question): boolean {
+  return question.kind === 'numeric' && /%|per ?cent/i.test(question.label);
+}
+
+/**
+ * The average of a percentage question, overall and by group.
+ *
+ * It is the mean of the observers' estimates, one report one vote, and not
+ * a share of the people at the events: an event of two thousand and an
+ * event of fifty count the same here, because the form records an
+ * estimated percentage and not a headcount, so there is nothing to weight
+ * by that would not be invented. Every chart of it says how many reports
+ * it rests on for that reason.
+ *
+ * An entry outside 0 to 100 is dropped. It is not a percentage, whatever
+ * else it is.
+ */
+export function percentageOf(
+  dataset: Dataset,
+  question: Question,
+  rowFilter?: boolean[],
+): Percentage | null {
+  const col = question.columns[0];
+  if (col === undefined) return null;
+  const all: number[] = [];
+  const byParty = new Map<string, number[]>();
+  const byArea = new Map<string, number[]>();
+
+  dataset.table.rows.forEach((row, i) => {
+    if (rowFilter && !rowFilter[i]) return;
+    const raw = clean(row[col] ?? '');
+    if (isBlank(raw)) return;
+    const v = Number(raw);
+    if (!Number.isFinite(v) || v < 0 || v > 100) return;
+    all.push(v);
+    const party = dataset.rowParty[i];
+    if (party) byParty.set(party, [...(byParty.get(party) ?? []), v]);
+    const area = dataset.rowGroup[i];
+    if (area) byArea.set(area, [...(byArea.get(area) ?? []), v]);
+  });
+
+  if (all.length === 0) return null;
+  const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const ordered = (m: Map<string, number[]>, order: string[]): GroupMean[] =>
+    order
+      .filter((label) => m.has(label))
+      .map((label) => ({ label, mean: mean(m.get(label)!), n: m.get(label)!.length }));
+
+  return {
+    mean: mean(all),
+    n: all.length,
+    byParty: ordered(byParty, dataset.parties),
+    byArea: ordered(byArea, dataset.groups),
+  };
+}
+
 export function analyse(dataset: Dataset, question: Question, rowFilter?: boolean[]): Breakdown {
   const { rows } = dataset.table;
   const include = (i: number) => !rowFilter || rowFilter[i];
@@ -582,6 +674,10 @@ export function analyse(dataset: Dataset, question: Question, rowFilter?: boolea
       }
     }
     if (n > 0) breakdown.meanScore = weighted / n;
+  }
+
+  if (isPercentageQuestion(question)) {
+    breakdown.percent = percentageOf(dataset, question, rowFilter) ?? undefined;
   }
 
   return breakdown;
@@ -850,6 +946,15 @@ export interface ConstituencyGroup {
   totalConstituencies: number;
   /** Reports from the LGA whose constituency could not be read. */
   unnamed: number;
+  /**
+   * What those reports wrote instead, as they wrote it.
+   *
+   * "Constituency not named" on its own reads as a gap in the data when
+   * the field was in fact filled in - with a neighbourhood, an area or a
+   * region, none of which is a constituency. Showing the entry turns a
+   * shrug into something the data team can act on.
+   */
+  unrecognised: { text: string; reports: number }[];
 }
 
 /**
@@ -874,9 +979,10 @@ export function constituencyCoverage(
   const perArea = new Map<string, Map<string, number>>();
   const totals = new Map<string, number>();
   const unnamed = new Map<string, number>();
+  const wrote = new Map<string, Map<string, number>>();
   let ungrouped = 0;
 
-  dataset.table.rows.forEach((_row, i) => {
+  dataset.table.rows.forEach((row, i) => {
     if (rowFilter && !rowFilter[i]) return;
     const area = dataset.rowGroup[i];
     if (!area) {
@@ -887,6 +993,15 @@ export function constituencyCoverage(
     const c = dataset.rowConstituency[i];
     if (!c) {
       unnamed.set(area, (unnamed.get(area) ?? 0) + 1);
+      const raw =
+        dataset.constituencyColumn === null
+          ? ''
+          : clean(row[dataset.constituencyColumn] ?? '');
+      if (raw) {
+        const m = wrote.get(area) ?? new Map<string, number>();
+        m.set(raw, (m.get(raw) ?? 0) + 1);
+        wrote.set(area, m);
+      }
       return;
     }
     const m = perArea.get(area) ?? new Map<string, number>();
@@ -907,6 +1022,9 @@ export function constituencyCoverage(
       })),
       totalConstituencies: a.constituencies.length,
       unnamed: unnamed.get(a.name) ?? 0,
+      unrecognised: [...(wrote.get(a.name) ?? new Map<string, number>())]
+        .sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))
+        .map(([text, reports]) => ({ text, reports })),
     };
   });
 
@@ -953,7 +1071,10 @@ export function coverage(dataset: Dataset, rowFilter?: boolean[]): Coverage {
     label,
     reports: counts.get(label) ?? 0,
     registered: dataset.geo
-      ? (LGAS.find((a) => a.name === label)?.registered2021 ?? null)
+      ? (() => {
+          const a = LGAS.find((x) => x.name === label);
+          return a ? registeredOf(a.code) : null;
+        })()
       : null,
   }));
 
@@ -962,7 +1083,7 @@ export function coverage(dataset: Dataset, rowFilter?: boolean[]): Coverage {
     const observed = byGroup
       .filter((g) => g.reports > 0)
       .reduce((s2, g) => s2 + (g.registered ?? 0), 0);
-    const total = LGAS.reduce((s2, a) => s2 + a.registered2021, 0);
+    const total = TOTAL_REGISTERED_2026;
     registerShare = total > 0 ? (observed / total) * 100 : 0;
   }
 

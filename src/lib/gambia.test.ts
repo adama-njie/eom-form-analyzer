@@ -6,7 +6,9 @@ import {
   DISTRICT_TO_LGA,
   LGAS,
   LGA_SHAPES,
-  TOTAL_REGISTERED_2021,
+  REGISTERED_2026,
+  TOTAL_REGISTERED_2026,
+  registeredOf,
   UNMAPPED_CONSTITUENCIES,
   resolveConstituency,
   resolveLga,
@@ -24,14 +26,19 @@ describe('geography', () => {
     expect(new Set(ALL_CONSTITUENCIES).size).toBe(53);
   });
 
-  it('reconciles to the official 2021 register', () => {
-    expect(TOTAL_REGISTERED_2021).toBe(962_157);
+  it('reconciles to the official 2026 register', () => {
+    expect(TOTAL_REGISTERED_2026).toBe(1_119_143);
+  });
+
+  it('knows the register of every constituency it lists', () => {
+    // The LGA figures are sums of these, so a constituency with no entry
+    // would quietly shrink its area's electorate.
+    for (const c of ALL_CONSTITUENCIES) expect(REGISTERED_2026[c]).toBeGreaterThan(0);
+    expect(Object.keys(REGISTERED_2026)).toHaveLength(53);
   });
 
   it('splits Central River back into Kuntaur and Janjanbureh', () => {
-    const kuntaur = LGAS.find((a) => a.code === 'KUN')!;
-    const janjan = LGAS.find((a) => a.code === 'JAN')!;
-    expect(kuntaur.registered2021 + janjan.registered2021).toBe(119_606);
+    expect(registeredOf('KUN') + registeredOf('JAN')).toBe(140_899);
   });
 });
 
@@ -60,6 +67,35 @@ describe('name matching', () => {
 
   it('still resolves the IEC seven-area name', () => {
     expect(resolveLga('Central River')).not.toBeNull();
+  });
+
+  it('forgives a letter, which is what observers actually write', () => {
+    // Both of these are in the live campaign export.
+    expect(resolveConstituency('Kantoro')?.name).toBe('Kantora');
+    expect(resolveConstituency('Foni Jarol')?.name).toBe('Foni Jarrol');
+  });
+
+  it('completes a name that can only be one constituency', () => {
+    expect(resolveConstituency('Latrikunda')?.name).toBe('Latrikunda Sabiji');
+    // The other way round too: an entry that opens with a constituency
+    // and goes on to say where in it.
+    expect(resolveConstituency('Basse Santa Su')?.name).toBe('Basse');
+  });
+
+  it('refuses a name that could be two', () => {
+    // "Brikama" starts both Brikama North and Brikama South, so it names
+    // the area. Picking one would put a report in a constituency nobody
+    // reported from.
+    expect(resolveConstituency('Brikama')).toBeNull();
+    expect(resolveConstituency('Niamina')).toBeNull();
+    // As an area, though, it is unambiguous: both are in Brikama.
+    expect(resolveLga('Brikama')).toBe('BRI');
+  });
+
+  it('refuses what is not a constituency at all', () => {
+    for (const raw of ['Westfield', 'URR', 'Kanifing', 'the village hall', '']) {
+      expect(resolveConstituency(raw), raw).toBeNull();
+    }
   });
 });
 

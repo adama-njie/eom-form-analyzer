@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 186 tests
+npm test           # vitest, 193 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 143 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 150 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -91,6 +91,20 @@ geography.
 
 ## Decisions that are easy to undo by accident
 
+- **The gazetteer is the IEC's.** The 53 constituencies and their register
+  come from "Total Number of Registered Voters Per Polling Station 2026";
+  `REGISTERED_2026` is the only place a voter figure is written and an LGA's
+  electorate is the sum of its constituencies. The IEC reports under seven
+  regions, so Central River is split back into Kuntaur and Janjanbureh here.
+- **A constituency name resolves exactly, by unique prefix, or by one
+  letter.** "Latrikunda" can only be Latrikunda Sabiji, and "Kantoro" is
+  Kantora; "Brikama" is the start of two constituencies, so it names the area
+  and resolves to neither. What does not resolve is shown as written -
+  "Westfield", "URR" - on screen and under the deck's table, because
+  "constituency not named" reads as missing data when the field was filled in.
+- **Coverage by constituency is a table**, grouped by area, with the register
+  beside the reports, spread evenly over as many columns as it takes and
+  continued on a second slide where it must be.
 - **An LGA is named by its administrative capital.** Banjul, Kanifing,
   Brikama, Kerewan, Mansa Konko, Kuntaur, Janjanbureh, Basse. The regional
   names (West Coast, North Bank, Lower River, Upper River) are aliases that
@@ -114,8 +128,15 @@ geography.
   header, so "B.15 Language(s) of the speeches (Mandinka)" keeps its block.
 - **Numbers are counted in bands from the start**, not banded at the chart.
   The bands are what `byArea` and `byParty` hold, so a numeric question can be
-  compared across party and area; a question whose wording asks for a
-  percentage carries `%` into every band label.
+  compared across party and area.
+- **A question that asks for a percentage is averaged, not banded.** B.8 and
+  B.9 are already rates, so the figure, the figure by party and the figure by
+  LGA is what they get - `isPercentageQuestion` and `percentageOf` in
+  `analyse.ts`, drawn by `drawPercentage`, `PercentPanel` and `meanBarsPng`.
+  Every bar says how many reports it rests on, the bars run against a fixed
+  0-100 track, and the mean is one report one vote: the form records an
+  estimated share, not a headcount, so there is nothing to weight by that
+  would not be invented.
 - **Maps carry a key and no prose.** Title, picture, key. A categorical or
   ordinal question with two to five answers and at least three areas also gets
   a pie map after its own slide, with the pies sized by report count and

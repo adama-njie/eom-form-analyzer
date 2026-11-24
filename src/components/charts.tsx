@@ -1,4 +1,4 @@
-import type { Count } from '@/lib/analyse';
+import type { Count, GroupMean, Percentage } from '@/lib/analyse';
 import { NON_ANSWERS } from '@/lib/schema';
 import { ACCENT, ACCENT_DEEP, CAT, NOT_APPLICABLE, SCALE } from '@/lib/theme';
 
@@ -167,6 +167,67 @@ export function BarList({
         </li>
       ))}
     </ul>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+/**
+ * A percentage question, averaged.
+ *
+ * The bars run against a fixed 0 to 100 track rather than against the
+ * largest of them, because the thing being drawn is already a percentage:
+ * a party averaging 30% must not fill the same width as one averaging 95%.
+ * Each bar carries the number of reports behind it, since an average of
+ * two estimates and an average of twelve look identical otherwise.
+ */
+export function MeanBars({ rows }: { rows: GroupMean[] }) {
+  if (rows.length === 0) return <p className="muted">No answers.</p>;
+  return (
+    <ul className="barlist">
+      {rows.map((r) => (
+        <li key={r.label}>
+          <span className="barlist-label" title={r.label}>
+            {r.label}
+          </span>
+          <span className="barlist-track">
+            <span
+              className="barlist-fill"
+              style={{ width: `${Math.max(0, Math.min(100, r.mean))}%`, background: BAR }}
+            />
+          </span>
+          <span className="barlist-value">
+            {Math.round(r.mean)}% <span className="muted">of {r.n}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The figure, then the same figure by party and by area. */
+export function PercentPanel({ p }: { p: Percentage }) {
+  return (
+    <>
+      <p className="percent-headline">
+        <strong>{Math.round(p.mean)}%</strong>{' '}
+        <span className="muted small">
+          mean of {p.n} {p.n === 1 ? 'estimate' : 'estimates'}
+        </span>
+      </p>
+      {p.byParty.length > 1 && (
+        <>
+          <h4 className="chart-sub">By party</h4>
+          <MeanBars rows={p.byParty} />
+        </>
+      )}
+      {p.byArea.length > 1 && (
+        <>
+          <h4 className="chart-sub">By Local Government Area</h4>
+          <MeanBars rows={p.byArea} />
+        </>
+      )}
+    </>
   );
 }
 
