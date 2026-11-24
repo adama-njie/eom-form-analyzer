@@ -13,6 +13,7 @@
 import type { Breakdown, Dataset } from './analyse';
 import { analyse, displayCounts, findings, isWordCloud } from './analyse';
 import { columnWidth, fitsAt } from './layout';
+import { periodSlug, type Period } from './period';
 import type { Question } from './schema';
 import { TYPE } from './theme';
 
@@ -35,6 +36,8 @@ export interface ExportSelection {
    * checked against the file it came from.
    */
   period: string;
+  /** The same choice as a word, for the file's name. */
+  periodId: Period;
   /** Section blocks, in the order they appear in the output. */
   coverage: boolean;
   maps: boolean;
@@ -226,6 +229,7 @@ export function defaultSelection(dataset: Dataset, formName: string): ExportSele
     election: 'Presidential Election - The Gambia',
     electionDate: '5 December 2026',
     period: '',
+    periodId: 'all',
     coverage: true,
     maps: true,
     findingsTable: true,
@@ -233,6 +237,47 @@ export function defaultSelection(dataset: Dataset, formName: string): ExportSele
     questions: [],
     ...preset.build(dataset),
   };
+}
+
+/**
+ * What an export is called before the analyst renames it.
+ *
+ * The sheet's own name, which on a form export is the form's own
+ * ("Campaign Report"). It is the cover's title and now the downloaded
+ * file's name as well, and neither reads properly as
+ * "campaign-report-20261124-143212.xlsx". A workbook saved with a
+ * spreadsheet's default sheet name says nothing about what is in it, so
+ * that falls back to the file it came in.
+ */
+export function defaultTitle(fileName: string, sheetName: string): string {
+  const sheet = sheetName.trim();
+  const generic = /^(sheet|table|tabelle|hoja|feuille|foglio)\s*\d*$/i;
+  if (sheet && !generic.test(sheet)) return sheet;
+  return fileName.replace(/\.[^.]+$/, '') || fileName;
+}
+
+/**
+ * What a downloaded file is called.
+ *
+ * The title the dialogue was given, rather than a fixed
+ * "observer-analysis": an analyst produces a deck for the Chief Observer
+ * and another for the EMB in the same afternoon, and two files of the same
+ * name land in Downloads as (1) and (2), which says nothing about which is
+ * which. The period goes in the name as well - an all-period export and a
+ * campaign-period one are the pair most easily confused - and the date, so
+ * that this morning's file is still recognisable next week.
+ */
+export function exportFileName(selection: ExportSelection, extension: string): string {
+  const base = selection.title
+    // The source workbook's extension is noise in another file's name.
+    .replace(/\.(xlsx|xlsm|xls|csv)\b/gi, ' ')
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 70)
+    .replace(/-+$/, '');
+  const stamp = new Date().toISOString().slice(0, 10);
+  const parts = [base || 'observer-analysis', periodSlug(selection.periodId), stamp];
+  return `${parts.filter(Boolean).join('-')}.${extension}`;
 }
 
 /** The selected questions, in form order rather than click order. */

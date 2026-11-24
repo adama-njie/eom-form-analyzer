@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyse, bandsFor, buildDataset, percentageOf } from './analyse';
+import { analyse, bandsFor, buildDataset, meanLabel, percentageOf } from './analyse';
 import { inferSchema, toTable } from './schema';
 
 /**
@@ -86,6 +86,22 @@ describe('a percentage question', () => {
     const p = percentageOf(ds, ds.questions.find((x) => x.code === 'B.8')!)!;
     expect(p.n).toBe(2);
     expect(p.mean).toBe(50);
+  });
+});
+
+describe('writing an average out', () => {
+  it('rounds to a whole number, as the estimates behind it are', () => {
+    expect(meanLabel(48.25)).toBe('48');
+    expect(meanLabel(49.6)).toBe('50');
+    expect(meanLabel(50)).toBe('50');
+  });
+
+  it('keeps a decimal place where rounding would wipe the figure out', () => {
+    // B.10, estimated % of disabled participants, runs at well under 1%.
+    // "0%" says nobody was there when several reports said somebody was.
+    expect(meanLabel(0.54)).toBe('0.5');
+    expect(meanLabel(2.25)).toBe('2.3');
+    expect(meanLabel(3)).toBe('3');
   });
 });
 

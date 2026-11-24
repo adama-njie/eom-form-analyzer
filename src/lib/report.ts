@@ -40,7 +40,7 @@ import { mapPng } from './mapImage';
 import { describe, describeFinding, executiveSummary } from './narrative';
 import { JUDGED, colourFor, fillsFor } from './pptx';
 import { ACCENT_DEEP, CAT, FLAG, INK, MUTED } from './theme';
-import { selectedQuestions, type ExportSelection } from './selection';
+import { exportFileName, selectedQuestions, type ExportSelection } from './selection';
 
 // One palette for every output. A figure that appears in the deck and in
 // the report should be the same colour in both, because they get shown in
@@ -470,7 +470,7 @@ export async function exportReport(
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `observer-report-${new Date().toISOString().slice(0, 10)}.docx`;
+  a.download = exportFileName(options.selection, 'docx');
   document.body.appendChild(a);
   a.click();
   a.remove();

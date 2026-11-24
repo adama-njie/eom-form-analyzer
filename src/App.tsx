@@ -39,6 +39,8 @@ import ExportDialog, { type ExportKind } from '@/components/ExportDialog';
 import PrintView from '@/components/PrintView';
 import {
   defaultSelection,
+  defaultTitle,
+  exportFileName,
   exportableQuestions,
   selectedQuestions,
   type ExportSelection,
@@ -53,6 +55,9 @@ const JUDGED =
 export default function App() {
   const [dataset, setDataset] = useState<Dataset | null>(null);
   const [formName, setFormName] = useState('');
+  // What the export dialogue opens with: the form's own name, not the
+  // workbook's file name, because it ends up on a cover and on a file.
+  const [title, setTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('overview');
   const [group, setGroup] = useState<string>('');
@@ -86,6 +91,7 @@ export default function App() {
       if (questions.length === 0) throw new Error('No questions could be identified.');
       setDataset(buildDataset(table, questions));
       setFormName(`${file.name} — ${best.n}`);
+      setTitle(defaultTitle(file.name, best.n));
       setGroup('');
       setTeam('');
       setPeriod('all');
@@ -155,8 +161,9 @@ export default function App() {
     // screen is what the export covers, and the cover says which that is.
     const note = periodNote(dataset, period);
     setSelection((current) => ({
-      ...(current ?? defaultSelection(dataset, formName)),
+      ...(current ?? defaultSelection(dataset, title)),
       period: note,
+      periodId: period,
     }));
     setExporting(kind);
   };
@@ -257,7 +264,16 @@ export default function App() {
           </button>
           <button
             type="button"
-            onClick={() => exportAllTables(dataset, rowFilter)}
+            onClick={() =>
+              exportAllTables(
+                dataset,
+                rowFilter,
+                exportFileName(
+                  { ...(selection ?? defaultSelection(dataset, title)), periodId: period },
+                  'csv',
+                ),
+              )
+            }
           >
             Export tables
           </button>

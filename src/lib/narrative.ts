@@ -12,7 +12,7 @@
  */
 
 import type { Breakdown, Dataset, Finding } from './analyse';
-import { analyse, coverage, findings, realTotal } from './analyse';
+import { analyse, coverage, findings, meanLabel, realTotal } from './analyse';
 import type { Question } from './schema';
 
 function pct(v: number): string {
@@ -35,7 +35,7 @@ export function describe(q: Question, b: Breakdown, geo: boolean): string {
     // average and where it is highest - not which band most events fell in.
     const p = b.percent;
     const sentences = [
-      `Observers estimated ${Math.round(p.mean)}% on average, across ${p.n} ${
+      `Observers estimated ${meanLabel(p.mean)}% on average, across ${p.n} ${
         p.n === 1 ? 'report' : 'reports'
       }.`,
     ];
@@ -44,7 +44,7 @@ export function describe(q: Question, b: Breakdown, geo: boolean): string {
     if (p.byParty.length > 1) {
       const t = top(p.byParty);
       sentences.push(
-        `It was highest for ${t.label}, at ${Math.round(t.mean)}% across ${t.n} ${
+        `It was highest for ${t.label}, at ${meanLabel(t.mean)}% across ${t.n} ${
           t.n === 1 ? 'report' : 'reports'
         }.`,
       );
@@ -52,7 +52,7 @@ export function describe(q: Question, b: Breakdown, geo: boolean): string {
     if (p.byArea.length > 1) {
       const t = top(p.byArea);
       sentences.push(
-        `By ${area}, the highest was ${t.label} at ${Math.round(t.mean)}%.`,
+        `By ${area}, the highest was ${t.label} at ${meanLabel(t.mean)}%.`,
       );
     }
     return sentences.join(' ');

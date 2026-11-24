@@ -34,7 +34,7 @@ export function downloadCsv(filename: string, rows: (string | number)[][]): void
  * what gets pasted into a report or handed to someone who wants to check a
  * number without opening the tool.
  */
-export function exportAllTables(dataset: Dataset, filter?: boolean[]): void {
+export function exportAllTables(dataset: Dataset, filter?: boolean[], name?: string): void {
   const rows: (string | number)[][] = [
     ['Observer form analysis'],
     ['Generated', new Date().toISOString()],
@@ -58,5 +58,5 @@ export function exportAllTables(dataset: Dataset, filter?: boolean[]): void {
     }
   }
 
-  downloadCsv('observer-form-analysis.csv', rows);
+  downloadCsv(name || 'observer-form-analysis.csv', rows);
 }

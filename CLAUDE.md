@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 193 tests
+npm test           # vitest, 202 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 150 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 159 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -136,7 +136,15 @@ geography.
   Every bar says how many reports it rests on, the bars run against a fixed
   0-100 track, and the mean is one report one vote: the form records an
   estimated share, not a headcount, so there is nothing to weight by that
-  would not be invented.
+  would not be invented. The figure stands alone - "mean of 36 estimates"
+  beside it read as a hedge, not as a base - and `meanLabel` is the one
+  place it is written: whole numbers, except under 10, where B.10's half a
+  percent would otherwise be drawn as 0%.
+- **An export is named after the title it was given**, not
+  `observer-analysis-<date>`: `exportFileName` slugs the dialogue's title,
+  adds the period where one is filtered, then the date. The title starts
+  as the form's own name from the sheet (`defaultTitle`), because it is
+  printed on a cover as well as on a file.
 - **Maps carry a key and no prose.** Title, picture, key. A categorical or
   ordinal question with two to five answers and at least three areas also gets
   a pie map after its own slide, with the pies sized by report count and

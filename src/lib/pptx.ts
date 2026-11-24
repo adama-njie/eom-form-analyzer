@@ -5,6 +5,7 @@ import {
   coverage,
   displayCounts,
   findings,
+  meanLabel,
   rateByPlace,
   reportsByPlace,
   textValues,
@@ -39,6 +40,7 @@ import {
   needsOwnSlide,
   selectedQuestions,
   slideBreakdown,
+  exportFileName,
   type ExportSelection,
 } from './selection';
 import { NON_ANSWERS, type Question } from './schema';
@@ -127,8 +129,7 @@ export async function exportPptx(
   options: PptxOptions,
 ): Promise<void> {
   const pptx = buildDeck(dataset, filter, options);
-  const stamp = new Date().toISOString().slice(0, 10);
-  await pptx.writeFile({ fileName: `observer-analysis-${stamp}.pptx` });
+  await pptx.writeFile({ fileName: exportFileName(options.selection, 'pptx') });
 }
 
 /** Build the deck without writing it, so it can be inspected in tests. */
@@ -1026,14 +1027,11 @@ function drawPercentage(
   box: { x: number; y: number; w: number; h: number },
 ): void {
   const headH = 0.78;
+  // The figure alone. "mean of 36 estimates" beside it read as a hedge
+  // rather than as a base; the reports behind each average are on the
+  // bars, and the deck's coverage slide carries the total.
   slide.addText(
-    [
-      { text: `${Math.round(p.mean)}%`, options: { fontSize: TYPE.figure, bold: true, color: INK } },
-      {
-        text: `   mean of ${p.n} ${p.n === 1 ? 'estimate' : 'estimates'}`,
-        options: { fontSize: TYPE.body, color: MUTED },
-      },
-    ],
+    [{ text: `${meanLabel(p.mean)}%`, options: { fontSize: TYPE.figure, bold: true, color: INK } }],
     {
       ...place({ x: box.x, y: box.y, w: box.w, h: headH }, 'percentage mean'),
       fontFace: FONT,
@@ -1056,6 +1054,10 @@ function drawPercentage(
 
   charts.forEach((c, i) => {
     const x = box.x + i * (w + gap);
+    // A chart of small averages needs a decimal place: B.10 runs at well
+    // under 1%, and whole numbers would draw every bar as 0% or 1%.
+    const fine = c.rows.some((r) => r.mean < 10 && Math.round(r.mean * 10) % 10 !== 0);
+    const value = (v: number) => (fine ? Math.round(v * 10) / 10 : Math.round(v));
     slide.addText(c.title, {
       ...place({ x, y: top, w, h: 0.4 }, 'percentage chart title'),
       fontSize: TYPE.chartTitleSmall,
@@ -1070,7 +1072,7 @@ function drawPercentage(
         {
           name: q.code || 'Percentage',
           labels: topDown(c.rows.map((r) => `${r.label} (${r.n})`)),
-          values: topDown(c.rows.map((r) => Math.round(r.mean))),
+          values: topDown(c.rows.map((r) => value(r.mean))),
         },
       ],
       {
@@ -1083,7 +1085,7 @@ function drawPercentage(
         valAxisMinVal: 0,
         showValue: true,
         dataLabelPosition: 'outEnd',
-        dataLabelFormatCode: '0"%"',
+        dataLabelFormatCode: fine ? '0.0"%"' : '0"%"',
         dataLabelColor: MUTED,
         dataLabelFontSize: TYPE.dataLabel,
         catAxisLabelFontSize: TYPE.category,

@@ -90,6 +90,19 @@ export interface Percentage {
   byArea: GroupMean[];
 }
 
+/**
+ * A mean percentage, written for a reader.
+ *
+ * Whole numbers, because the estimates behind them are whole numbers -
+ * except where the figure is small, which rounding destroys: B.10
+ * averages 0.54%, and "0%" says nobody when several reports said
+ * somebody.
+ */
+export function meanLabel(value: number): string {
+  const tenth = Math.round(value * 10) / 10;
+  return value < 10 && !Number.isInteger(tenth) ? tenth.toFixed(1) : String(Math.round(value));
+}
+
 export interface Dataset {
   table: Table;
   questions: Question[];

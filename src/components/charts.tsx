@@ -1,4 +1,5 @@
 import type { Count, GroupMean, Percentage } from '@/lib/analyse';
+import { meanLabel } from '@/lib/analyse';
 import { NON_ANSWERS } from '@/lib/schema';
 import { ACCENT, ACCENT_DEEP, CAT, NOT_APPLICABLE, SCALE } from '@/lib/theme';
 
@@ -197,7 +198,7 @@ export function MeanBars({ rows }: { rows: GroupMean[] }) {
             />
           </span>
           <span className="barlist-value">
-            {Math.round(r.mean)}% <span className="muted">of {r.n}</span>
+            {meanLabel(r.mean)}% <span className="muted">of {r.n}</span>
           </span>
         </li>
       ))}
@@ -209,11 +210,14 @@ export function MeanBars({ rows }: { rows: GroupMean[] }) {
 export function PercentPanel({ p }: { p: Percentage }) {
   return (
     <>
+      {/*
+        * The figure alone. It used to carry "mean of 36 estimates" beside
+        * it, which read as a hedge rather than as a base; how many reports
+        * are behind each bar is on the bars, and the total is on the
+        * coverage line at the top of the page.
+        */}
       <p className="percent-headline">
-        <strong>{Math.round(p.mean)}%</strong>{' '}
-        <span className="muted small">
-          mean of {p.n} {p.n === 1 ? 'estimate' : 'estimates'}
-        </span>
+        <strong>{meanLabel(p.mean)}%</strong>
       </p>
       {p.byParty.length > 1 && (
         <>

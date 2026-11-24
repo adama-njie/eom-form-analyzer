@@ -286,6 +286,22 @@ against the longest of them. The mean is one report one vote: the form records a
 share and not a headcount, so an event of two thousand and an event of fifty count the same,
 and there is nothing to weight by that would not be invented.
 
+The figure is written on its own. It used to carry "mean of 36 estimates" beside it, which
+reads as a hedge rather than as a base, and the base is already on the bars and on the
+coverage slide. It is a whole number, as the estimates behind it are, except where rounding
+would destroy it: B.10 asks for the estimated share of participants with a disability and
+averages half a percent, and "0%" would say nobody was there when several reports said
+somebody was.
+
+**An export is named after the title it was given.** It used to be
+`observer-analysis-2026-11-24.pptx`, which is the same name for the Chief Observer's deck
+and the EMB's, produced the same afternoon, so the second arrives in Downloads as a (1).
+The name now follows the dialogue's title, and carries the period where one is filtered -
+an all-period export and a campaign-period one are the pair most easily mistaken for each
+other - and the date. The title itself starts as the form's own name, read off the sheet,
+rather than the workbook's file name: it is printed on a cover as well as on a file, and
+neither wants to read "campaign-report-20261124-143212.xlsx".
+
 **Coverage by constituency is a table.** A list with the count hanging off the right of each
 line reads well enough down one column and not at all across three. The table rules the
 columns, gives each area a banded row of its own, and has room for the register beside the

@@ -122,6 +122,13 @@ export function periodCounts(dataset: Dataset): PeriodCounts {
   return { campaign, before, undated };
 }
 
+/** The period, as a word a file name can carry. Blank for the whole file. */
+export function periodSlug(period: Period): string {
+  if (period === 'campaign') return 'campaign-period';
+  if (period === 'before') return 'before-campaign';
+  return '';
+}
+
 /**
  * Whether the period filter is worth offering.
  *

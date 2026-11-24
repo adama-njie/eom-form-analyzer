@@ -10,6 +10,7 @@
  */
 
 import type { Count, GroupMean } from './analyse';
+import { meanLabel } from './analyse';
 
 const SCALE = 2;
 // Arial, as the mission's reference report is set, and a size that survives
@@ -106,7 +107,7 @@ export function meanBarsPng(
     ctx.fillRect(trackX, y - 8, w, 16);
 
     ctx.fillStyle = '#16202A';
-    ctx.fillText(`${Math.round(row.mean)}%`, trackX + trackW + 10, y);
+    ctx.fillText(`${meanLabel(row.mean)}%`, trackX + trackW + 10, y);
     ctx.fillStyle = '#5D6B76';
     ctx.fillText(`of ${row.n}`, trackX + trackW + 52, y);
   });
