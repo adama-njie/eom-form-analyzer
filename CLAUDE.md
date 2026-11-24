@@ -66,11 +66,11 @@ src/
     text.ts            prose vs lists, word and phrase counting
     chartImage.ts      canvas rendering (report charts, word clouds)
     mapImage.ts        map rasterisation for the deck
-    gambia.ts          LGAs, constituencies, districts, name matching
+    gambia.ts          LGAs, constituencies, the register, name matching
     period.ts          the campaign period, and the dashboard's view of it
     layout.ts          slide geometry; `place()` throws on anything that would not fit
     theme.ts           every colour and type size in the product
-  data/boundaries.ts   real boundary shapes (geoBoundaries gbOpen)
+  data/boundaries.ts   real LGA boundaries (geoBoundaries gbOpen, ADM1)
 ```
 
 Nothing is specific to one country except `gambia.ts`. Point the tool at a form
@@ -111,6 +111,14 @@ geography.
   Coverage by constituency is a table, which can show all 53. Do not
   reintroduce the district layer without a real constituency boundary
   file; `scripts/build_boundaries.py` still writes the ADM2 shapes.
+- **A form from outside The Gambia still works, without the maps.** When the
+  area column's answers do not resolve against the gazetteer, `dataset.geo`
+  is false: the tool groups by whatever the file says, calls those groups
+  districts rather than areas on screen and in both documents, and draws no
+  map, with a line saying why. This is why `district` still appears
+  throughout `App.tsx`, `pptx.ts`, `report.ts` and `narrative.ts` after the
+  district map was removed - it is the generic word, not the Gambian
+  division. Do not tidy it away.
 - **Coverage by constituency is a table**, grouped by area, with the register
   beside the reports, spread evenly over as many columns as it takes and
   continued on a second slide where it must be.

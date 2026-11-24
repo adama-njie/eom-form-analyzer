@@ -43,8 +43,8 @@ Four tabs:
 
 - **Overview** — reports, areas and constituencies covered, reports by team and area, and the
   mean of each overall assessment question.
-- **Map** — the real map of The Gambia, shaded by *any* question and *any* answer, at Local
-  Government Area or district level. Pick "C.3 problem in the vicinity" and "Yes" and the map shows
+- **Map** — the real map of The Gambia, shaded by *any* question and *any* answer, across the
+  eight Local Government Areas. Pick "C.3 problem in the vicinity" and "Yes" and the map shows
   where that problem clusters. Click a place to filter the whole report to it. Places that returned
   no reports are hatched, never shaded at the bottom of the ramp, because "nobody observed here"
   and "nobody reported a problem here" are different statements.
@@ -164,8 +164,7 @@ constituency boundary file ever appears.
 
 Observers may write the LGA name, the IEC's name for it, the code or the constituency, and all
 resolve. The common spelling variants in Gambian official documents are folded too: Niumi/Nuimi,
-Baddibu/Badibu, Fulladu/Fuladu, Wuli/Wulli, Illiasa/Illiassa, Sanjal/Sanjar. Observers may write the area name, the IEC's name for it, the code, or the constituency, and
-all four resolve.
+Baddibu/Badibu, Fulladu/Fuladu, Wuli/Wulli, Illiasa/Illiassa, Sanjal/Sanjar.
 
 Because the register is attached, coverage can be expressed as the share of the electorate reached
 rather than just a count of reports, which matters when Kombo South has 62,399 registered voters and
@@ -197,8 +196,8 @@ rather than having its title shrunk or cut. The floor reaches the maps too,
 which are canvas images rather than PowerPoint text, so their labels are sized
 as a fraction of the drawing width and come out at the same 18pt once the slide
 has scaled the image. Banjul and Kanifing are too small to hold a name at that
-size, so theirs sit below the country on leader lines; on the district map,
-where most of the 48 cannot hold a label, the colour scale carries it alone.
+size, so theirs sit below the country on leader lines, and the deck's finding
+maps put their figures in the same callouts.
 
 **A slide carries the question and its charts, and nothing else.** There is no
 running header, no slide number, no count of reports under the title and no
