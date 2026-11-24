@@ -146,18 +146,21 @@ River", which is why an earlier version of this tool had seven. Eight is correct
 observer reports against, and the Central River electorate has been split back out from the IEC's
 own constituency table: Kuntaur 50,864 and Janjanbureh 68,742, summing to the published 119,606.
 
-**Boundaries are real**, from geoBoundaries gbOpen: ADM1 for the eight LGAs and ADM2 for the 48
-districts. `scripts/build_boundaries.py` in the parent project downloads them, simplifies with
-Ramer-Douglas-Peucker and rounds to four decimal places, producing a 63KB TypeScript module that
+**Boundaries are real**, from geoBoundaries gbOpen: ADM1 for the eight LGAs.
+`scripts/build_boundaries.py` in the parent project downloads them, simplifies with
+Ramer-Douglas-Peucker and rounds to four decimal places, producing a TypeScript module that
 inlines into the single offline HTML file. Drawing uses an equirectangular projection with the x
 axis scaled by the cosine of the mid-latitude, which at this size is indistinguishable from a
 proper conic projection and needs no mapping library.
 
-A note on the district level: **the 53 constituencies and the 48 districts are different
-divisions.** The urban constituencies in Kanifing and the Kombos were split more finely than the
-districts they sit in. Constituencies are mapped to districts where the names correspond, and the
-interface lists by name the ones that cannot be placed rather than folding them into a neighbour.
-Everything other than the district map works at full constituency resolution.
+**The map is of areas, and only areas.** There is no map below the LGA, because there is nothing
+honest to draw one on: the 53 constituencies have no published boundaries, and the 48
+administrative districts that do are a different division of the country. The urban constituencies
+in Kanifing and the Kombos were split more finely than the districts they sit in, so eleven of
+them - the eleven where most reports come from - cannot be placed on a district at all. A map that
+needs a footnote to explain its blank half is worse than no map, and coverage by constituency is
+a table, which has none of that trouble. The ADM2 shapes are still in the build script if a proper
+constituency boundary file ever appears.
 
 Observers may write the LGA name, the IEC's name for it, the code or the constituency, and all
 resolve. The common spelling variants in Gambian official documents are folded too: Niumi/Nuimi,
@@ -302,17 +305,13 @@ other - and the date. The title itself starts as the form's own name, read off t
 rather than the workbook's file name: it is printed on a cover as well as on a file, and
 neither wants to read "campaign-report-20261124-143212.xlsx".
 
-**The second map is of constituencies.** It used to be titled "Reports by district", which
-is what it is drawn on and not what it counts: every figure on it comes from the
-constituency an observer wrote down. The 53 constituencies have no published boundaries,
-the 48 districts do, and the two divisions nearly line up - so the shape is a district and
-the name written on it is the constituency's, in the register's spelling rather than the
-boundary file's "Serrekunda West" and "Lower Niumi". The eleven constituencies that have no
-district of their name are the urban ones, where most of the reports come from, so the map
-says underneath which they are instead of leaving a reader to count areas off it and
-undercount the coverage. The six districts that hold no constituency are drawn flat and
-unnamed rather than hatched, because hatching means a place that returned no reports and
-those were never a place that could.
+**There is no constituency map.** There was one, drawn on district boundaries, and it went
+through three names before it went altogether. The trouble was never the title: the 53
+constituencies have no published boundaries, the 48 districts are a different division, and
+eleven constituencies - the urban ones, where most of the reports come from - have no district
+to be drawn on. The map was therefore blank exactly where the mission was working, and the
+footnote explaining that grew longer than anything the picture said. Coverage by constituency
+is a table instead, which can show all 53 without apologising for any of them.
 
 **Coverage by constituency is a table.** A list with the count hanging off the right of each
 line reads well enough down one column and not at all across three. The table rules the

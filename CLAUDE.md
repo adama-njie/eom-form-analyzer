@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 205 tests
+npm test           # vitest, 199 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 162 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 156 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -102,18 +102,15 @@ geography.
   and resolves to neither. What does not resolve is shown as written -
   "Westfield", "URR" - on screen and under the deck's table, because
   "constituency not named" reads as missing data when the field was filled in.
-- **The second map is of constituencies, not districts.** What it counts
-  is the constituency an observer named; it is drawn on the 48 district
-  boundaries only because the 53 constituencies have none published. So
-  every label on it is the constituency's name in the register's spelling
-  (`placeLabel`, over `DISTRICT_TO_CONSTITUENCY`) - the boundary file
-  writes "Serrekunda West" and "Lower Niumi" - and nothing a reader sees
-  calls it a district except the sentence saying what it is drawn on. The
-  eleven constituencies with no district of their name are listed under
-  the map rather than dropped silently, and the six districts holding no
-  constituency are drawn flat and unnamed (`CONSTITUENCY_SHAPES`), never
-  hatched: hatching means a place that returned no reports, and those
-  never could.
+- **Maps are of LGAs only.** There is no constituency map and no district
+  map; `mapPng` and `GambiaMap` take rates and nothing else. A map below
+  the LGA was tried twice: the 53 constituencies have no published
+  boundaries, and the 48 districts that do are a different division, so
+  eleven constituencies - the urban ones, which is where the reports are -
+  could not be drawn and the map was blank where the mission was working.
+  Coverage by constituency is a table, which can show all 53. Do not
+  reintroduce the district layer without a real constituency boundary
+  file; `scripts/build_boundaries.py` still writes the ADM2 shapes.
 - **Coverage by constituency is a table**, grouped by area, with the register
   beside the reports, spread evenly over as many columns as it takes and
   continued on a second slide where it must be.

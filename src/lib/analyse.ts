@@ -7,8 +7,6 @@
 
 import {
   ALL_CONSTITUENCIES,
-  CONSTITUENCY_SHAPES,
-  CONSTITUENCY_TO_DISTRICT,
   LGAS,
   TOTAL_REGISTERED_2026,
   lgaName,
@@ -16,7 +14,6 @@ import {
   resolveConstituency,
   resolveLga,
   type LgaCode,
-  type MapUnit,
 } from './gambia';
 import {
   NON_ANSWERS,
@@ -848,21 +845,6 @@ export function bandingFor(
 /* Rates by place, for the map                                         */
 /* ------------------------------------------------------------------ */
 
-/**
- * The shape a row's constituency is drawn on.
- *
- * The constituency map is drawn on district boundaries, which are the only
- * published ones, and the 53 constituencies and the 48 districts are
- * different divisions: eleven constituencies have no district of their
- * name. Those rows are left out of that map and counted by
- * `unmappedDistrictRows`, never folded into a neighbour.
- */
-function districtOf(dataset: Dataset, i: number): string | null {
-  const c = dataset.rowConstituency[i];
-  if (!c) return null;
-  return CONSTITUENCY_TO_DISTRICT[c] ?? null;
-}
-
 export interface PlaceRate {
   place: string;
   /** Reports in this place that answered the question at all. */
@@ -874,7 +856,7 @@ export interface PlaceRate {
 }
 
 /**
- * The rate of one answer to one question, per area or per constituency.
+ * The rate of one answer to one question, per area.
  *
  * This is what the map shades. `null` where a place returned no answers,
  * which the map must draw differently from zero: "nobody observed here" and
@@ -885,15 +867,10 @@ export function rateByPlace(
   dataset: Dataset,
   question: Question,
   answer: string,
-  level: MapUnit,
   rowFilter?: boolean[],
 ): PlaceRate[] {
-  const places =
-    level === 'lga' ? LGAS.map((a) => a.name) : CONSTITUENCY_SHAPES.map((d) => d.key);
-  const keyOf = (i: number) =>
-    level === 'lga'
-      ? (dataset.rowArea[i] ? lgaName(dataset.rowArea[i]!) : null)
-      : districtOf(dataset, i);
+  const places = LGAS.map((a) => a.name);
+  const keyOf = (i: number) => (dataset.rowArea[i] ? lgaName(dataset.rowArea[i]!) : null);
 
   const totals = new Map<string, number>();
   const hits = new Map<string, number>();
@@ -923,20 +900,12 @@ export function rateByPlace(
 }
 
 /** Report counts per place, for the default coverage map. */
-export function reportsByPlace(
-  dataset: Dataset,
-  level: MapUnit,
-  rowFilter?: boolean[],
-): PlaceRate[] {
-  const places =
-    level === 'lga' ? LGAS.map((a) => a.name) : CONSTITUENCY_SHAPES.map((d) => d.key);
+export function reportsByPlace(dataset: Dataset, rowFilter?: boolean[]): PlaceRate[] {
+  const places = LGAS.map((a) => a.name);
   const counts = new Map<string, number>();
   dataset.table.rows.forEach((_row, i) => {
     if (rowFilter && !rowFilter[i]) return;
-    const place =
-      level === 'lga'
-        ? (dataset.rowArea[i] ? lgaName(dataset.rowArea[i]!) : null)
-        : districtOf(dataset, i);
+    const place = dataset.rowArea[i] ? lgaName(dataset.rowArea[i]!) : null;
     if (place) counts.set(place, (counts.get(place) ?? 0) + 1);
   });
   return places.map((place) => {
@@ -1049,7 +1018,7 @@ export interface Coverage {
   reports: number;
   groupsCovered: number;
   groupsTotal: number;
-  /** Share of the 2021 register in observed areas. Only meaningful in geo mode. */
+  /** Share of the 2026 register in observed areas. Only meaningful in geo mode. */
   registerShare: number | null;
   /** Constituencies that returned at least one report. */
   constituenciesCovered: number;

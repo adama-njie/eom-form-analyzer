@@ -179,7 +179,7 @@ export function executiveSummary(dataset: Dataset, filter?: boolean[]): string[]
     : `${cov.groupsCovered} districts`;
   const reach =
     cov.registerShare !== null
-      ? `, covering areas that hold ${pct(cov.registerShare)} of the 2021 register`
+      ? `, covering areas that hold ${pct(cov.registerShare)} of the 2026 register`
       : '';
   paras.push(
     `This analysis covers ${cov.reports} observer reports from ${where}${reach}.${

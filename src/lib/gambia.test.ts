@@ -1,15 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { DISTRICT_BOUNDARIES, GAMBIA_BBOX, LGA_BOUNDARIES } from '@/data/boundaries';
+import { GAMBIA_BBOX, LGA_BOUNDARIES } from '@/data/boundaries';
 import {
   ALL_CONSTITUENCIES,
-  CONSTITUENCY_TO_DISTRICT,
-  DISTRICT_TO_LGA,
   LGAS,
   LGA_SHAPES,
   REGISTERED_2026,
   TOTAL_REGISTERED_2026,
   registeredOf,
-  UNMAPPED_CONSTITUENCIES,
   resolveConstituency,
   resolveLga,
 } from './gambia';
@@ -106,12 +103,8 @@ describe('boundaries', () => {
     for (const { shape } of LGA_SHAPES) expect(shape.rings.length).toBeGreaterThan(0);
   });
 
-  it('has the 48 districts', () => {
-    expect(DISTRICT_BOUNDARIES).toHaveLength(48);
-  });
-
   it('stores rings as flat coordinate pairs', () => {
-    for (const b of [...LGA_BOUNDARIES, ...DISTRICT_BOUNDARIES]) {
+    for (const b of LGA_BOUNDARIES) {
       for (const ring of b.rings) {
         expect(ring.length % 2).toBe(0);
         expect(ring.length).toBeGreaterThanOrEqual(8);
@@ -135,19 +128,6 @@ describe('boundaries', () => {
     }
   });
 
-  it('assigns most districts to an LGA', () => {
-    const mapped = DISTRICT_BOUNDARIES.filter((d) => DISTRICT_TO_LGA[d.name]).length;
-    expect(mapped / DISTRICT_BOUNDARIES.length).toBeGreaterThan(0.85);
-  });
-
-  it('is honest about constituencies with no district', () => {
-    // 53 constituencies do not fit onto 48 districts. The ones that cannot
-    // be placed must be listed, not quietly dropped.
-    const mapped = Object.keys(CONSTITUENCY_TO_DISTRICT).length;
-    expect(mapped + UNMAPPED_CONSTITUENCIES.length).toBe(53);
-    expect(UNMAPPED_CONSTITUENCIES.length).toBeGreaterThan(0);
-    expect(mapped).toBeGreaterThan(30);
-  });
 });
 
 describe('projection', () => {

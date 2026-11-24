@@ -8,7 +8,7 @@
  */
 
 import type { PlaceRate } from './analyse';
-import { DISTRICT_SHAPES, LGA_SHAPES, placeLabel, type MapUnit } from './gambia';
+import { LGA_SHAPES } from './gambia';
 import { labelPoint, makeProjector, shapeWidth } from './projection';
 import type { BoundaryShape } from '@/data/boundaries';
 
@@ -86,21 +86,13 @@ function label(
  * back into the size it will actually be once a deck slide has scaled it,
  * which is what the 18pt floor is about.
  */
-export function mapLabelSize(width: number, unit: MapUnit): number {
-  return width / (unit === 'lga' ? 50 : 58);
+export function mapLabelSize(width: number): number {
+  return width / 50;
 }
 
 /** What `mapLabelSize` comes to on a slide, once the map is scaled to fit. */
-export function slideLabelPt(width: number, unit: MapUnit, inchesOnSlide: number): number {
-  return mapLabelSize(width, unit) * ((inchesOnSlide * 72) / width);
-}
-
-function short(name: string): string {
-  if (name.length <= 12) return name;
-  const parts = name.split(' ');
-  if (parts.length === 1) return name.slice(0, 11);
-  const [first, ...rest] = parts;
-  return `${first} ${rest.map((p) => p[0]).join('')}`;
+export function slideLabelPt(width: number, inchesOnSlide: number): number {
+  return mapLabelSize(width) * ((inchesOnSlide * 72) / width);
 }
 
 /**
@@ -165,7 +157,6 @@ function legend(
  */
 export function mapPng(
   rates: PlaceRate[],
-  unit: MapUnit,
   suffix: '%' | '',
   colourHex = '#12239E',
   width = 700,
@@ -177,10 +168,9 @@ export function mapPng(
    * Banjul is 12 square miles and Kanifing is beside it, so neither can hold
    * a name at the size the rest of the deck is set in. Their labels go below
    * the country on a leader line, and that needs clear paper: drawn over the
-   * map they landed on West Coast. Only the LGA map gets the band, because
-   * the district map does not use callouts at all.
+   * map they landed on West Coast.
    */
-  const callout = unit === 'lga' ? mapLabelSize(width, unit) * 3.1 : 0;
+  const callout = mapLabelSize(width) * 3.1;
   const height = Math.round(projector.height + callout);
   const dpr = 2;
 
@@ -194,7 +184,7 @@ export function mapPng(
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, width, height);
 
-  const shapes = unit === 'lga' ? LGA_SHAPES : DISTRICT_SHAPES;
+  const shapes = LGA_SHAPES;
   const byPlace = new Map(rates.map((r) => [r.place, r]));
   const vals = rates.map((r) => r.pct).filter((v): v is number => v !== null);
   const max = vals.length ? Math.max(...vals, 0.0001) : 1;
@@ -206,11 +196,7 @@ export function mapPng(
     const r = byPlace.get(key);
     const has = r && r.pct !== null;
     trace(ctx, shape, project);
-    // A district with no constituency of its own name: flat, so it is not
-    // read as a constituency that returned nothing. See `CONSTITUENCY_SHAPES`.
-    if (!r) {
-      ctx.fillStyle = '#EEF1F3';
-    } else if (has) {
+    if (has) {
       ctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, ${0.14 + (r.pct! / max) * 0.86})`;
     } else {
       ctx.fillStyle = hatch;
@@ -219,16 +205,6 @@ export function mapPng(
     ctx.strokeStyle = '#FFFFFF';
     ctx.lineWidth = 0.9;
     ctx.stroke();
-  }
-
-  // LGA outlines over the constituencies, so the eight areas stay legible.
-  if (unit === 'district') {
-    ctx.strokeStyle = 'rgba(93, 107, 118, 0.55)';
-    ctx.lineWidth = 1.6;
-    for (const { shape } of LGA_SHAPES) {
-      trace(ctx, shape, project);
-      ctx.stroke();
-    }
   }
 
   /*
@@ -241,7 +217,7 @@ export function mapPng(
    * the deck keeps to. Sizing by width makes a label the same size on the
    * page whatever the canvas, and width/50 is that 18pt.
    */
-  const size = mapLabelSize(width, unit);
+  const size = mapLabelSize(width);
   const lead = size * 0.62;
 
   legend(
@@ -260,27 +236,23 @@ export function mapPng(
    * Places too small to hold their own label.
    *
    * A label wider than the place it names is worse than no label: it runs
-   * across its neighbours and then neither can be read. What to do about it
-   * depends on how many there are. The eight LGAs are all worth naming, and
-   * Banjul and Kanifing are small and adjacent, so theirs are moved into the
-   * empty space below the country and joined to the place by a line. The 48
-   * constituencies are a different matter: most of them cannot hold a label at
-   * this size and forty callouts would be worse than none, so on that map
-   * the colour scale carries it alone.
+   * across its neighbours and then neither can be read. The eight LGAs are
+   * all worth naming, and Banjul and Kanifing are small and adjacent, so
+   * theirs are moved into the empty space below the country and joined to
+   * the place by a line.
    */
   const overflow: { name: string; value: string; cx: number; cy: number }[] = [];
 
   for (const { key, shape } of shapes) {
     const r = byPlace.get(key);
-    if (!r) continue;
-    const has = r.pct !== null;
+    const has = r && r.pct !== null;
     const [cx, cy] = labelPoint(shape, projector);
-    const name = unit === 'lga' ? key : short(placeLabel(unit, key));
+    const name = key;
     const value = has ? `${r!.pct!.toFixed(0)}${suffix}` : '–';
 
     ctx.font = `700 ${size}px Arial, "Segoe UI", system-ui, sans-serif`;
     if (ctx.measureText(name).width > shapeWidth(shape, projector)) {
-      if (unit === 'lga') overflow.push({ name, value, cx, cy });
+      overflow.push({ name, value, cx, cy });
       continue;
     }
 
@@ -359,7 +331,7 @@ export function pieMapPng(
   width = 1400,
 ): MapImage {
   const projector = makeProjector(width, 8);
-  const size = mapLabelSize(width, 'lga');
+  const size = mapLabelSize(width);
   const rMax = size * 2.2;
   const rMin = size * 0.6;
 

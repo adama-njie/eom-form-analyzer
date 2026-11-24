@@ -642,8 +642,7 @@ function Overview({
           <section className="card">
             <h2>Reports by Local Government Area</h2>
             <GambiaMap
-              rates={reportsByPlace(dataset, 'lga', periodFilter)}
-              unit="lga"
+              rates={reportsByPlace(dataset, periodFilter)}
               suffix=""
               selected={group || null}
               onSelect={(p) => onGroup(p ?? '')}

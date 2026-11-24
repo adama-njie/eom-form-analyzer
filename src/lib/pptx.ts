@@ -33,7 +33,7 @@ import {
   TYPE,
 } from './theme';
 import { drawFlag, euFlag, gambiaFlag } from './flags';
-import { ALL_CONSTITUENCIES, REGISTERED_2026, UNMAPPED_CONSTITUENCIES } from './gambia';
+import { ALL_CONSTITUENCIES, REGISTERED_2026 } from './gambia';
 import { mapPng, pieMapPng } from './mapImage';
 import {
   isConstituencyQuestion,
@@ -605,49 +605,23 @@ function addMapSlide(
    * number written on it, does not need a line of explanation above it and
    * another below; the one thing those lines carried that the picture did
    * not - that hatching means no reports - is now a key on the map itself.
+   *
+   * There was a second map here, of constituencies drawn on district
+   * boundaries. It went: the two divisions do not line up, so eleven
+   * constituencies - the urban ones, where most of the reports come from -
+   * were missing from it, and a map whose blank half has to be explained
+   * in a footnote is not doing the job of a map. Coverage by constituency
+   * is a table, which has none of that trouble.
    */
-  const maps: ['lga' | 'district', string][] = [
-    ['lga', 'Reports by Local Government Area'],
-  ];
-  if (dataset.constituencies.length > 0) {
-    maps.push(['district', 'Reports by constituency']);
-  }
-
-  for (const [unit, title] of maps) {
-    const s = pptx.addSlide({ masterName: 'BASE' });
-    const top = heading(s, title);
-    const img = mapPng(reportsByPlace(dataset, unit, filter), unit, '', ACCENT_DEEP, 1400);
-    const w = CONTENT.w;
-    const h = (w / img.width) * img.height;
-    s.addImage({
-      data: `data:image/png;base64,${toBase64(img.data)}`,
-      ...place({ x: PAD.x, y: top, w, h }, `${unit} map`),
-    });
-
-    /*
-     * What the constituency map cannot show.
-     *
-     * The rule on these slides is a key and no prose, because a line
-     * restating the picture is chrome. This is not that: constituencies
-     * have no published boundaries, so the map is drawn on the districts,
-     * and eleven constituencies - the urban ones, where most of the
-     * reports come from - have no district of their name and are missing
-     * from the picture entirely. A reader counting areas off the map
-     * would otherwise undercount the coverage.
-     */
-    if (unit === 'district' && UNMAPPED_CONSTITUENCIES.length > 0 && top + h + 0.7 < PAD.bottom) {
-      s.addText(
-        `Drawn on district boundaries, the closest published division. ${UNMAPPED_CONSTITUENCIES.length} constituencies have none of their own and are not shown: ${UNMAPPED_CONSTITUENCIES.join(', ')}. Their reports are counted everywhere else.`,
-        {
-          ...place({ x: PAD.x, y: top + h + 0.12, w, h: 0.56 }, 'constituency map note'),
-          fontSize: TYPE.caption,
-          color: MUTED,
-          fontFace: FONT,
-          valign: 'top',
-        },
-      );
-    }
-  }
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  const top = heading(s, 'Reports by Local Government Area');
+  const img = mapPng(reportsByPlace(dataset, filter), '', ACCENT_DEEP, 1400);
+  const w = CONTENT.w;
+  const h = (w / img.width) * img.height;
+  s.addImage({
+    data: `data:image/png;base64,${toBase64(img.data)}`,
+    ...place({ x: PAD.x, y: top, w, h }, 'area map'),
+  });
 }
 
 /** One finding, mapped. */
@@ -664,8 +638,7 @@ function addFindingMapSlide(
   // lines doing it.
   const top = heading(s, `${f.question.code} ${f.question.label}`.trim());
   const img = mapPng(
-    rateByPlace(dataset, f.question, f.label, 'lga', filter),
-    'lga',
+    rateByPlace(dataset, f.question, f.label, filter),
     '%',
     FLAG,
     1400,

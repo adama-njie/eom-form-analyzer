@@ -1,14 +1,6 @@
 import { useId, useMemo, useState } from 'react';
 import type { PlaceRate } from '@/lib/analyse';
-import {
-  DISTRICT_SHAPES,
-  DISTRICT_TO_LGA,
-  LGAS,
-  LGA_SHAPES,
-  lgaName,
-  placeLabel,
-  type MapUnit,
-} from '@/lib/gambia';
+import { LGAS, LGA_SHAPES } from '@/lib/gambia';
 import { labelPoint, makeProjector, pathFor, shapeWidth } from '@/lib/projection';
 
 /**
@@ -28,7 +20,6 @@ const VIEW_W = 980;
 
 export interface MapProps {
   rates: PlaceRate[];
-  unit: MapUnit;
   /** "%" for rates, "" for counts. */
   suffix: '%' | '';
   colour?: string;
@@ -40,7 +31,6 @@ export interface MapProps {
 
 export function GambiaMap({
   rates,
-  unit,
   suffix,
   colour = '#12239E',
   selected,
@@ -51,7 +41,7 @@ export function GambiaMap({
   const [hover, setHover] = useState<string | null>(null);
 
   const projector = useMemo(() => makeProjector(VIEW_W), []);
-  const shapes = unit === 'lga' ? LGA_SHAPES : DISTRICT_SHAPES;
+  const shapes = LGA_SHAPES;
   const byPlace = useMemo(() => new Map(rates.map((r) => [r.place, r])), [rates]);
 
   const max = useMemo(() => {
@@ -83,9 +73,8 @@ export function GambiaMap({
         onMouseLeave={() => setHover(null)}
       >
         <title id={titleId}>
-          Map of The Gambia by {unit === 'lga' ? 'Local Government Area' : 'constituency'}, drawn
-          on {unit === 'lga' ? 'area' : 'district'} boundaries. The same figures appear in the
-          table beside the map.
+          Map of The Gambia by Local Government Area. The same figures appear in the table
+          beside the map.
         </title>
         <defs>
           <pattern
@@ -102,28 +91,7 @@ export function GambiaMap({
 
         {drawn.map(({ key, d }) => {
           const r = byPlace.get(key);
-          /*
-           * A shape the map has nothing to say about: on the constituency
-           * map, one of the six districts that holds no constituency of
-           * its own name. It is drawn flat and unnamed, because a hole in
-           * the country reads as a fault and hatching it would put it
-           * among the places that returned no reports, which it never
-           * could.
-           */
-          if (!r) {
-            return (
-              <path
-                key={key}
-                d={d}
-                fill="#EEF1F3"
-                stroke="#FFFFFF"
-                strokeWidth={0.9}
-                strokeLinejoin="round"
-                pointerEvents="none"
-              />
-            );
-          }
-          const has = r.pct !== null;
+          const has = r && r.pct !== null;
           const intensity = has ? 0.14 + (r.pct! / max) * 0.86 : 0;
           const isSel = selected === key;
           const isHot = active === key;
@@ -141,8 +109,8 @@ export function GambiaMap({
               aria-pressed={isSel}
               aria-label={
                 has
-                  ? `${placeLabel(unit, key)}: ${r!.pct!.toFixed(1)}${suffix}, ${r!.n} of ${r!.total} reports`
-                  : `${placeLabel(unit, key)}: no reports`
+                  ? `${key}: ${r!.pct!.toFixed(1)}${suffix}, ${r!.n} of ${r!.total} reports`
+                  : `${key}: no reports`
               }
               className="map-shape"
               onMouseEnter={() => setHover(key)}
@@ -159,46 +127,29 @@ export function GambiaMap({
           );
         })}
 
-        {/* LGA outlines over the constituencies, so the eight areas stay legible. */}
-        {unit === 'district' &&
-          LGA_SHAPES.map(({ key, shape }) => (
-            <path
-              key={`lga-${key}`}
-              d={pathFor(shape, projector)}
-              fill="none"
-              stroke="#5D6B76"
-              strokeWidth={1.6}
-              strokeOpacity={0.55}
-              pointerEvents="none"
-            />
-          ))}
 
         {!compact &&
-          drawn.map(({ key, label, width }) => {
+          drawn.map(({ key, label }) => {
             const r = byPlace.get(key);
-            if (!r) return null;
-            const has = r.pct !== null;
-            // Constituencies are small and numerous; only label where it fits.
-            const minWidth = unit === 'lga' ? 0 : 54;
-            if (width < minWidth) return null;
-            const size = unit === 'lga' ? 15 : 10;
+            const has = r && r.pct !== null;
+            const size = 15;
             return (
               <g key={`t-${key}`} pointerEvents="none">
                 <text
                   x={label[0]}
-                  y={label[1] - (unit === 'lga' ? 4 : 3)}
+                  y={label[1] - 4}
                   textAnchor="middle"
                   className="map-name"
                   style={{ fontSize: size }}
                 >
-                  {unit === 'lga' ? key : short(placeLabel(unit, key))}
+                  {key}
                 </text>
                 <text
                   x={label[0]}
-                  y={label[1] + (unit === 'lga' ? 13 : 9)}
+                  y={label[1] + 13}
                   textAnchor="middle"
                   className="map-figure"
-                  style={{ fontSize: size + (unit === 'lga' ? 1 : 0) }}
+                  style={{ fontSize: size + 1 }}
                 >
                   {has ? `${r!.pct!.toFixed(0)}${suffix}` : '–'}
                 </text>
@@ -209,10 +160,7 @@ export function GambiaMap({
 
       {activeRate && (
         <div className="card map-readout" role="status">
-          <strong>{placeLabel(unit, activeRate.place)}</strong>
-          {unit === 'district' && DISTRICT_TO_LGA[activeRate.place] && (
-            <span className="muted"> · {lgaName(DISTRICT_TO_LGA[activeRate.place]!)}</span>
-          )}
+          <strong>{activeRate.place}</strong>
           {activeRate.pct === null ? (
             <span className="muted"> · no reports</span>
           ) : (
@@ -254,24 +202,13 @@ function Legend({ colour, max, suffix }: { colour: string; max: number; suffix: 
   );
 }
 
-/** Constituency names are long and the shapes are small. */
-function short(name: string): string {
-  if (name.length <= 12) return name;
-  const parts = name.split(' ');
-  if (parts.length === 1) return name.slice(0, 11);
-  const [first, ...rest] = parts;
-  return `${first} ${rest.map((p) => p[0]).join('')}`;
-}
-
 /** The map's data as a table, always rendered alongside it. */
 export function MapTable({
   rates,
-  unit,
   suffix,
   answerLabel,
 }: {
   rates: PlaceRate[];
-  unit: MapUnit;
   suffix: '%' | '';
   answerLabel: string;
 }) {
@@ -282,8 +219,7 @@ export function MapTable({
       <table className="plain">
         <thead>
           <tr>
-            <th>{unit === 'lga' ? 'Local Government Area' : 'Constituency'}</th>
-            {unit === 'district' && <th>LGA</th>}
+            <th>Local Government Area</th>
             <th style={{ textAlign: 'right' }}>{answerLabel}</th>
             <th style={{ textAlign: 'right' }}>Reports</th>
             <th style={{ textAlign: 'right' }}>{suffix === '%' ? 'Rate' : 'Count'}</th>
@@ -292,12 +228,7 @@ export function MapTable({
         <tbody>
           {withData.map((r) => (
             <tr key={r.place}>
-              <th scope="row">{placeLabel(unit, r.place)}</th>
-              {unit === 'district' && (
-                <td className="muted">
-                  {DISTRICT_TO_LGA[r.place] ? lgaName(DISTRICT_TO_LGA[r.place]!) : '—'}
-                </td>
-              )}
+              <th scope="row">{r.place}</th>
               <td style={{ textAlign: 'right' }}>{r.n}</td>
               <td style={{ textAlign: 'right' }}>{r.total}</td>
               <td style={{ textAlign: 'right', fontWeight: 600 }}>
@@ -310,14 +241,14 @@ export function MapTable({
               <th scope="row" className="muted">
                 No reports
               </th>
-              <td colSpan={unit === 'district' ? 4 : 3} className="muted">
-                {without.map((r) => placeLabel(unit, r.place)).join(', ')}
+              <td colSpan={3} className="muted">
+                {without.map((r) => r.place).join(', ')}
               </td>
             </tr>
           )}
         </tbody>
       </table>
-      {unit === 'lga' && withData.length < LGAS.length && (
+      {withData.length < LGAS.length && (
         <p className="muted small mt">
           {LGAS.length - withData.length} of the 8 Local Government Areas returned no reports.
         </p>

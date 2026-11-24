@@ -29,8 +29,7 @@ describe('the type floor', () => {
 
   it('keeps map labels at the floor once the slide has scaled them', () => {
     // The deck draws a 1400px map across the full content width.
-    expect(slideLabelPt(1400, 'lga', CONTENT.w)).toBeGreaterThanOrEqual(MIN - 0.5);
-    expect(slideLabelPt(1400, 'district', CONTENT.w)).toBeGreaterThanOrEqual(15);
+    expect(slideLabelPt(1400, CONTENT.w)).toBeGreaterThanOrEqual(MIN - 0.5);
   });
 
   it('gives a long question the full width rather than shrinking its title', () => {

@@ -35,7 +35,6 @@ import {
   type Dataset,
 } from './analyse';
 import { barChartPng, meanBarsPng, stackedByAreaPng, wordCloudPng } from './chartImage';
-import { UNMAPPED_CONSTITUENCIES } from './gambia';
 import { wordFrequencies } from './text';
 import { mapPng } from './mapImage';
 import { describe, describeFinding, executiveSummary } from './narrative';
@@ -205,7 +204,7 @@ export async function buildReport(
   );
   children.push(
     table(
-      [dataset.geo ? 'Area' : 'District', 'Reports', 'Share of reports', ...(dataset.geo ? ['2021 register'] : [])],
+      [dataset.geo ? 'Area' : 'District', 'Reports', 'Share of reports', ...(dataset.geo ? ['2026 register'] : [])],
       cov.byGroup.map((g) => [
         g.label,
         String(g.reports),
@@ -218,18 +217,8 @@ export async function buildReport(
   children.push(caption(`Table 1. Reports by ${dataset.geo ? 'administrative area' : 'district'}.`));
 
   if (canDrawMaps) {
-    children.push(chartParagraph(mapPng(reportsByPlace(dataset, 'lga', filter), 'lga', '', BRAND, 640)));
+    children.push(chartParagraph(mapPng(reportsByPlace(dataset, filter), '', BRAND, 640)));
     children.push(caption('Figure 1. Reports by Local Government Area. Hatched areas returned no reports.'));
-    if (dataset.constituencies.length > 0) {
-      children.push(
-        chartParagraph(mapPng(reportsByPlace(dataset, 'district', filter), 'district', '', BRAND, 640)),
-      );
-      children.push(
-        caption(
-          `Figure 2. Reports by constituency, drawn on district boundaries. ${dataset.constituencies.length} of 53 constituencies returned reports; ${UNMAPPED_CONSTITUENCIES.length} constituencies have no boundary of their own and are not shown on this map.`,
-        ),
-      );
-    }
   }
 
   const teamPng = barChartPng(
@@ -241,7 +230,7 @@ export async function buildReport(
     cov.byTeam.map((_, i) => CAT[i % CAT.length]!),
   );
   children.push(chartParagraph(teamPng));
-  children.push(caption(`Figure ${canDrawMaps ? (dataset.constituencies.length > 0 ? 3 : 2) : 1}. Reports by team type.`));
+  children.push(caption(`Figure ${canDrawMaps ? 2 : 1}. Reports by team type.`));
 
   }
 
@@ -280,8 +269,7 @@ export async function buildReport(
         children.push(
           chartParagraph(
             mapPng(
-              rateByPlace(dataset, f.question, f.label, 'lga', filter),
-              'lga',
+              rateByPlace(dataset, f.question, f.label, filter),
               '%',
               FLAG,
               640,

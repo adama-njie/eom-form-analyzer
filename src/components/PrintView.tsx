@@ -110,20 +110,7 @@ export default function PrintView({
       {showMaps && (
         <section className="print-block">
           <h2>Where the reports came from</h2>
-          <GambiaMap
-            rates={reportsByPlace(dataset, 'lga', filter)}
-            unit="lga"
-            suffix=""
-            compact={false}
-          />
-          {dataset.constituencies.length > 0 && (
-            <GambiaMap
-              rates={reportsByPlace(dataset, 'district', filter)}
-              unit="district"
-              suffix=""
-              compact={false}
-            />
-          )}
+          <GambiaMap rates={reportsByPlace(dataset, filter)} suffix="" compact={false} />
         </section>
       )}
 
