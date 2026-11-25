@@ -34,7 +34,8 @@ import {
   periodNote,
   type Period,
 } from '@/lib/period';
-import { inferSchema, toTable, type Question } from '@/lib/schema';
+import { inferSchema, toTable, type Question, type Table } from '@/lib/schema';
+import { AREA_WORDS, type Division } from '@/lib/gambia';
 import { wordFrequencies } from '@/lib/text';
 import { downloadCsv, exportAllTables } from '@/lib/export';
 import { exportPptx } from '@/lib/pptx';
@@ -58,7 +59,21 @@ const JUDGED =
   /(problem|unauthorised|unauthorized|interfer|overcrowd|unrest|tension|campaign|missing|turned away|without proper|influence|voting together|stuffing|proxy|compelled|objection|intimidat|violence|vote buying|able to observe|accessible|adequate|protect|plain view|suitable|explained|marked with ink|secrecy|confidence|transparen|conduct|performance|understanding)/i;
 
 export default function App() {
-  const [dataset, setDataset] = useState<Dataset | null>(null);
+  /*
+   * The parsed file, and the dataset built from it.
+   *
+   * Two states rather than one, because the dataset depends on which
+   * division of the country the file reports against, and that is a
+   * choice the analyst can override: rebuilding it is a few passes over
+   * the rows and happens only when they change the setting.
+   */
+  const [source, setSource] = useState<{ table: Table; questions: Question[] } | null>(null);
+  const [divisionChoice, setDivisionChoice] = useState<Division | null>(null);
+  const dataset = useMemo<Dataset | null>(
+    () =>
+      source ? buildDataset(source.table, source.questions, divisionChoice ?? undefined) : null,
+    [source, divisionChoice],
+  );
   const [formName, setFormName] = useState('');
   // What the export dialogue opens with: the form's own name, not the
   // workbook's file name, because it ends up on a cover and on a file.
@@ -94,7 +109,8 @@ export default function App() {
       const table = toTable(best.grid);
       const questions = inferSchema(table);
       if (questions.length === 0) throw new Error('No questions could be identified.');
-      setDataset(buildDataset(table, questions));
+      setSource({ table, questions });
+      setDivisionChoice(null);
       setFormName(`${file.name} — ${best.n}`);
       setTitle(defaultTitle(file.name, best.n));
       setGroup('');
@@ -103,7 +119,7 @@ export default function App() {
       setTab('overview');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not read that file.');
-      setDataset(null);
+      setSource(null);
     }
   }, []);
 
@@ -237,6 +253,25 @@ export default function App() {
               </optgroup>
             )}
           </select>
+          {/*
+            * Which division the file reports against.
+            *
+            * Inferred, and switchable: both divisions call the place
+            * Janjanbureh, so a file that says nothing either way - no
+            * Central River reports, no list of areas in its headers - is
+            * read as eight areas, and this is how an analyst says it is
+            * seven. See `divisionOf`.
+            */}
+          {dataset.geo && (
+            <select
+              value={dataset.division}
+              onChange={(e) => setDivisionChoice(e.target.value as Division)}
+              title="Which division of the country this form reports against"
+            >
+              <option value="lga">Areas: 8 LGAs</option>
+              <option value="region">Areas: 7 regions</option>
+            </select>
+          )}
           {periodic && (
             <select
               value={period}
@@ -616,9 +651,9 @@ function Overview({
         <div className="statrow">
           <Stat label="Reports" value={cov.reports} />
           <Stat
-            label={dataset.geo ? 'LGAs' : 'Districts covered'}
+            label={dataset.geo ? AREA_WORDS[dataset.division].tile : 'Districts covered'}
             value={`${cov.groupsCovered} / ${cov.groupsTotal}`}
-            sub={dataset.geo ? 'Local Government Areas' : 'as named in the file'}
+            sub={dataset.geo ? AREA_WORDS[dataset.division].many : 'as named in the file'}
           />
           {cov.constituenciesTotal > 0 ? (
             <Stat
@@ -655,12 +690,13 @@ function Overview({
       <div className="two">
         {dataset.geo ? (
           <section className="card">
-            <h2>Reports by Local Government Area</h2>
+            <h2>Reports by {AREA_WORDS[dataset.division].one}</h2>
             <GambiaMap
               rates={reportsByPlace(dataset, periodFilter)}
               suffix=""
               selected={group || null}
               onSelect={(p) => onGroup(p ?? '')}
+              division={dataset.division}
             />
             <p className="muted small">
               Click an area to filter the whole report. Hatched areas returned no reports, which is
@@ -843,7 +879,7 @@ function QuestionCard({
 
       {words && <WordCloud words={words} />}
 
-      {b.percent && <PercentPanel p={b.percent} />}
+      {b.percent && <PercentPanel p={b.percent} division={dataset.division} />}
 
       {q.kind === 'numeric' && !b.percent && b.numeric && (
         <>

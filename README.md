@@ -393,6 +393,33 @@ six of them nearly empty, and the tool took its constituency figures from whiche
 single column resolved most often - so a hundred reports from seven areas were reported
 as covering 7 of 53 constituencies when they covered 39.
 
+**Seven regions or eight areas, and the file decides.** The campaign form asks observers
+for the Local Government Area and offers all eight. The polling-day forms - opening,
+voting, closing, counting - ask for the region and offer seven: the IEC reports Kuntaur
+and Janjanbureh together as Central River, and names it after its administrative capital,
+which is Janjanbureh. Counted against eight, a deployment that reached every region read
+"7 of 8 areas" and the map hatched Kuntaur - and hatching, on these maps, means nobody
+observed there, which was not true.
+
+The name cannot settle it, because both divisions call the place Janjanbureh: on one form
+it is half of Central River and on the other it is all of it. So the file has to say so
+itself, and three things can. A report filed from Kuntaur, which only the eight-area list
+offers. The form's own list of areas, which a question split into a column per area prints
+in its headers - "B.2 Polling station constituency - Kanifing" and six more, Kuntaur
+absent. Or a Kuntaur constituency filed under Janjanbureh, which can only happen where
+Janjanbureh means the region.
+
+Eight is the answer when nothing says otherwise, and the header has a switch for the file
+that says nothing either way. The two errors are not equal: reading an eight-area file as
+seven would report a deployment that never reached Kuntaur as complete coverage, and a
+coverage figure that overstates itself is the one mistake this tool must not make.
+
+In region mode Central River is drawn as one shape with both its LGAs' electorates behind
+it, labelled "Janjanbureh (Central River)" on the map, because that shape is twice the
+size of the Janjanbureh on a campaign deck and two decks in one briefing should not leave
+a reader wondering which is which. The cover says which division the document counts, next
+to the period it covers.
+
 **The constituency is read as part of the area, not beside it.** Every form
 asks for the Local Government Area and then the constituency inside it, and
 the two are a hierarchy: Bakau and Serekunda West are in Kanifing. Flattening

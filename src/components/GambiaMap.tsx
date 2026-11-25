@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from 'react';
 import type { PlaceRate } from '@/lib/analyse';
-import { LGAS, LGA_SHAPES } from '@/lib/gambia';
+import { AREA_WORDS, areaShapes, type Division } from '@/lib/gambia';
 import { labelPoint, makeProjector, pathFor, shapeWidth } from '@/lib/projection';
 
 /**
@@ -27,6 +27,8 @@ export interface MapProps {
   onSelect?: (place: string | null) => void;
   /** Hide in-shape labels, for small renders. */
   compact?: boolean;
+  /** Which division the file counts: eight LGAs, or seven regions. */
+  division?: Division;
 }
 
 export function GambiaMap({
@@ -36,12 +38,13 @@ export function GambiaMap({
   selected,
   onSelect,
   compact,
+  division = 'lga',
 }: MapProps) {
   const titleId = useId();
   const [hover, setHover] = useState<string | null>(null);
 
   const projector = useMemo(() => makeProjector(VIEW_W), []);
-  const shapes = LGA_SHAPES;
+  const shapes = useMemo(() => areaShapes(division), [division]);
   const byPlace = useMemo(() => new Map(rates.map((r) => [r.place, r])), [rates]);
 
   const max = useMemo(() => {
@@ -51,8 +54,9 @@ export function GambiaMap({
 
   const drawn = useMemo(
     () =>
-      shapes.map(({ key, shape }) => ({
+      shapes.map(({ key, label, shape }) => ({
         key,
+        name: label,
         d: pathFor(shape, projector),
         label: labelPoint(shape, projector),
         width: shapeWidth(shape, projector),
@@ -73,8 +77,8 @@ export function GambiaMap({
         onMouseLeave={() => setHover(null)}
       >
         <title id={titleId}>
-          Map of The Gambia by Local Government Area. The same figures appear in the table
-          beside the map.
+          Map of The Gambia by {AREA_WORDS[division].one}. The same figures appear in the
+          table beside the map.
         </title>
         <defs>
           <pattern
@@ -129,7 +133,7 @@ export function GambiaMap({
 
 
         {!compact &&
-          drawn.map(({ key, label }) => {
+          drawn.map(({ key, name, label }) => {
             const r = byPlace.get(key);
             const has = r && r.pct !== null;
             const size = 15;
@@ -142,7 +146,7 @@ export function GambiaMap({
                   className="map-name"
                   style={{ fontSize: size }}
                 >
-                  {key}
+                  {name}
                 </text>
                 <text
                   x={label[0]}
@@ -207,10 +211,12 @@ export function MapTable({
   rates,
   suffix,
   answerLabel,
+  division = 'lga',
 }: {
   rates: PlaceRate[];
   suffix: '%' | '';
   answerLabel: string;
+  division?: Division;
 }) {
   const withData = rates.filter((r) => r.total > 0).sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0));
   const without = rates.filter((r) => r.total === 0);
@@ -219,7 +225,7 @@ export function MapTable({
       <table className="plain">
         <thead>
           <tr>
-            <th>Local Government Area</th>
+            <th>{AREA_WORDS[division].heading}</th>
             <th style={{ textAlign: 'right' }}>{answerLabel}</th>
             <th style={{ textAlign: 'right' }}>Reports</th>
             <th style={{ textAlign: 'right' }}>{suffix === '%' ? 'Rate' : 'Count'}</th>
@@ -248,9 +254,10 @@ export function MapTable({
           )}
         </tbody>
       </table>
-      {withData.length < LGAS.length && (
+      {without.length > 0 && (
         <p className="muted small mt">
-          {LGAS.length - withData.length} of the 8 Local Government Areas returned no reports.
+          {without.length} of the {rates.length} {AREA_WORDS[division].many} returned no
+          reports.
         </p>
       )}
     </div>

@@ -7,12 +7,16 @@
 
 import {
   ALL_CONSTITUENCIES,
+  CENTRAL_RIVER_UNIT,
   LGAS,
   TOTAL_REGISTERED_2026,
+  areaUnits,
   lgaName,
-  registeredOf,
   resolveConstituency,
   resolveLga,
+  unitCodeFor,
+  type AreaUnit,
+  type Division,
   type LgaCode,
 } from './gambia';
 import {
@@ -111,7 +115,19 @@ export interface Dataset {
   questions: Question[];
   /** Column index holding the area or district, if one was found. */
   areaColumn: number | null;
-  /** Area code per row, where resolvable against Gambian geography. */
+  /**
+   * Which division of the country this file reports against: the eight
+   * Local Government Areas, or the seven regions. Read from the file in
+   * `divisionOf`, or set by the analyst.
+   */
+  division: Division;
+  /** The areas of the country as this file counts them, west to east. */
+  areas: AreaUnit[];
+  /**
+   * The area each row belongs to, as this file counts them. In a
+   * seven-region file a Central River report is keyed by Janjanbureh,
+   * which is the region's own name on these forms.
+   */
   rowArea: (LgaCode | null)[];
   /**
    * Grouping label per row: the Gambian area name where it resolves, and
@@ -247,7 +263,61 @@ function utcDay(year: number, month: number, day: number): number | null {
   return d.getUTCMonth() === month - 1 && d.getUTCDate() === day ? ms : null;
 }
 
-export function buildDataset(table: Table, questions: Question[]): Dataset {
+/**
+ * Which division of the country a file reports against.
+ *
+ * It cannot be read from the names, because both divisions call the place
+ * Janjanbureh: on the campaign form it is one of eight Local Government
+ * Areas, and on the polling-day forms it is the whole of Central River,
+ * named after its administrative capital. So the file has to say so
+ * itself, and three things can:
+ *
+ *   - a report filed from Kuntaur, which only the eight-area list offers;
+ *   - the form's own list of areas, which a question split into a column
+ *     per area prints in its headers - seven of them, Kuntaur missing;
+ *   - a Kuntaur constituency filed under Janjanbureh, which can only
+ *     happen where Janjanbureh means the region.
+ *
+ * Eight is the answer when nothing says otherwise. The two errors are not
+ * equal: reading an eight-area file as seven would report a deployment
+ * that never reached Kuntaur as complete coverage, and a coverage figure
+ * that overstates itself is the one mistake this tool must not make. The
+ * header offers the analyst the switch for the file that says nothing
+ * either way.
+ */
+export function divisionOf(
+  questions: Question[],
+  rowLga: (LgaCode | null)[],
+  rowConstituency: (string | null)[],
+): Division {
+  if (rowLga.includes('KUN')) return 'lga';
+
+  for (const q of questions) {
+    const labels = q.columnLabels;
+    if (!labels || labels.length < 5) continue;
+    const codes = labels.map((l) => resolveLga(l));
+    if (codes.some((c) => c === null)) continue;
+    const named = new Set(codes as LgaCode[]);
+    if (named.size === LGAS.length - 1 && !named.has('KUN') && named.has(CENTRAL_RIVER_UNIT)) {
+      return 'region';
+    }
+  }
+
+  const kuntaur = new Set(LGAS.find((a) => a.code === 'KUN')?.constituencies ?? []);
+  for (let i = 0; i < rowLga.length; i += 1) {
+    const c = rowConstituency[i];
+    if (rowLga[i] === CENTRAL_RIVER_UNIT && c && kuntaur.has(c)) return 'region';
+  }
+
+  return 'lga';
+}
+
+export function buildDataset(
+  table: Table,
+  questions: Question[],
+  /** The analyst's own choice, where they have made one. */
+  divisionOverride?: Division,
+): Dataset {
   const { headers, rows } = table;
 
   let areaColumn: number | null = null;
@@ -368,9 +438,21 @@ export function buildDataset(table: Table, questions: Question[]): Dataset {
     dateColumn === null ? null : parseDay(clean(r[dateColumn] ?? '')),
   );
 
-  const rowArea = rows.map((r) =>
+  const rowLga = rows.map((r) =>
     areaColumn === null ? null : resolveLga(clean(r[areaColumn] ?? '')),
   );
+  const rowConstituency = rows.map((r) => {
+    for (const col of constituencyColumns) {
+      const hit = resolveConstituency(clean(r[col] ?? ''));
+      if (hit) return hit.name;
+    }
+    return null;
+  });
+  const division = divisionOverride ?? divisionOf(questions, rowLga, rowConstituency);
+  const areas = areaUnits(division);
+  // Folded on the way in, so everything downstream counts the areas the
+  // file itself reports against.
+  const rowArea = rowLga.map((code) => (code ? unitCodeFor(code, division) : null));
   const rowTeam = rows.map((r) => (teamColumn >= 0 ? clean(r[teamColumn] ?? '') : ''));
 
   // Use Gambian areas when most rows resolve to them, and the file's own
@@ -386,18 +468,11 @@ export function buildDataset(table: Table, questions: Question[]): Dataset {
   });
 
   const groups = geo
-    ? LGAS.filter((a) => rowArea.includes(a.code)).map((a) => a.name)
+    ? areas.filter((a) => rowArea.includes(a.code)).map((a) => a.name)
     : [...new Set(rowGroup.filter((g): g is string => Boolean(g)))].sort();
 
-  const rowConstituency = rows.map((r) => {
-    for (const col of constituencyColumns) {
-      const hit = resolveConstituency(clean(r[col] ?? ''));
-      if (hit) return hit.name;
-    }
-    return null;
-  });
   const seenConstituencies = new Set(rowConstituency.filter(Boolean) as string[]);
-  const constituencies = LGAS.flatMap((a) =>
+  const constituencies = areas.flatMap((a) =>
     a.constituencies.filter((c) => seenConstituencies.has(c)),
   );
 
@@ -405,6 +480,8 @@ export function buildDataset(table: Table, questions: Question[]): Dataset {
     table,
     questions,
     areaColumn,
+    division,
+    areas,
     rowArea,
     rowGroup,
     groups,
@@ -913,7 +990,7 @@ export function rateByPlace(
   answer: string,
   rowFilter?: boolean[],
 ): PlaceRate[] {
-  const places = LGAS.map((a) => a.name);
+  const places = dataset.areas.map((a) => a.name);
   const keyOf = (i: number) => (dataset.rowArea[i] ? lgaName(dataset.rowArea[i]!) : null);
 
   const totals = new Map<string, number>();
@@ -945,7 +1022,7 @@ export function rateByPlace(
 
 /** Report counts per place, for the default coverage map. */
 export function reportsByPlace(dataset: Dataset, rowFilter?: boolean[]): PlaceRate[] {
-  const places = LGAS.map((a) => a.name);
+  const places = dataset.areas.map((a) => a.name);
   const counts = new Map<string, number>();
   dataset.table.rows.forEach((_row, i) => {
     if (rowFilter && !rowFilter[i]) return;
@@ -1036,7 +1113,7 @@ export function constituencyCoverage(
     perArea.set(area, m);
   });
 
-  const groups = LGAS.filter((a) => totals.has(a.name)).map((a) => {
+  const groups = dataset.areas.filter((a) => totals.has(a.name)).map((a) => {
     const counts = perArea.get(a.name) ?? new Map<string, number>();
     const known = a.constituencies.filter((c) => counts.has(c));
     const other = [...counts.keys()].filter((c) => !a.constituencies.includes(c)).sort();
@@ -1093,16 +1170,13 @@ export function coverage(dataset: Dataset, rowFilter?: boolean[]): Coverage {
     if (team) teams.set(team, (teams.get(team) ?? 0) + 1);
   });
 
-  const universe = dataset.geo ? LGAS.map((a) => a.name) : dataset.groups;
+  const universe = dataset.geo ? dataset.areas.map((a) => a.name) : dataset.groups;
   const byGroup = universe.map((label) => ({
     label,
     reports: counts.get(label) ?? 0,
-    registered: dataset.geo
-      ? (() => {
-          const a = LGAS.find((x) => x.name === label);
-          return a ? registeredOf(a.code) : null;
-        })()
-      : null,
+    // Central River's electorate is both its LGAs', which is what makes
+    // the register column add up to the national total either way.
+    registered: dataset.areas.find((a) => a.name === label)?.registered ?? null,
   }));
 
   let registerShare: number | null = null;

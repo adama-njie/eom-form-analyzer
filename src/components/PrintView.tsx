@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { BarList, Donut, PercentPanel, StackedByArea, WordCloud, fmtPct } from './charts';
 import { GambiaMap } from './GambiaMap';
+import { AREA_WORDS } from '@/lib/gambia';
 import {
   analyse,
   coverage,
@@ -47,7 +48,8 @@ export default function PrintView({
         <h1>{selection.title}</h1>
         {selection.preparedBy && <p className="lede">Prepared by {selection.preparedBy}</p>}
         <p className="muted small">
-          {cov.reports} observer reports · {cov.groupsCovered} of {cov.groupsTotal} areas ·{' '}
+          {cov.reports} observer reports · {cov.groupsCovered} of {cov.groupsTotal}{' '}
+          {dataset.geo ? AREA_WORDS[dataset.division].many : 'districts'} ·{' '}
           {new Date().toLocaleDateString('en-GB')}
         </p>
         {selection.period && <p className="lede">{selection.period}</p>}
@@ -73,7 +75,7 @@ export default function PrintView({
               <span className="stat-value">{cov.reports}</span>
             </div>
             <div className="stat">
-              <span className="stat-label">LGAs</span>
+              <span className="stat-label">{AREA_WORDS[dataset.division].tile}</span>
               <span className="stat-value">
                 {cov.groupsCovered} / {cov.groupsTotal}
               </span>
@@ -110,7 +112,12 @@ export default function PrintView({
       {showMaps && (
         <section className="print-block">
           <h2>Where the reports came from</h2>
-          <GambiaMap rates={reportsByPlace(dataset, filter)} suffix="" compact={false} />
+          <GambiaMap
+            rates={reportsByPlace(dataset, filter)}
+            suffix=""
+            compact={false}
+            division={dataset.division}
+          />
         </section>
       )}
 
@@ -209,7 +216,7 @@ function PrintQuestion({
         <h3>
           <span className="qcode">{q.code}</span> {q.label}
         </h3>
-        <PercentPanel p={b.percent} />
+        <PercentPanel p={b.percent} division={dataset.division} />
         <p className="muted small">{describe(q, b, dataset.geo)}</p>
       </article>
     );

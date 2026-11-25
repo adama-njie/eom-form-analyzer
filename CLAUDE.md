@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 214 tests
+npm test           # vitest, 224 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 171 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 181 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -111,6 +111,24 @@ geography.
   Coverage by constituency is a list on screen, which can show all 53. Do
   not reintroduce the district layer without a real constituency boundary
   file; `scripts/build_boundaries.py` still writes the ADM2 shapes.
+- **A file reports against seven regions or eight LGAs, and the file
+  says which.** The campaign form asks for the Local Government Area and
+  offers all eight. The polling-day forms ask for the region and offer
+  seven, because the IEC reports Kuntaur and Janjanbureh together as
+  Central River and names it after its administrative capital,
+  Janjanbureh. Read as eight, a complete seven-region deployment counts
+  "7 / 8" and the map hatches Kuntaur, which on these maps means "nobody
+  observed here". The name cannot settle it - both divisions call the
+  place Janjanbureh - so `divisionOf` reads the evidence: a report filed
+  from Kuntaur, the form's own list of areas in the headers of a question
+  split by area, or a Kuntaur constituency filed under Janjanbureh.
+  Eight when nothing says otherwise, because reading an eight-area file
+  as seven would report a deployment that never reached Kuntaur as
+  complete coverage, and the header has the switch for the file that says
+  nothing either way. Everything that groups, counts, shades or divides
+  by area goes through `dataset.areas`, and the words come from
+  `AREA_WORDS[dataset.division]`, so nothing has its own idea of how many
+  areas there are.
 - **A form from outside The Gambia still works, without the maps.** When the
   area column's answers do not resolve against the gazetteer, `dataset.geo`
   is false: the tool groups by whatever the file says, calls those groups

@@ -43,6 +43,7 @@ import { describe, describeFinding, executiveSummary } from './narrative';
 import { JUDGED, colourFor, fillsFor } from './pptx';
 import { ACCENT_DEEP, CAT, FLAG, INK, MUTED } from './theme';
 import { exportFileName, selectedQuestions, type ExportSelection } from './selection';
+import { AREA_WORDS } from './gambia';
 
 // One palette for every output. A figure that appears in the deck and in
 // the report should be the same colour in both, because they get shown in
@@ -162,7 +163,9 @@ export async function buildReport(
       spacing: { after: sel.period ? 80 : 600 },
       children: [
         new TextRun({
-          text: `${cov.reports} observer reports  ·  ${cov.groupsCovered} of ${cov.groupsTotal} areas  ·  generated ${new Date().toLocaleDateString('en-GB')}`,
+          text: `${cov.reports} observer reports  ·  ${cov.groupsCovered} of ${cov.groupsTotal} ${
+            dataset.geo ? AREA_WORDS[dataset.division].many : 'districts'
+          }  ·  generated ${new Date().toLocaleDateString('en-GB')}`,
           size: 20,
           color: MUTED,
         }),
@@ -215,7 +218,12 @@ export async function buildReport(
   );
   children.push(
     table(
-      [dataset.geo ? 'Area' : 'District', 'Reports', 'Share of reports', ...(dataset.geo ? ['2026 register'] : [])],
+      [
+        dataset.geo ? AREA_WORDS[dataset.division].heading : 'District',
+        'Reports',
+        'Share of reports',
+        ...(dataset.geo ? ['2026 register'] : []),
+      ],
       cov.byGroup.map((g) => [
         g.label,
         String(g.reports),
@@ -225,13 +233,21 @@ export async function buildReport(
       dataset.geo ? [34, 18, 22, 26] : [46, 24, 30],
     ),
   );
-  children.push(caption(`Table 1. Reports by ${dataset.geo ? 'administrative area' : 'district'}.`));
+  children.push(
+    caption(
+      `Table 1. Reports by ${dataset.geo ? AREA_WORDS[dataset.division].one : 'district'}.`,
+    ),
+  );
 
   if (canDrawMaps) {
-    children.push(chartParagraph(mapPng(reportsByPlace(dataset, filter), '', BRAND, 640)));
+    children.push(
+      chartParagraph(
+        mapPng(reportsByPlace(dataset, filter), '', BRAND, 640, dataset.division),
+      ),
+    );
     children.push(
       caption(
-        `Figure ${figure}. Reports by Local Government Area. Hatched areas returned no reports.`,
+        `Figure ${figure}. Reports by ${AREA_WORDS[dataset.division].one}. Hatched areas returned no reports.`,
       ),
     );
     figure += 1;
@@ -299,7 +315,9 @@ export async function buildReport(
       // Map the three most frequent findings: where a problem clusters is
       // usually the first question a mission asks of it.
       for (const f of probs.slice(0, 3)) {
-        children.push(h(`${f.question.code} by LGA`, HeadingLevel.HEADING_3));
+        children.push(
+          h(`${f.question.code} by ${AREA_WORDS[dataset.division].one}`, HeadingLevel.HEADING_3),
+        );
         children.push(body(describeFinding(f)));
         children.push(
           chartParagraph(
@@ -308,12 +326,13 @@ export async function buildReport(
               '%',
               FLAG,
               640,
+              dataset.division,
             ),
           ),
         );
         children.push(
           caption(
-            `Share of reports answering ${f.label} to ${f.question.code}, by Local Government Area.`,
+            `Share of reports answering ${f.label} to ${f.question.code}, by ${AREA_WORDS[dataset.division].one}.`,
           ),
         );
       }
@@ -389,7 +408,7 @@ export async function buildReport(
         const p = b.percent;
         for (const [title, rows] of [
           ['by party', p.byParty],
-          [`by ${dataset.geo ? 'Local Government Area' : 'district'}`, p.byArea],
+          [`by ${dataset.geo ? AREA_WORDS[dataset.division].one : 'district'}`, p.byArea],
         ] as const) {
           if (rows.length < 2) continue;
           children.push(chartParagraph(meanBarsPng(rows, `#${ACCENT_DEEP}`)));
@@ -427,7 +446,11 @@ export async function buildReport(
             ),
           ),
         );
-        children.push(caption(`Figure ${figure}. ${q.code} by ${dataset.geo ? 'lga' : 'district'}.`));
+        children.push(
+          caption(
+            `Figure ${figure}. ${q.code} by ${dataset.geo ? AREA_WORDS[dataset.division].one : 'district'}.`,
+          ),
+        );
         figure += 1;
       }
     }

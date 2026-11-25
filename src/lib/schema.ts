@@ -55,6 +55,13 @@ export interface Question {
    * it, so the key is read once here and the words are used everywhere.
    */
   valueLabels?: Record<string, string>;
+  /**
+   * What each column of a split block was headed with: the area names in
+   * "B.2 Polling station constituency - Kanifing". It is the form's own
+   * list of areas, which is how the tool knows whether a file reports
+   * against eight Local Government Areas or seven regions.
+   */
+  columnLabels?: string[];
   /** Sub-items grouped under this question, e.g. the polling staff roles. */
   children?: Question[];
 }
@@ -416,6 +423,7 @@ export function inferSchema(table: Table): Question[] {
             columns: cols,
             options: [...new Set(vals)].map((v) => ({ label: v, column: cols[0]! })),
             scale: kindOf.scale,
+            columnLabels: cols.map((c) => splitBase(headers[c] ?? '')?.suffix ?? ''),
           });
         }
         i = cols[cols.length - 1]! + 1;

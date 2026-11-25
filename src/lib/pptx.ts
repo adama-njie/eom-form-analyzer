@@ -38,6 +38,7 @@ import {
   TYPE,
 } from './theme';
 import { drawFlag, euFlag, gambiaFlag } from './flags';
+import { AREA_WORDS, type Division } from './gambia';
 import { mapPng, pieMapPng } from './mapImage';
 import {
   isConstituencyQuestion,
@@ -173,7 +174,7 @@ export function buildDeck(
   const canDrawMaps =
     sel.maps && (options.includeMaps ?? true) && dataset.geo && typeof document !== 'undefined';
 
-  addTitleSlide(pptx, sel);
+  addTitleSlide(pptx, sel, dataset.division);
   if (sel.coverage) addCoverageSlide(pptx, dataset, cov, filter);
   if (sel.coverage) addTurnoutSlide(pptx, dataset, filter);
   if (canDrawMaps) addMapSlide(pptx, dataset, filter);
@@ -190,7 +191,7 @@ export function buildDeck(
 
 /* ------------------------------------------------------------------ */
 
-function addTitleSlide(pptx: PptxGenJS, sel: ExportSelection): void {
+function addTitleSlide(pptx: PptxGenJS, sel: ExportSelection, division: Division): void {
   const s = pptx.addSlide();
   s.background = { color: 'FFFFFF' };
 
@@ -257,6 +258,25 @@ function addTitleSlide(pptx: PptxGenJS, sel: ExportSelection): void {
     });
   }
 
+  /*
+   * Which division of the country the deck counts.
+   *
+   * A deck of seven regions and a deck of eight Local Government Areas
+   * both show a place called Janjanbureh, and in one of them it is twice
+   * the size of the other. Side by side in a briefing that is a question
+   * nobody should have to ask, so the cover answers it.
+   */
+  if (division === 'region') {
+    s.addText(
+      'Areas are the seven regions; Central River is reported as Janjanbureh.',
+      {
+        ...place({ x: 0.9, y: 5.25, w: SLIDE.w - 1.8, h: 0.4 }, 'division note'),
+        fontSize: TYPE.coverStamp, color: MUTED,
+        fontFace: FONT, align: 'center', valign: 'middle',
+      },
+    );
+  }
+
   s.addText('Updated', {
     ...place({ x: 0.9, y: SLIDE.h - 1.25, w: SLIDE.w - 1.8, h: 0.35 }, 'updated label'),
     fontSize: TYPE.coverStamp, color: INK,
@@ -313,7 +333,10 @@ function addCoverageSlide(
 
   const tiles: [string, string][] = [
     ['Reports', String(cov.reports)],
-    [dataset.geo ? 'LGAs' : 'Districts', `${cov.groupsCovered} / ${cov.groupsTotal}`],
+    [
+      dataset.geo ? AREA_WORDS[dataset.division].tile : 'Districts',
+      `${cov.groupsCovered} / ${cov.groupsTotal}`,
+    ],
   ];
   if (cov.constituenciesTotal > 0) {
     tiles.push(['Constituencies', `${cov.constituenciesCovered} / ${cov.constituenciesTotal}`]);
@@ -388,7 +411,9 @@ function addCoverageSlide(
   const charts: { title: string; labels: string[]; values: number[]; colour: string }[] = [];
   if (areaRows.length > 0) {
     charts.push({
-      title: dataset.geo ? 'Reports by Local Government Area' : 'Reports by district',
+      title: dataset.geo
+        ? `Reports by ${AREA_WORDS[dataset.division].one}`
+        : 'Reports by district',
       labels: areaRows.map((g) => g.label),
       values: areaRows.map((g) => g.reports),
       colour: ACCENT_DEEP,
@@ -512,8 +537,14 @@ function addMapSlide(
    * is a table, which has none of that trouble.
    */
   const s = pptx.addSlide({ masterName: 'BASE' });
-  const top = heading(s, 'Reports by Local Government Area');
-  const img = mapPng(reportsByPlace(dataset, filter), '', ACCENT_DEEP, 1400);
+  const top = heading(s, `Reports by ${AREA_WORDS[dataset.division].one}`);
+  const img = mapPng(
+    reportsByPlace(dataset, filter),
+    '',
+    ACCENT_DEEP,
+    1400,
+    dataset.division,
+  );
   const w = CONTENT.w;
   const h = (w / img.width) * img.height;
   s.addImage({
@@ -540,6 +571,7 @@ function addFindingMapSlide(
     '%',
     FLAG,
     1400,
+    dataset.division,
   );
   const w = CONTENT.w;
   const h = (w / img.width) * img.height;
@@ -784,7 +816,7 @@ function addPieMapSlide(pptx: PptxGenJS, dataset: Dataset, planned: Planned): vo
 
   const s = pptx.addSlide({ masterName: 'BASE' });
   const top = heading(s, `${q.code} ${q.label}`.trim());
-  const img = pieMapPng(data, order, colours, 1400);
+  const img = pieMapPng(data, order, colours, 1400, dataset.division);
   const w = CONTENT.w;
   const h = (w / img.width) * img.height;
   if (top + h > PAD.bottom) return;
@@ -836,7 +868,12 @@ function drawQuestion(
 
   // A percentage is averaged, not banded. See `percentageOf`.
   if (b.percent) {
-    drawPercentage(pptx, slide, q, b.percent, { x: col.x, y: top, w: col.w, h: height });
+    drawPercentage(pptx, slide, q, b.percent, dataset.division, {
+      x: col.x,
+      y: top,
+      w: col.w,
+      h: height,
+    });
     return;
   }
 
@@ -928,6 +965,7 @@ function drawPercentage(
   slide: PptxGenJS.Slide,
   q: Question,
   p: Percentage,
+  division: Division,
   box: { x: number; y: number; w: number; h: number },
 ): void {
   const headH = 0.78;
@@ -964,7 +1002,7 @@ function drawPercentage(
   const charts: { title: string; rows: GroupMean[] }[] = [];
   if (p.byParty.length > 1) charts.push({ title: 'By party', rows: p.byParty });
   if (p.byArea.length > 1) {
-    charts.push({ title: 'By Local Government Area', rows: p.byArea });
+    charts.push({ title: `By ${AREA_WORDS[division].one}`, rows: p.byArea });
   }
   if (charts.length === 0) return;
 
@@ -1124,7 +1162,7 @@ function drawByGroup(
     by === 'party'
       ? 'by Party'
       : dataset.geo
-        ? 'by Local Government Area'
+        ? `by ${AREA_WORDS[dataset.division].one}`
         : 'by area';
   slide.addText(heading, {
     ...place({ x: box.x, y: box.y, w: box.w, h: 0.34 }, 'by-area title'),

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { GambiaMap, MapTable } from './GambiaMap';
 import { analyse, rateByPlace, reportsByPlace, type Dataset } from '@/lib/analyse';
 import { downloadCsv } from '@/lib/export';
+import { AREA_WORDS } from '@/lib/gambia';
 import { JUDGED } from '@/lib/pptx';
 
 /**
@@ -109,9 +110,16 @@ export default function MapTab({
             className="ghost"
             onClick={() =>
               downloadCsv(
-                `map-${showingCoverage ? 'coverage' : `${question!.code}-${answer}`}-lga.csv`,
+                `map-${showingCoverage ? 'coverage' : `${question!.code}-${answer}`}-${
+                  dataset.division === 'region' ? 'region' : 'lga'
+                }.csv`,
                 [
-                  ['LGA', 'Matching', 'Reports', suffix === '%' ? 'Rate %' : 'Count'],
+                  [
+                    AREA_WORDS[dataset.division].heading,
+                    'Matching',
+                    'Reports',
+                    suffix === '%' ? 'Rate %' : 'Count',
+                  ],
                   ...rates.map((r) => [
                     r.place,
                     r.n,
@@ -137,15 +145,17 @@ export default function MapTab({
           colour={showingCoverage ? '#12239E' : '#E66C37'}
           selected={selected || null}
           onSelect={(p) => onSelect(p ?? '')}
+          division={dataset.division}
         />
       </section>
 
       <section className="card">
-        <h2>By Local Government Area</h2>
+        <h2>By {AREA_WORDS[dataset.division].one}</h2>
         <MapTable
           rates={rates}
           suffix={suffix}
           answerLabel={showingCoverage ? 'Reports' : answer}
+          division={dataset.division}
         />
       </section>
     </div>

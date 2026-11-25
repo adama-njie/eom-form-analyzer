@@ -1,5 +1,6 @@
 import type { Count, GroupMean, Percentage } from '@/lib/analyse';
 import { meanLabel } from '@/lib/analyse';
+import { AREA_WORDS, type Division } from '@/lib/gambia';
 import { NON_ANSWERS } from '@/lib/schema';
 import { ACCENT, ACCENT_DEEP, CAT, NOT_APPLICABLE, SCALE } from '@/lib/theme';
 
@@ -207,7 +208,7 @@ export function MeanBars({ rows }: { rows: GroupMean[] }) {
 }
 
 /** The figure, then the same figure by party and by area. */
-export function PercentPanel({ p }: { p: Percentage }) {
+export function PercentPanel({ p, division }: { p: Percentage; division: Division }) {
   return (
     <>
       {/*
@@ -233,7 +234,7 @@ export function PercentPanel({ p }: { p: Percentage }) {
       )}
       {p.byArea.length > 1 && (
         <>
-          <h4 className="chart-sub">By Local Government Area</h4>
+          <h4 className="chart-sub">By {AREA_WORDS[division].one}</h4>
           <MeanBars rows={p.byArea} />
         </>
       )}

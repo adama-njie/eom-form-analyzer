@@ -8,7 +8,7 @@
  */
 
 import type { PlaceRate } from './analyse';
-import { LGA_SHAPES } from './gambia';
+import { areaShapes, type Division } from './gambia';
 import { labelPoint, makeProjector, shapeWidth } from './projection';
 import type { BoundaryShape } from '@/data/boundaries';
 
@@ -160,6 +160,8 @@ export function mapPng(
   suffix: '%' | '',
   colourHex = '#12239E',
   width = 700,
+  /** Which division the file counts: eight LGAs, or seven regions. */
+  division: Division = 'lga',
 ): MapImage {
   const projector = makeProjector(width, 8);
   /*
@@ -184,7 +186,7 @@ export function mapPng(
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, width, height);
 
-  const shapes = LGA_SHAPES;
+  const shapes = areaShapes(division);
   const byPlace = new Map(rates.map((r) => [r.place, r]));
   const vals = rates.map((r) => r.pct).filter((v): v is number => v !== null);
   const max = vals.length ? Math.max(...vals, 0.0001) : 1;
@@ -243,11 +245,13 @@ export function mapPng(
    */
   const overflow: { name: string; value: string; cx: number; cy: number }[] = [];
 
-  for (const { key, shape } of shapes) {
+  for (const { key, label: mapLabel, shape } of shapes) {
     const r = byPlace.get(key);
     const has = r && r.pct !== null;
     const [cx, cy] = labelPoint(shape, projector);
-    const name = key;
+    // Central River is drawn twice the size of the Janjanbureh on a
+    // campaign map, so in region mode the shape says which it is.
+    const name = mapLabel;
     const value = has ? `${r!.pct!.toFixed(0)}${suffix}` : '–';
 
     ctx.font = `700 ${size}px Arial, "Segoe UI", system-ui, sans-serif`;
@@ -329,7 +333,9 @@ export function pieMapPng(
   order: string[],
   colours: string[],
   width = 1400,
+  division: Division = 'lga',
 ): MapImage {
+  const shapes = areaShapes(division);
   const projector = makeProjector(width, 8);
   const size = mapLabelSize(width);
   const rMax = size * 2.2;
@@ -358,7 +364,7 @@ export function pieMapPng(
   const project = projector.project.bind(projector);
   const hatch = hatchPattern(ctx);
 
-  for (const { key, shape } of LGA_SHAPES) {
+  for (const { key, shape } of shapes) {
     trace(ctx, shape, project);
     ctx.fillStyle = totals.has(key) ? '#E8ECF0' : hatch;
     ctx.fill();
@@ -391,7 +397,7 @@ export function pieMapPng(
   const overflow: Placed[] = [];
   const onMap: Placed[] = [];
 
-  for (const { key, shape } of LGA_SHAPES) {
+  for (const { key, shape } of shapes) {
     const entry = data.find((d) => d.place === key);
     const total = totals.get(key) ?? 0;
     if (!entry || total === 0) continue;

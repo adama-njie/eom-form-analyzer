@@ -352,6 +352,146 @@ export function resolveConstituency(raw: string): { name: string; lga: LgaCode }
 /* Boundaries                                                          */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* Which division of the country a form uses                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The two divisions the mission's forms report against.
+ *
+ * The campaign form asks for the Local Government Area and offers all
+ * eight. The polling-day forms - opening, voting, closing, counting - ask
+ * for the region and offer seven, because the IEC treats Kuntaur and
+ * Janjanbureh as one Central River region and names it after its
+ * administrative capital, Janjanbureh.
+ *
+ * Which one a file uses is read from the file itself, in `divisionOf`. It
+ * cannot be read from the name: both divisions call that place
+ * Janjanbureh, and in one it is half of Central River and in the other it
+ * is all of it.
+ */
+export type Division = 'lga' | 'region';
+
+/** The LGAs the IEC reports together as Central River. */
+export const CENTRAL_RIVER: LgaCode[] = ['KUN', 'JAN'];
+/** The one of them that names the region. */
+export const CENTRAL_RIVER_UNIT: LgaCode = 'JAN';
+
+/**
+ * One area as a given form counts them: an LGA, or a region made of two.
+ *
+ * Everything that groups, counts, shades or divides by area goes through
+ * this list, so a file that reports seven areas is never counted against
+ * eight. Central River's electorate and its constituencies are the two
+ * LGAs' put together, which is what makes the coverage figures add up.
+ */
+export interface AreaUnit {
+  /** The LGA code this unit is keyed by; Central River is keyed by JAN. */
+  code: LgaCode;
+  /** What the form calls it, and what every chart and table prints. */
+  name: string;
+  /**
+   * What the map prints, which is longer where the unit covers two LGAs: a
+   * shape twice the size of the Janjanbureh on a campaign map needs to say
+   * so on the map itself, not in the deck that happens to hold it.
+   */
+  mapLabel: string;
+  /** The LGAs inside it. One, except for Central River. */
+  lgas: LgaCode[];
+  constituencies: string[];
+  registered: number;
+}
+
+function unitOf(lgas: LgaCode[], name: string, mapLabel: string): AreaUnit {
+  const members = lgas.map((c) => LGAS.find((a) => a.code === c)!);
+  const constituencies = members.flatMap((a) => a.constituencies);
+  return {
+    code: lgas[lgas.length - 1]!,
+    name,
+    mapLabel,
+    lgas,
+    constituencies,
+    registered: constituencies.reduce((n, c) => n + (REGISTERED_2026[c] ?? 0), 0),
+  };
+}
+
+/** The areas of the country as one division counts them, west to east. */
+export function areaUnits(division: Division): AreaUnit[] {
+  if (division === 'lga') {
+    return LGAS.map((a) => unitOf([a.code], a.name, a.name));
+  }
+  const out: AreaUnit[] = [];
+  for (const a of LGAS) {
+    if (a.code === 'KUN') continue; // folded into the unit below
+    if (a.code === CENTRAL_RIVER_UNIT) {
+      out.push(unitOf(CENTRAL_RIVER, a.name, `${a.name} (Central River)`));
+    } else {
+      out.push(unitOf([a.code], a.name, a.name));
+    }
+  }
+  return out;
+}
+
+/**
+ * The unit an LGA belongs to under a division.
+ *
+ * A report filed from Kuntaur in a seven-region file does not exist - the
+ * form offers no such answer - but a report whose constituency resolves to
+ * Kuntaur does, so the fold has to happen on the way in rather than at the
+ * chart.
+ */
+export function unitCodeFor(code: LgaCode, division: Division): LgaCode {
+  return division === 'region' && CENTRAL_RIVER.includes(code) ? CENTRAL_RIVER_UNIT : code;
+}
+
+/** What to call an area, in the words the file's own division uses. */
+export interface AreaWords {
+  /** "Local Government Area" or "region". */
+  one: string;
+  /** "Local Government Areas" or "regions". */
+  many: string;
+  /** A tile's caption: "LGAs" or "Regions". */
+  tile: string;
+  /** A table's column heading: "Area" or "Region". */
+  heading: string;
+}
+
+export const AREA_WORDS: Record<Division, AreaWords> = {
+  lga: {
+    one: 'Local Government Area',
+    many: 'Local Government Areas',
+    tile: 'LGAs',
+    heading: 'Area',
+  },
+  region: { one: 'region', many: 'regions', tile: 'Regions', heading: 'Region' },
+};
+
+/**
+ * The shapes to draw for a division, keyed by the name charts use.
+ *
+ * In region mode Central River is one shape made of both its LGAs' rings,
+ * so the region gets one fill, one figure and one label across the pair.
+ * The hairline still visible between them is the Gambia river, which is
+ * where their boundary runs and where the river belongs anyway.
+ */
+export function areaShapes(
+  division: Division,
+): { key: string; label: string; shape: BoundaryShape }[] {
+  return areaUnits(division).map((unit) => {
+    const parts = unit.lgas.map((code) => {
+      const a = LGAS.find((x) => x.code === code)!;
+      const shape = LGA_BOUNDARIES.find((b) => key(b.name) === key(a.boundaryName));
+      if (!shape) throw new Error(`No boundary for LGA ${a.name}`);
+      return shape;
+    });
+    return {
+      key: unit.name,
+      label: unit.mapLabel,
+      shape: { name: unit.name, rings: parts.flatMap((p) => p.rings) },
+    };
+  });
+}
+
 /** LGA boundaries, keyed by the name this app uses rather than the file's. */
 export const LGA_SHAPES: { key: string; shape: BoundaryShape }[] = LGAS.map((a) => {
   const shape = LGA_BOUNDARIES.find((b) => key(b.name) === key(a.boundaryName));
