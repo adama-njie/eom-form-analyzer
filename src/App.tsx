@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import {
   BarList,
   Donut,
+  MeanBars,
   PercentPanel,
   StackedByArea,
   WordCloud,
@@ -16,8 +17,12 @@ import {
   constituencyCoverage,
   findings,
   isWordCloud,
+  ratingOf,
+  ratingQuestions,
   reportsByPlace,
+  stationsObserved,
   textValues,
+  turnoutByHour,
   type Breakdown,
   type Dataset,
 } from '@/lib/analyse';
@@ -600,7 +605,10 @@ function Overview({
   onGroup: (g: string) => void;
   group: string;
 }) {
-  const ratings = dataset.questions.filter((q) => q.kind === 'ordinal' && /^J\./.test(q.code));
+  // Every question the form scores, whatever section it sits in.
+  const ratings = ratingQuestions(dataset);
+  const stations = stationsObserved(dataset, filter);
+  const turnout = turnoutByHour(dataset, filter);
   return (
     <div className="stack">
       <section className="card">
@@ -608,9 +616,9 @@ function Overview({
         <div className="statrow">
           <Stat label="Reports" value={cov.reports} />
           <Stat
-            label={dataset.geo ? 'Areas covered' : 'Districts covered'}
+            label={dataset.geo ? 'LGAs' : 'Districts covered'}
             value={`${cov.groupsCovered} / ${cov.groupsTotal}`}
-            sub={dataset.geo ? 'administrative areas' : 'as named in the file'}
+            sub={dataset.geo ? 'Local Government Areas' : 'as named in the file'}
           />
           {cov.constituenciesTotal > 0 ? (
             <Stat
@@ -625,6 +633,13 @@ function Overview({
                 cov.groupsCovered ? (cov.reports / cov.groupsCovered).toFixed(1) : '—'
               }
               sub="mean across covered districts"
+            />
+          )}
+          {stations !== null && (
+            <Stat
+              label="Polling stations"
+              value={stations}
+              sub="distinct stations observed"
             />
           )}
           <Stat label="Teams reporting" value={cov.byTeam.length} />
@@ -692,6 +707,17 @@ function Overview({
         </section>
       </div>
 
+      {turnout && (
+        <section className="card">
+          <h2>Turnout through the day</h2>
+          <p className="muted small">
+            Mean share of each station&rsquo;s list that had voted, by the hour the reading was
+            taken. {turnout.readings} readings, on arrival and on departure.
+          </p>
+          <MeanBars rows={turnout.points} />
+        </section>
+      )}
+
       {dataset.geo && <ConstituencyPanel dataset={dataset} filter={filter} />}
 
       {ratings.length > 0 && (
@@ -699,13 +725,17 @@ function Overview({
           <h2>Overall assessments</h2>
           <div className="statrow">
             {ratings.map((q) => {
-              const b = analyse(dataset, q, filter);
+              const r = ratingOf(dataset, q, filter);
               return (
                 <Stat
-                  key={q.code}
+                  key={`${q.code}-${q.columns[0]}`}
                   label={`${q.code} ${q.label}`}
-                  value={b.meanScore ? b.meanScore.toFixed(2) : '—'}
-                  sub={`mean of ${b.answered} ratings`}
+                  value={r ? `${r.mean.toFixed(2)} / ${r.points}` : '—'}
+                  sub={
+                    r
+                      ? `${fmtPct(r.goodPct)} ${r.goodLabels.join(' or ').toLowerCase()}`
+                      : 'no ratings'
+                  }
                 />
               );
             })}

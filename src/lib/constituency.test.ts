@@ -116,7 +116,16 @@ describe('constituencies under their area', () => {
 });
 
 describe('the deck', () => {
-  it('carries a coverage page for the constituencies', async () => {
+  /*
+   * There is no constituency page any more.
+   *
+   * It was a table of all 53 under their areas, and on the polling-day
+   * form it was a table of one area's: the constituency is asked there in
+   * a column per area, and the page was built from whichever single column
+   * resolved most often. The grouping it showed is still on screen, where
+   * a reader can scroll, filter and check it against the register.
+   */
+  it('leaves the constituencies to the table on screen', async () => {
     const ds = form();
     const deck = buildDeck(ds, undefined, {
       selection: {
@@ -132,13 +141,10 @@ describe('the deck', () => {
     const zip = await JSZip.loadAsync(buf);
     const slides = Object.keys(zip.files).filter((f) => /ppt\/slides\/slide\d+\.xml$/.test(f));
     const texts = await Promise.all(slides.map((f) => zip.files[f]!.async('string')));
-    const page = texts.find((x) => x.includes('Coverage by constituency'));
-    expect(page, 'the constituency page is in the deck').toBeDefined();
-    expect(page).toContain('Serekunda West');
-    expect(page).toContain('Kanifing');
+    expect(texts.some((x) => x.includes('Coverage by constituency'))).toBe(false);
   });
 
-  it('sets it as a table, with the register beside the reports', async () => {
+  it('still counts them on the coverage page', async () => {
     const ds = form();
     const deck = buildDeck(ds, undefined, {
       selection: {
@@ -154,12 +160,10 @@ describe('the deck', () => {
     const zip = await JSZip.loadAsync(buf);
     const slides = Object.keys(zip.files).filter((f) => /ppt\/slides\/slide\d+\.xml$/.test(f));
     const texts = await Promise.all(slides.map((f) => zip.files[f]!.async('string')));
-    const page = texts.find((x) => x.includes('Coverage by constituency'))!;
-    expect(page).toContain('<a:tbl>');
-    expect(page).toContain('Registered');
-    // Serekunda West's 2026 register, from the IEC's own figures.
-    expect(page).toContain('51,522');
-    // And what the report that named no constituency actually wrote.
-    expect(page).toContain('Westfield');
+    const page = texts.find((x) => x.includes('Coverage'))!;
+    // Five constituencies resolved across three areas, of the country's
+    // 53. "Westfield" is not one of them, and is not counted as one.
+    expect(page).toContain('Constituencies');
+    expect(page).toContain('5 / 53');
   });
 });

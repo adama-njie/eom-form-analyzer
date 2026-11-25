@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 199 tests
+npm test           # vitest, 214 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 156 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 171 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -108,8 +108,8 @@ geography.
   boundaries, and the 48 districts that do are a different division, so
   eleven constituencies - the urban ones, which is where the reports are -
   could not be drawn and the map was blank where the mission was working.
-  Coverage by constituency is a table, which can show all 53. Do not
-  reintroduce the district layer without a real constituency boundary
+  Coverage by constituency is a list on screen, which can show all 53. Do
+  not reintroduce the district layer without a real constituency boundary
   file; `scripts/build_boundaries.py` still writes the ADM2 shapes.
 - **A form from outside The Gambia still works, without the maps.** When the
   area column's answers do not resolve against the gazetteer, `dataset.geo`
@@ -119,9 +119,54 @@ geography.
   throughout `App.tsx`, `pptx.ts`, `report.ts` and `narrative.ts` after the
   district map was removed - it is the generic word, not the Gambian
   division. Do not tidy it away.
-- **Coverage by constituency is a table**, grouped by area, with the register
-  beside the reports, spread evenly over as many columns as it takes and
-  continued on a second slide where it must be.
+- **Coverage by constituency is a screen, not a slide.** The deck's page of
+  it is gone: on the polling-day form it was a page of one area's
+  constituencies, because the form asks the question in a column per area
+  and the page was built from whichever single column resolved most often.
+  The grouping is still on the dashboard, where it can be scrolled and
+  filtered, and the count is on the coverage slide.
+- **A question the form splits into a column per area is one question.**
+  "B.2 Polling station constituency - Banjul" through "- Basse" is seven
+  columns and a report fills the one its station is in; "A.1 Team number"
+  is five. Read column by column they are seven questions, six of them
+  nearly empty, and every figure drawn from them is a fraction of the
+  truth. `splitBase` in `schema.ts` groups them where no row fills two.
+- **A clock time is a time, not the number a workbook stores it as.** A date
+  cell read without `cellDates` is an Excel serial, so "A.2 Time of arrival"
+  classified as numeric and the deck printed a hundred arrival times as a
+  total of 46,361. `readClockTimes` rewrites such a column as "07:40" before
+  anything classifies it, and leaves alone any column that dates the report
+  itself, because `parseDay` reads the serial and the period filter needs it.
+- **A scored question wears the words from its own legend.** The forms put
+  the key in a column of its own - "4=Very good 3=Good 2=Bad 1=Very bad" -
+  and store the digit, so a rating chart read 1, 2, 3, 4 with the key
+  nowhere near it. `parseLegend` reads it once and the whole scale is kept,
+  including points nobody used, because "the better half of the scale" is a
+  different half otherwise.
+- **Turnout is the one thing a polling-day form can say about the day.**
+  Each report reads how many had voted on arrival and on departure, against
+  that station's own list, and each reading carries a clock time, so the
+  reports together draw the curve. The pairing is by the word the two
+  questions share - arrival, departure - rather than by question code.
+  Each point is the mean of those shares, one station one vote: a national
+  turnout would need every station in the country, not the observed ones.
+  A count of votes cast is therefore charted as that share and not in
+  bands, which would put a station of 2,000 beside one of 300; the list
+  itself stays a count, because summing it is a real figure.
+- **A worked-out percentage says what it is a share of.** The hedge this
+  tool removed was "mean of 36 estimates" beside a figure the form asked
+  for as a percentage. "As a share of voters on the voter list" under a
+  question headed "Total number of voters who had already voted" is not a
+  hedge but the unit, and `Percentage.basis` carries it.
+- **A rating question is found by its scale, not by its section letter.**
+  It was `/^J\./`, and the opening form rates one thing in section G, so a
+  morning's observation reported nothing at all.
+- **The coverage slide is the briefing's front page.** Reports, LGAs,
+  constituencies, polling stations, teams and the headline rating, four to
+  a row and wrapping to a second row, then reports by area, by team and by
+  station type. Distinct stations, not reports: two observers at one
+  station is one station observed. The figures come from `stationsObserved`,
+  `stationTypeQuestion` and `ratingOf`, so the dashboard shows the same ones.
 - **An LGA is named by its administrative capital.** Banjul, Kanifing,
   Brikama, Kerewan, Mansa Konko, Kuntaur, Janjanbureh, Basse. The regional
   names (West Coast, North Bank, Lower River, Upper River) are aliases that

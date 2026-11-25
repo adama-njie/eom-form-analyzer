@@ -298,11 +298,11 @@ export function estimateSlides(
   selection: ExportSelection,
   questionCount: number,
   heavy = 0,
-  /** True where the form has constituencies, which add a coverage page. */
-  constituencies = false,
+  /** True where the form supports a turnout curve, which adds a page. */
+  turnout = false,
 ): number {
   let n = 1; // cover
-  if (selection.coverage) n += constituencies ? 2 : 1;
+  if (selection.coverage) n += turnout ? 2 : 1;
   if (selection.maps) n += 2;
   if (selection.findingsTable) n += 1 + 3; // table plus mapped findings
   if (selection.ratings) n += 1;

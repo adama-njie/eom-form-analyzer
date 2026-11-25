@@ -219,6 +219,12 @@ export function PercentPanel({ p }: { p: Percentage }) {
       <p className="percent-headline">
         <strong>{meanLabel(p.mean)}%</strong>
       </p>
+      {/*
+        * Except where the form did not ask for a share. "32%" under "Total
+        * number of voters who had already voted" needs its denominator: it
+        * is a share of the station's list, not of the reports.
+        */}
+      {p.basis && <p className="muted small percent-basis">{p.basis}</p>}
       {p.byParty.length > 1 && (
         <>
           <h4 className="chart-sub">By party</h4>

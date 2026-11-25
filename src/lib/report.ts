@@ -30,8 +30,10 @@ import {
   displayCounts,
   findings,
   rateByPlace,
+  ratingQuestions,
   textValues,
   reportsByPlace,
+  turnoutByHour,
   type Dataset,
 } from './analyse';
 import { barChartPng, meanBarsPng, stackedByAreaPng, wordCloudPng } from './chartImage';
@@ -194,6 +196,15 @@ export async function buildReport(
   children.push(h('Summary', HeadingLevel.HEADING_1));
   for (const p of executiveSummary(dataset, filter)) children.push(body(p));
 
+  /*
+   * Figures are numbered as they are drawn.
+   *
+   * The number used to be worked out from how many figures the coverage
+   * section was expected to have produced, which was a guess in two places
+   * and wrong whenever a section was added or dropped.
+   */
+  let figure = 1;
+
   /* Coverage --------------------------------------------------------- */
   if (sel.coverage) {
   children.push(h('Coverage', HeadingLevel.HEADING_1));
@@ -218,7 +229,12 @@ export async function buildReport(
 
   if (canDrawMaps) {
     children.push(chartParagraph(mapPng(reportsByPlace(dataset, filter), '', BRAND, 640)));
-    children.push(caption('Figure 1. Reports by Local Government Area. Hatched areas returned no reports.'));
+    children.push(
+      caption(
+        `Figure ${figure}. Reports by Local Government Area. Hatched areas returned no reports.`,
+      ),
+    );
+    figure += 1;
   }
 
   const teamPng = barChartPng(
@@ -230,7 +246,26 @@ export async function buildReport(
     cov.byTeam.map((_, i) => CAT[i % CAT.length]!),
   );
   children.push(chartParagraph(teamPng));
-  children.push(caption(`Figure ${canDrawMaps ? 2 : 1}. Reports by team type.`));
+  children.push(caption(`Figure ${figure}. Reports by team type.`));
+  figure += 1;
+
+  /*
+   * How far voting had got, through the day.
+   *
+   * The only statement a polling-day form can make about the election as a
+   * whole rather than about the stations observed, so it belongs with the
+   * coverage it rests on. See `turnoutByHour`.
+   */
+  const turnout = turnoutByHour(dataset, filter);
+  if (turnout && turnout.points.length > 1) {
+    children.push(chartParagraph(meanBarsPng(turnout.points, `#${ACCENT_DEEP}`)));
+    children.push(
+      caption(
+        `Figure ${figure}. Mean share of each station's list that had voted, by the hour the reading was taken, from ${turnout.readings} readings.`,
+      ),
+    );
+    figure += 1;
+  }
 
   }
 
@@ -288,8 +323,8 @@ export async function buildReport(
   }
 
   /* Overall assessments ----------------------------------------------- */
-  const ratings = dataset.questions.filter((q) => q.kind === 'ordinal' && /^J\./.test(q.code));
-  const scored = ratings
+  // Every question the form scores, found by its scale. See `ratingQuestions`.
+  const scored = ratingQuestions(dataset)
     .map((q) => ({ q, b: analyse(dataset, q, filter) }))
     .filter((r) => r.b.meanScore !== undefined);
   if (sel.ratings && scored.length > 0) {
@@ -327,7 +362,6 @@ export async function buildReport(
 
     const reportable = picked;
     let section = '';
-    let figure = canDrawMaps ? (dataset.constituencies.length > 0 ? 4 : 3) : 2;
 
     for (const q of reportable) {
       if (q.section && q.section !== section) {

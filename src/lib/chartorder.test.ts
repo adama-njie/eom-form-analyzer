@@ -48,7 +48,11 @@ describe.skipIf(!HAS_FIXTURE)('chart ordering', () => {
     const xmls = await deckXml();
     const hourly = xmls.filter((x) => /<c:v>\d{2}:00<\/c:v>/.test(x));
     expect(hourly.length, 'a chart of hours exists').toBeGreaterThan(0);
-    for (const x of hourly) {
+    // Bars only. The turnout curve is also drawn against the hours and is a
+    // line, because what is read off it is the slope.
+    const bars = hourly.filter((x) => x.includes('<c:barChart>'));
+    expect(bars.length, 'a bar chart of hours exists').toBeGreaterThan(0);
+    for (const x of bars) {
       expect(x).toContain('<c:barDir val="col"/>');
     }
   });

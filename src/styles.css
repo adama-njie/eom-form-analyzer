@@ -447,6 +447,7 @@ button.primary:hover:not(:disabled) { background: var(--primary-dark); }
   white-space: nowrap;
 }
 
-.percent-headline { margin: .2rem 0 .5rem; }
+.percent-headline { margin: .2rem 0 .25rem; }
+.percent-basis { margin: 0 0 .6rem; }
 .percent-headline strong { font-size: 2rem; font-variant-numeric: tabular-nums; }
 .chart-sub { margin: .6rem 0 .25rem; font-size: .8rem; color: var(--muted); font-weight: 600; }

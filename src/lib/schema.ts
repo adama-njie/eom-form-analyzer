@@ -46,6 +46,15 @@ export interface Question {
   options: Option[];
   /** Ordered value domain for ordinal questions, worst to best. */
   scale?: string[];
+  /**
+   * What a stored answer is called on a chart.
+   *
+   * A form that scores a question 1 to 4 puts the key in a column of its
+   * own - "4=Very good 3=Good 2=Bad 1=Very bad" - and then stores the
+   * digit. A chart of 1, 2, 3 and 4 is unreadable without the key beside
+   * it, so the key is read once here and the words are used everywhere.
+   */
+  valueLabels?: Record<string, string>;
   /** Sub-items grouped under this question, e.g. the polling staff roles. */
   children?: Question[];
 }
@@ -120,6 +129,36 @@ function isLegend(header: string): boolean {
   return /\d\s*=\s*\w/.test(header) && !CODE.test(header);
 }
 
+/**
+ * The scale a legend column spells out, as {digit: word}.
+ *
+ * Forms that score a question put the key in a column header of its own and
+ * then store the digit, so the deck used to carry five charts of 1, 2, 3 and
+ * 4 with the key nowhere on the slide. Split on each "<digit>=", so a word
+ * with a space in it stays whole.
+ */
+export function parseLegend(header: string): Record<string, string> | null {
+  const out: Record<string, string> = {};
+  for (const part of header.split(/\s+(?=\d+\s*=)/)) {
+    const m = /^(\d+)\s*=\s*(.+)$/.exec(part.trim());
+    if (m) out[m[1]!] = m[2]!.trim();
+  }
+  return Object.keys(out).length > 1 ? out : null;
+}
+
+/**
+ * Whether a legend runs best-first, as "1=Very good ... 4=Very bad" does.
+ *
+ * Every scale in this tool is held worst first, because that is the order a
+ * stacked bar and a mean score both need. A legend numbered the other way
+ * round would otherwise score a station rated "very bad" as a four.
+ */
+function legendIsReversed(words: string[]): boolean {
+  const first = words[0] ?? '';
+  const last = words[words.length - 1] ?? '';
+  return /good|excellent|satisfactory/i.test(first) && /bad|poor/i.test(last);
+}
+
 function matchScale(values: Set<string>): string[] | undefined {
   const present = [...values].filter((v) => !NON_ANSWERS.has(v));
   if (present.length < 2) return undefined;
@@ -179,7 +218,64 @@ export function toTable(grid: unknown[][]): Table {
     const row = (grid[r] ?? []).map(clean);
     if (row.some((v) => v.length > 0)) rows.push(row);
   }
+  readClockTimes(headers, rows);
   return { headers, rows };
+}
+
+/* ------------------------------------------------------------------ */
+/* Clock times                                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Excel serials for 1990 and 2100. A real date cell lands inside this
+ * window; a count of voters or of ballot papers does not.
+ */
+const SERIAL_MIN = 32_874;
+const SERIAL_MAX = 73_415;
+
+/** Whether a value is an Excel date-time, or a bare time, rather than a count. */
+function isSerialTime(value: string): boolean {
+  if (!/^\d+(\.\d+)?$/.test(value)) return false;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return false;
+  // No fractional part is a date with no clock time, which is not a time.
+  if (n === Math.floor(n)) return false;
+  return (n >= SERIAL_MIN && n <= SERIAL_MAX) || n < 1;
+}
+
+/** The clock time an Excel serial holds, as "07:20". */
+function clockTime(serial: number): string {
+  const minutes = Math.round((serial - Math.floor(serial)) * 1440) % 1440;
+  const hh = String(Math.floor(minutes / 60)).padStart(2, '0');
+  return `${hh}:${String(minutes % 60).padStart(2, '0')}`;
+}
+
+/**
+ * Rewrite columns of Excel date-times as the clock time they hold.
+ *
+ * "A.2 Time of arrival" is a real date cell in the mission's exports, and a
+ * date cell read without `cellDates` is a serial number: 46361.3194. Every
+ * such value looks numeric, so the whole column was classified as a number
+ * and the deck printed the arrival time of a hundred observers as a total of
+ * 46,361 with bands either side of it. Read as a time it is 07:40, and the
+ * question gets the chart it was always meant to have.
+ *
+ * The date is dropped, not kept: these columns answer "when in the day", and
+ * every report in a polling-day file is from the same day. Columns that date
+ * the report itself are left alone, because `parseDay` reads the serial and
+ * the period filter depends on it.
+ */
+function readClockTimes(headers: string[], rows: string[][]): void {
+  headers.forEach((header, col) => {
+    if (META_HEADERS.test(header) || /\bdate\b/i.test(header)) return;
+    const values = rows.map((r) => r[col] ?? '').filter((v) => !isBlank(v));
+    if (values.length === 0) return;
+    if (values.filter(isSerialTime).length / values.length < 0.8) return;
+    rows.forEach((r) => {
+      const v = r[col];
+      if (v !== undefined && isSerialTime(v)) r[col] = clockTime(Number(v));
+    });
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -188,6 +284,52 @@ export function toTable(grid: unknown[][]): Table {
 
 /** Column headers that identify the report rather than answer a question. */
 const META_HEADERS = /^(source|username|date|submitted|timestamp|id)$/i;
+
+/**
+ * The stem of a column split across one option each, as "B.2 Polling
+ * station constituency - Kanifing" is.
+ *
+ * Not the same shape as a multi-answer block, which brackets its option and
+ * can be ticked several times over. These columns are one question asked
+ * once: the form lays out a separate column per area, and each report fills
+ * exactly one of them.
+ */
+function splitBase(header: string): { base: string; suffix: string } | null {
+  const m = /^(.*\S)\s+[-\u2013\u2014]\s+(\S[^-\u2013\u2014]*)$/.exec(header);
+  if (!m) return null;
+  return { base: m[1]!.trim(), suffix: m[2]!.trim() };
+}
+
+/** What a column holds, from what is in it. Null for a column worth nothing. */
+function classify(
+  header: string,
+  code: string,
+  vals: string[],
+): { kind: QuestionKind; scale?: string[] } | null {
+  const distinct = new Set(vals);
+
+  // A column holding a single repeated value and carrying no question code
+  // is a marker or a constant, not a question. Charting it wastes a slide.
+  // This has to be tested before classification, or the categorical branch
+  // claims it first.
+  if (distinct.size === 1 && !code && !META_HEADERS.test(header)) return null;
+  if (META_HEADERS.test(header)) return { kind: 'meta' };
+  if (looksLikeTime(vals)) return { kind: 'time' };
+  const scale = matchScale(distinct);
+  if (scale) return { kind: 'ordinal', scale };
+  if (looksNumeric(vals)) return { kind: 'numeric' };
+  if (
+    distinct.size <= 3 &&
+    [...distinct].every((v) => YES_NO.includes(v) || NON_ANSWERS.has(v))
+  ) {
+    return { kind: 'binary' };
+  }
+  if (distinct.size > 0 && distinct.size <= 12 && vals.length > distinct.size) {
+    return { kind: 'categorical' };
+  }
+  if (distinct.size === 0) return null; // an empty column tells us nothing
+  return { kind: 'text' };
+}
 
 export function inferSchema(table: Table): Question[] {
   const { headers, rows } = table;
@@ -198,11 +340,18 @@ export function inferSchema(table: Table): Question[] {
 
   const questions: Question[] = [];
   let i = 0;
+  /** The scale most recently spelled out by a legend column, if any. */
+  let legend: Record<string, string> | null = null;
 
   while (i < n) {
     const header = headers[i] ?? '';
 
-    if (!header || isLegend(header)) {
+    if (isLegend(header)) {
+      legend = parseLegend(header) ?? legend;
+      i += 1;
+      continue;
+    }
+    if (!header) {
       i += 1;
       continue;
     }
@@ -227,6 +376,53 @@ export function inferSchema(table: Table): Question[] {
       }
     }
 
+    /*
+     * A question the form split into one column per area.
+     *
+     * "B.2 Polling station constituency" is seven columns, one for each
+     * Local Government Area, and a report fills the one its station is in.
+     * Read column by column they are seven questions, six of them nearly
+     * empty, and the tool's constituency figures came from whichever single
+     * column happened to resolve most often - so a hundred reports from all
+     * eight areas were counted as covering one area's constituencies. Read
+     * together they are the one question they were printed as.
+     */
+    const split = splitBase(header);
+    if (split) {
+      const cols = [i];
+      let j = i + 1;
+      while (j < n) {
+        const next = splitBase(headers[j] ?? '');
+        if (!next || next.base !== split.base) break;
+        cols.push(j);
+        j += 1;
+      }
+      // Only where the form really does ask it once: a row filling two of
+      // the columns means they are separate questions that happen to share
+      // a stem, such as a count asked of men and of women.
+      const multiple = rows.filter(
+        (r) => cols.filter((c) => !isBlank(clean(r[c] ?? ''))).length > 1,
+      ).length;
+      if (cols.length > 1 && multiple <= rows.length * 0.1) {
+        const vals = cols.flatMap((c) => valuesFor(c));
+        const parsed = parseCode(split.base);
+        const kindOf = classify(split.base, parsed.code, vals);
+        if (kindOf) {
+          questions.push({
+            code: parsed.code,
+            label: parsed.label || split.base,
+            section: parsed.section,
+            kind: kindOf.kind,
+            columns: cols,
+            options: [...new Set(vals)].map((v) => ({ label: v, column: cols[0]! })),
+            scale: kindOf.scale,
+          });
+        }
+        i = cols[cols.length - 1]! + 1;
+        continue;
+      }
+    }
+
     if (blockCols.length > 1) {
       const options: Option[] = blockCols.map((col) => {
         const s = stem(headers[col] ?? '');
@@ -243,40 +439,34 @@ export function inferSchema(table: Table): Question[] {
     // Single column. Classify it by what is in it.
     const vals = valuesFor(i);
     const distinct = new Set(vals);
-
-    // A column holding a single repeated value and carrying no question
-    // code is a marker or a constant, not a question. Charting it wastes a
-    // slide. This has to be tested before classification, or the
-    // categorical branch claims it first.
-    if (distinct.size === 1 && !code && !META_HEADERS.test(header)) {
+    const kindOf = classify(header, code, vals);
+    if (!kindOf) {
       i += 1;
       continue;
     }
+    const kind = kindOf.kind;
+    let scale = kindOf.scale;
 
-    let kind: QuestionKind;
-    let scale: string[] | undefined;
-
-    if (META_HEADERS.test(header)) {
-      kind = 'meta';
-    } else if (looksLikeTime(vals)) {
-      kind = 'time';
-    } else if ((scale = matchScale(distinct))) {
-      kind = 'ordinal';
-    } else if (looksNumeric(vals)) {
-      kind = 'numeric';
-    } else if (
-      distinct.size <= 3 &&
-      [...distinct].every((v) => YES_NO.includes(v) || NON_ANSWERS.has(v))
-    ) {
-      kind = 'binary';
-    } else if (distinct.size > 0 && distinct.size <= 12 && vals.length > distinct.size) {
-      kind = 'categorical';
-    } else if (distinct.size === 0) {
-      i += 1;
-      continue; // an entirely empty column tells us nothing
-
-    } else {
-      kind = 'text';
+    /*
+     * A scored question wears the words from its legend.
+     *
+     * The legend is a column of its own - "4=Very good 3=Good 2=Bad 1=Very
+     * bad" - and the answers are stored as digits, so without this every
+     * rating chart on the slide reads 1, 2, 3, 4 and the key is nowhere
+     * near it. Applied only where every value the column holds is a point
+     * on that scale, so a later question that happens to answer in small
+     * numbers is left alone.
+     */
+    let valueLabels: Record<string, string> | undefined;
+    if (legend && kind === 'ordinal' && scale && scale.every((v) => legend![v] !== undefined)) {
+      valueLabels = legend;
+      // The whole scale the form offers, not only the points the observers
+      // used: "the better half of the scale" is a different half on a
+      // four-point scale that happens to have been answered three ways.
+      const words = Object.keys(legend)
+        .sort((a, b) => Number(a) - Number(b))
+        .map((k) => legend![k]!);
+      scale = legendIsReversed(words) ? [...words].reverse() : words;
     }
 
     questions.push({
@@ -287,6 +477,7 @@ export function inferSchema(table: Table): Question[] {
       columns: [i],
       options: [...distinct].map((label2) => ({ label: label2, column: i })),
       scale,
+      valueLabels,
     });
     i += 1;
   }

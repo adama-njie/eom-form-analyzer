@@ -1,17 +1,22 @@
 import PptxGenJS from 'pptxgenjs';
 import {
   analyse,
-  constituencyCoverage,
   coverage,
   displayCounts,
   findings,
   meanLabel,
   rateByPlace,
+  ratingOf,
+  ratingQuestions,
   reportsByPlace,
+  stationTypeQuestion,
+  stationsObserved,
   textValues,
+  turnoutByHour,
   type Dataset,
   type GroupMean,
   type Percentage,
+  type Rating,
 } from './analyse';
 import { wordCloudPng } from './chartImage';
 import { wordFrequencies, type WordCount } from './text';
@@ -33,7 +38,6 @@ import {
   TYPE,
 } from './theme';
 import { drawFlag, euFlag, gambiaFlag } from './flags';
-import { ALL_CONSTITUENCIES, REGISTERED_2026 } from './gambia';
 import { mapPng, pieMapPng } from './mapImage';
 import {
   isConstituencyQuestion,
@@ -170,8 +174,8 @@ export function buildDeck(
     sel.maps && (options.includeMaps ?? true) && dataset.geo && typeof document !== 'undefined';
 
   addTitleSlide(pptx, sel);
-  if (sel.coverage) addCoverageSlide(pptx, dataset, cov);
-  if (sel.coverage) addConstituencySlide(pptx, dataset, filter);
+  if (sel.coverage) addCoverageSlide(pptx, dataset, cov, filter);
+  if (sel.coverage) addTurnoutSlide(pptx, dataset, filter);
   if (canDrawMaps) addMapSlide(pptx, dataset, filter);
   if (sel.findingsTable && probs.length > 0) addFindingsSlide(pptx, probs);
   if (canDrawMaps && sel.findingsTable) {
@@ -287,306 +291,200 @@ function addCoverageSlide(
   pptx: PptxGenJS,
   dataset: Dataset,
   cov: ReturnType<typeof coverage>,
+  filter: boolean[] | undefined,
 ): void {
   const s = pptx.addSlide({ masterName: 'BASE' });
   const top = heading(s, 'Coverage', 'What was observed, and where.');
 
   /*
-   * Four figures, and the third used to be the share of the register in
-   * observed areas. With reports from all eight LGAs that reads 100%, which
-   * says only what the figure beside it already said. How much of the
-   * country was actually reached is the constituency count: all eight areas,
-   * sixteen of fifty-three constituencies.
+   * The figures a briefing opens with, as the reference's own front page
+   * carries them: how much was observed, how much of the country that is,
+   * and how the day was rated.
+   *
+   * The share of the register in observed areas used to be among them. With
+   * reports from all eight LGAs that reads 100%, which says only what the
+   * figure beside it already said; how much of the country was actually
+   * reached is the constituency count.
    */
+  const stations = stationsObserved(dataset, filter);
+  const headline = ratingQuestions(dataset)
+    .map((q) => ratingOf(dataset, q, filter))
+    .find((r): r is Rating => r !== null);
+
   const tiles: [string, string][] = [
     ['Reports', String(cov.reports)],
-    [dataset.geo ? 'Areas covered' : 'Districts', `${cov.groupsCovered} / ${cov.groupsTotal}`],
-    cov.constituenciesTotal > 0
-      ? ['Constituencies', `${cov.constituenciesCovered} / ${cov.constituenciesTotal}`]
-      : [
-          'Mean per district',
-          (cov.reports / Math.max(1, cov.groupsCovered)).toFixed(1),
-        ],
-    ['Teams', String(cov.byTeam.length)],
+    [dataset.geo ? 'LGAs' : 'Districts', `${cov.groupsCovered} / ${cov.groupsTotal}`],
   ];
-  const tileCols = columns(4);
-  const tileH = 1.25;
+  if (cov.constituenciesTotal > 0) {
+    tiles.push(['Constituencies', `${cov.constituenciesCovered} / ${cov.constituenciesTotal}`]);
+  }
+  if (stations !== null) tiles.push(['Polling stations', String(stations)]);
+  tiles.push(['Teams', String(cov.byTeam.length)]);
+  if (headline) {
+    // The question's own words for the good end of its scale, so the figure
+    // is not left to mean whatever a reader takes "positive" to mean.
+    tiles.push([
+      `${headline.question.code} ${headline.goodLabels.join(' or ').toLowerCase()}`,
+      `${Math.round(headline.goodPct)}%`,
+    ]);
+  }
+
+  /*
+   * Four to a row, and a second row after that.
+   *
+   * Six tiles across one row leaves 1.4in of text in each, and "Polling
+   * stations" set at the 18pt floor does not fit it: the first build of
+   * this slide printed "Constitue..." and "Polling st..." and left the
+   * reader to guess. Nothing on a slide is allowed to be cut, so the row
+   * wraps instead.
+   */
+  const perRow = tiles.length <= 4 ? tiles.length : Math.ceil(tiles.length / 2);
+  const tileRows = Math.ceil(tiles.length / perRow);
+  const tileCols = columns(perRow);
+  const tileH = tileRows > 1 ? 1.05 : 1.25;
+  const figureH = tileH - 0.44;
   tiles.forEach(([label, value], i) => {
-    const col = tileCols[i]!;
+    const col = tileCols[i % perRow]!;
+    const y = top + Math.floor(i / perRow) * (tileH + 0.14);
     s.addShape(pptx.ShapeType.rect, {
-      ...place({ x: col.x, y: top, w: col.w, h: tileH }, `tile ${i}`),
+      ...place({ x: col.x, y, w: col.w, h: tileH }, `tile ${i}`),
       fill: { color: PANEL }, line: { color: PANEL },
     });
     // Caption above the figure, as the reference's own KPI cards set them.
     s.addText(label, {
-      x: col.x + 0.22, y: top + 0.14, w: col.w - 0.44, h: 0.3,
+      x: col.x + 0.22, y: y + 0.1, w: col.w - 0.44, h: 0.3,
       fontSize: TYPE.figureLabel, color: MUTED, fontFace: FONT,
     });
     s.addText(value, {
-      x: col.x + 0.22, y: top + 0.44, w: col.w - 0.44, h: 0.72,
+      x: col.x + 0.22, y: y + 0.4, w: col.w - 0.44, h: figureH,
       fontSize: TYPE.figure, color: INK, fontFace: FONT,
     });
   });
 
-  const chartTop = top + tileH + PAD.gap;
+  const chartTop = top + tileRows * tileH + (tileRows - 1) * 0.14 + PAD.gap;
   const chartH = PAD.bottom - chartTop;
-  const half = columns(2);
+
   // Most-observed at the top, as the reference orders its own.
   const areaRows = topDown(
     cov.byGroup.filter((g) => g.reports > 0).sort((a, b) => b.reports - a.reports),
   );
   const teamRows = topDown([...cov.byTeam].sort((a, b) => b.reports - a.reports));
 
+  /*
+   * What kind of place was observed, where the form asks.
+   *
+   * The reference's front page carries the same split - rural against
+   * urban, permanent against temporary - because a deployment that saw only
+   * one kind of station is a different deployment from one that saw both,
+   * and nothing else on this slide would say so.
+   */
+  const typeQ = stationTypeQuestion(dataset);
+  const typeRows = typeQ
+    ? topDown(
+        analyse(dataset, typeQ, filter).total.filter((c) => !NON_ANSWERS.has(c.label)),
+      )
+    : [];
+
+  const charts: { title: string; labels: string[]; values: number[]; colour: string }[] = [];
   if (areaRows.length > 0) {
+    charts.push({
+      title: dataset.geo ? 'Reports by Local Government Area' : 'Reports by district',
+      labels: areaRows.map((g) => g.label),
+      values: areaRows.map((g) => g.reports),
+      colour: ACCENT_DEEP,
+    });
+  }
+  if (teamRows.length > 0) {
+    charts.push({
+      title: 'Reports by team',
+      labels: teamRows.map((t) => t.team),
+      values: teamRows.map((t) => t.reports),
+      colour: ACCENT,
+    });
+  }
+  if (typeRows.length > 1 && typeQ) {
+    charts.push({
+      title: `${typeQ.code} ${typeQ.label}`.trim(),
+      labels: typeRows.map((c) => c.label),
+      values: typeRows.map((c) => c.n),
+      colour: ACCENT_DEEP,
+    });
+  }
+  if (charts.length === 0) return;
+
+  const cols = columns(charts.length);
+  charts.forEach((c, i) => {
+    const col = cols[i]!;
     s.addChart(
       pptx.ChartType.bar,
-      [{ name: 'Reports', labels: areaRows.map((g) => g.label), values: areaRows.map((g) => g.reports) }],
+      [{ name: 'Reports', labels: c.labels, values: c.values }],
       {
-        ...place({ x: half[0]!.x, y: chartTop, w: half[0]!.w, h: chartH }, 'coverage area chart'),
+        ...place({ x: col.x, y: chartTop, w: col.w, h: chartH }, `coverage chart ${i}`),
         ...BARE,
-        barDir: 'bar', chartColors: [ACCENT_DEEP],
+        barDir: 'bar', chartColors: [c.colour],
         showValue: true, dataLabelPosition: 'outEnd',
         dataLabelColor: MUTED, dataLabelFontSize: TYPE.dataLabel,
         catAxisLabelFontSize: TYPE.category,
         showLegend: false, showTitle: true, titleFontSize: TYPE.chartTitleSmall,
-        title: dataset.geo ? 'Reports by area' : 'Reports by district',
+        // Two lines, because PowerPoint wraps a chart title itself and
+        // cutting it at one line printed "Reports by Local Government...".
+        title: fitText(c.title, col.w, 2, TYPE.chartTitleSmall, TYPE.chartTitleSmall).text,
       },
     );
-  }
-  s.addChart(
-    pptx.ChartType.bar,
-    [{ name: 'Reports', labels: teamRows.map((t) => t.team), values: teamRows.map((t) => t.reports) }],
-    {
-      ...place({ x: half[1]!.x, y: chartTop, w: half[1]!.w, h: chartH }, 'coverage team chart'),
-      ...BARE,
-      barDir: 'bar', chartColors: [ACCENT],
-      showValue: true, dataLabelPosition: 'outEnd',
-      dataLabelColor: MUTED, dataLabelFontSize: TYPE.dataLabel,
-      catAxisLabelFontSize: TYPE.category,
-      showLegend: false, showTitle: true, titleFontSize: TYPE.chartTitleSmall,
-      title: 'Reports by team',
-    },
-  );
+  });
 }
 
 /**
- * Which constituencies of each area were reached.
+ * How far voting had got, through the day.
  *
- * The LGA and the constituency are a hierarchy - Bakau and Serekunda West
- * are inside Kanifing - and the coverage slide before this one only shows
- * the top of it. "Nine reports from Kanifing" is a different statement from
- * "nine reports from three of Kanifing's seven constituencies", and it is
- * the second one a deployment plan is judged on.
+ * The one page a polling-day deck can carry about the day as a whole, and
+ * the reference's own section D. Every report takes two readings of how many
+ * voters had voted - on arrival and on departure - against that station's
+ * own list, so the reports together draw the curve.
  *
- * A list rather than a chart: there are more places than a readable chart
- * has rows, and the thing being shown is the grouping, which a bar chart
- * cannot express.
+ * A line, not bars: the thing being read off it is the slope, and hours with
+ * no reading must leave a gap rather than a bar of zero.
  */
-function addConstituencySlide(
+function addTurnoutSlide(
   pptx: PptxGenJS,
   dataset: Dataset,
   filter: boolean[] | undefined,
 ): void {
-  if (!dataset.geo) return;
-  const { groups, ungrouped } = constituencyCoverage(dataset, filter);
-  if (groups.length === 0) return;
-  if (groups.every((g) => g.constituencies.length === 0)) return;
+  const t = turnoutByHour(dataset, filter);
+  if (!t || t.points.length < 2) return;
 
-  /*
-   * A table rather than a list.
-   *
-   * The list this replaced had the count hanging at the right of each
-   * line, which reads well enough down one column and not at all across
-   * three. A table rules the columns, gives each area a banded row of its
-   * own instead of a bold line that has to be taken on trust, and leaves
-   * room for the register beside the reports - the thing a reader wants
-   * next, which is how much of the electorate a constituency is.
-   */
-  const cell = (
-    text: string,
-    options: PptxGenJS.TableCellProps = {},
-  ): PptxGenJS.TableCell => ({
-    text,
-    options: { fontSize: TYPE.table, fontFace: FONT, color: INK, ...options },
-  });
-
-  const blocks: PptxGenJS.TableRow[][] = groups.map((g) => {
-    const rows: PptxGenJS.TableRow[] = [
-      [
-        {
-          text: `${g.area}  -  ${g.reports} ${g.reports === 1 ? 'report' : 'reports'}, ${g.constituencies.length} of ${g.totalConstituencies}`,
-          options: {
-            fontSize: TYPE.table,
-            fontFace: FONT,
-            color: INK,
-            bold: true,
-            fill: { color: PANEL },
-            colspan: 3,
-          },
-        },
-      ],
-    ];
-    for (const c of g.constituencies) {
-      rows.push([
-        cell(c.name, { color: MUTED }),
-        cell(String(c.reports), { align: 'right', color: MUTED }),
-        cell((REGISTERED_2026[c.name] ?? 0).toLocaleString('en-GB'), {
-          align: 'right',
-          color: MUTED,
-        }),
-      ]);
-    }
-    return rows;
-  });
-
-  /*
-   * What the unplaced reports wrote, in a line under the table.
-   *
-   * "Constituency not named" reads as missing data; the field was filled
-   * in on every one of them, with a neighbourhood, an area or a region.
-   * Printing the entries is the difference between a reader thinking the
-   * data is missing and the data team knowing which answers to go back
-   * to. It sits under the table rather than in it because an entry can be
-   * anything an observer typed, and a cell that wraps to two lines pushes
-   * every row below it off the foot of the slide.
-   */
-  const strays = groups
-    .filter((g) => g.unnamed > 0)
-    .map((g) => {
-      const wrote = g.unrecognised.map((u) => u.text).join(', ');
-      return wrote ? `${g.area}: ${wrote}` : `${g.area}: ${g.unnamed} not given`;
-    });
-
-  const notes = [
-    strays.length > 0 ? `Named no constituency - ${strays.join('; ')}.` : '',
-    ungrouped > 0
-      ? `${ungrouped} ${ungrouped === 1 ? 'report names' : 'reports name'} no area and are not counted above.`
-      : '',
-  ].filter(Boolean);
-
-  // A row of 18pt type is about a third of an inch however small the
-  // table is told to be, so the rows that fit are counted rather than
-  // squeezed.
-  const ROW = 0.34;
-  const footH = notes.length * 0.3;
-  const PER_SLIDE = 2;
-
-  // Where `heading` leaves the content when it has a subtitle. The tables
-  // are laid out before the first slide exists, so it is stated rather
-  // than measured; `place` throws if it ever stops being true.
-  const top = 1.43;
-  const space = PAD.bottom - top - footH;
-  // One row of each table is its header.
-  const perColumn = Math.max(3, Math.floor(space / ROW) - 1);
-
-  /*
-   * Areas are spread evenly over as many columns as it takes.
-   *
-   * Filling each column to the brim and letting the rest fall onto a
-   * second page gave two crowded columns and then a page holding Basse by
-   * itself. Counting the columns first and then dividing the areas
-   * between them keeps the pages looking like each other. An area and its
-   * constituencies always stay together.
-   */
-  const spread = (parts: number): PptxGenJS.TableRow[][][] => {
-    const total = blocks.reduce((n, b) => n + b.length, 0);
-    const target = Math.ceil(total / parts);
-    const out: PptxGenJS.TableRow[][][] = [[]];
-    let n = 0;
-    for (const block of blocks) {
-      const current = out[out.length - 1]!;
-      const over = n + block.length > target || n + block.length > perColumn;
-      if (current.length > 0 && over && out.length < parts) {
-        out.push([block]);
-        n = block.length;
-      } else {
-        current.push(block);
-        n += block.length;
-      }
-    }
-    return out;
-  };
-
-  let parts = 1;
-  while (
-    parts < 12 &&
-    spread(parts).some((part) => part.reduce((n, b) => n + b.length, 0) > perColumn)
-  ) {
-    parts += 1;
-  }
-  const laid = spread(Math.ceil(parts / PER_SLIDE) * PER_SLIDE);
-
-  for (let page = 0; page * PER_SLIDE < laid.length; page += 1) {
-    const s = pptx.addSlide({ masterName: 'BASE' });
-    const covered = groups.reduce((n, g) => n + g.constituencies.length, 0);
-    heading(
-      s,
-      page === 0 ? 'Coverage by constituency' : 'Coverage by constituency, continued',
-      page === 0
-        ? `${covered} of ${ALL_CONSTITUENCIES.length} constituencies returned a report.`
-        : ' ',
-    );
-
-    const taken = laid.slice(page * PER_SLIDE, page * PER_SLIDE + PER_SLIDE).filter(
-      (part) => part.length > 0,
-    );
-    const last = (page + 1) * PER_SLIDE >= laid.length;
-    const bottom = last ? PAD.bottom - footH : PAD.bottom;
-    const cols = columns(PER_SLIDE);
-    // One row height for the page, so two tables of different lengths
-    // beside each other still line up row for row.
-    const tallest = Math.max(...taken.map((part) => part.flat().length + 1));
-    const rowH = Math.min(0.55, Math.max(ROW, (bottom - top) / tallest));
-
-    taken.forEach((part, i) => {
-      const col = cols[i]!;
-      const head: PptxGenJS.TableRow = ['Constituency', 'Reports', 'Registered'].map(
-        (t, j) => ({
-          text: t,
-          options: {
-            color: ON_FILL,
-            fill: { color: ACCENT_DEEP },
-            fontSize: TYPE.table,
-            fontFace: FONT,
-            align: j === 0 ? 'left' : 'right',
-          },
-        }),
-      );
-      const rows = [head, ...part.flat()];
-      s.addTable(rows, {
-        ...place(
-          { x: col.x, y: top, w: col.w, h: Math.min(bottom - top, rowH * rows.length) },
-          'constituency table',
-        ),
-        // Wide enough for the words in the header row. At 18pt "Reports"
-        // and "Registered" wrapped to two lines in a narrower column, and
-        // a two-line header row pushes every row below it down.
-        colW: [col.w - 3.0, 1.25, 1.75],
-        rowH,
-        fontSize: TYPE.table,
-        fontFace: FONT,
-        valign: 'middle',
-        border: { type: 'none' },
-      });
-    });
-
-    if (last && notes.length > 0) {
-      notes.forEach((text, i) => {
-        s.addText(text, {
-          ...place(
-            { x: PAD.x, y: PAD.bottom - footH + i * 0.3, w: CONTENT.w, h: 0.3 },
-            'constituency note',
-          ),
-          fontSize: TYPE.caption,
-          color: MUTED,
-          fontFace: FONT,
-          valign: 'middle',
-        });
-      });
-    }
-  }
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  const top = heading(
+    s,
+    'Turnout through the day',
+    `Mean share of each station's list that had voted, from ${t.readings} readings.`,
+  );
+  s.addChart(
+    pptx.ChartType.line,
+    [{
+      name: 'Turnout',
+      labels: t.points.map((p) => p.label),
+      values: t.points.map((p) => Math.round(p.mean * 10) / 10),
+    }],
+    {
+      ...place({ x: PAD.x, y: top, w: CONTENT.w, h: PAD.bottom - top }, 'turnout chart'),
+      ...BARE,
+      chartColors: [ACCENT],
+      lineSize: 4,
+      lineDataSymbolSize: 9,
+      showValue: true,
+      dataLabelPosition: 't',
+      dataLabelFormatCode: '0.0"%"',
+      dataLabelColor: MUTED,
+      dataLabelFontSize: TYPE.dataLabel,
+      catAxisLabelFontSize: TYPE.category,
+      // From zero, not from the lowest reading: a curve left to scale
+      // itself would show a morning rush that never happened.
+      valAxisMinVal: 0,
+      showLegend: false,
+    },
+  );
 }
-
 
 /**
  * Where the reports came from.
@@ -709,14 +607,23 @@ function addRatingsSlide(
   dataset: Dataset,
   filter: boolean[] | undefined,
 ): void {
-  const ratings = dataset.questions.filter((q) => q.kind === 'ordinal' && /^J\./.test(q.code));
-  const scored = ratings
+  // Every question the form scores, found by its scale rather than by its
+  // section letter. See `ratingQuestions`.
+  const scored = ratingQuestions(dataset)
     .map((q) => ({ q, b: analyse(dataset, q, filter) }))
     .filter((r) => r.b.meanScore !== undefined);
   if (scored.length === 0) return;
 
+  // The axis runs to the top of the longest scale, so a four-point scale is
+  // not drawn against a five-point one and read as a worse day than it was.
+  const points = Math.max(...scored.map((r) => r.q.scale?.length ?? 5));
+
   const s = pptx.addSlide({ masterName: 'BASE' });
-  const top = heading(s, 'Overall assessments', 'Mean of each rating question, on its own scale.');
+  const top = heading(
+    s,
+    'Overall assessments',
+    `Mean of each rating question, out of ${points}.`,
+  );
   s.addChart(
     pptx.ChartType.bar,
     [{
@@ -737,7 +644,7 @@ function addRatingsSlide(
       // this slide where the decimal is the whole point.
       dataLabelFormatCode: '0.00',
       catAxisLabelFontSize: TYPE.category, showLegend: false,
-      valAxisMinVal: 0, valAxisMaxVal: 5,
+      valAxisMinVal: 0, valAxisMaxVal: points,
     },
   );
 }
@@ -1037,6 +944,23 @@ function drawPercentage(
     },
   );
 
+  /*
+   * What the figure is a share of, where the form did not ask for a share.
+   *
+   * "32%" under "Total number of voters who had already voted" is not a
+   * hedge needing removal but a unit: without the line the reader cannot
+   * tell a share of the station's list from a share of the reports.
+   */
+  let figureH = headH;
+  if (p.basis) {
+    slide.addText(p.basis, {
+      ...place({ x: box.x, y: box.y + headH, w: box.w, h: 0.34 }, 'percentage basis'),
+      fontSize: TYPE.caption, color: MUTED, fontFace: FONT,
+      align: 'center', valign: 'middle',
+    });
+    figureH += 0.34;
+  }
+
   const charts: { title: string; rows: GroupMean[] }[] = [];
   if (p.byParty.length > 1) charts.push({ title: 'By party', rows: p.byParty });
   if (p.byArea.length > 1) {
@@ -1044,8 +968,8 @@ function drawPercentage(
   }
   if (charts.length === 0) return;
 
-  const top = box.y + headH + 0.1;
-  const h = box.h - headH - 0.1;
+  const top = box.y + figureH + 0.1;
+  const h = box.h - figureH - 0.1;
   const gap = PAD.gap;
   const w = (box.w - gap * (charts.length - 1)) / charts.length;
 

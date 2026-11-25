@@ -41,8 +41,9 @@ That is the whole workflow. To share the tool, email the HTML file.
 
 Four tabs:
 
-- **Overview** — reports, areas and constituencies covered, reports by team and area, and the
-  mean of each overall assessment question.
+- **Overview** — reports, LGAs and constituencies covered, polling stations observed,
+  reports by team and area, turnout through the day where the form supports it, and the
+  mean of each overall assessment question with the share rated good or better.
 - **Map** — the real map of The Gambia, shaded by *any* question and *any* answer, across the
   eight Local Government Areas. Pick "C.3 problem in the vicinity" and "Yes" and the map shows
   where that problem clusters. Click a place to filter the whole report to it. Places that returned
@@ -310,14 +311,16 @@ constituencies have no published boundaries, the 48 districts are a different di
 eleven constituencies - the urban ones, where most of the reports come from - have no district
 to be drawn on. The map was therefore blank exactly where the mission was working, and the
 footnote explaining that grew longer than anything the picture said. Coverage by constituency
-is a table instead, which can show all 53 without apologising for any of them.
+is a list on screen instead, which can show all 53 without apologising for any of them.
 
-**Coverage by constituency is a table.** A list with the count hanging off the right of each
-line reads well enough down one column and not at all across three. The table rules the
-columns, gives each area a banded row of its own, and has room for the register beside the
-reports - which is the next thing a reader wants, since Serekunda West is fifty-one thousand
-voters and Janjanbureh is under two. It spreads over as many columns as it takes and
-continues on a second slide rather than shrinking below the type floor.
+**Coverage by constituency left the deck.** It was a slide, a table of all 53 under their
+areas with the register beside the reports, and it worked on the campaign form. On the
+polling-day form it was a table of one area's constituencies: that form asks the question
+in a column per Local Government Area, and the page was built from whichever single
+column resolved most often. The grouping is still on the dashboard, where a reader can
+open an area, filter by it and check it against the register, and the count - 39 of 53 -
+is on the coverage slide. A page in a briefing deck that is quietly a seventh of the
+answer is worse than no page.
 
 **A question with a handful of answers also goes on the map.** A shaded map
 can show one answer at a time, so "what type of event was it" needs four maps
@@ -353,6 +356,42 @@ on the cover of the deck, of the Word report and of the printed view, with the c
 reports that had to be left out. A deck that silently covered two weeks of a three-week file
 would be unanswerable six months later; a deck that says so is one anybody can check against
 the file it came from.
+
+**A clock time is a time.** "A.2 Time of arrival" is a real date cell, and a date
+cell read without `cellDates` is a serial number - 46361.3194 - which looks numeric to
+anything that reads it as text. So the deck printed a hundred observers' arrival times as
+a total of 46,361 with bands either side of it, which is the single most wrong-looking
+figure this tool has produced. Such a column is now rewritten as the clock time it holds
+before anything classifies it, and the question gets the chart it was always meant to
+have: one column per hour, the morning on the left.
+
+**Turnout is the one thing a polling-day form can say about the election rather than
+about the stations observed.** Every report reads how many voters had voted when the
+observer arrived and again when they left, each against that station's own list and each
+with the time it was taken; a few hundred reports therefore draw the shape of the day.
+The two halves of a reading are paired by the word they share - arrival, departure - so a
+form that asks a third time needs no code change. Each point is the mean of the shares,
+one station one vote, and not a national turnout: that would need every station in the
+country rather than the ones that were visited. The same logic makes a count of votes
+cast a share rather than a band. "How many stations had served between 200 and 399
+voters" puts a station of 2,000 beside a station of 300 and says nothing about either;
+the same answer as a share of that station's list is turnout. The list itself stays a
+count, because summing it is a real figure.
+
+**A scored question wears the words from its own legend.** The forms score the overall
+assessments 1 to 4 and put the key in a column header of its own - "4=Very good 3=Good
+2=Bad 1=Very bad" - so the deck carried five charts of 1, 2, 3 and 4 with the key nowhere
+on the slide. The key is read once and the digits are charted as the words. The whole
+scale is kept, including points nobody used, because the better half of a four-point
+scale is a different half from the better half of the three points that happened to be
+answered.
+
+**A question the form splits into a column per area is one question.** The polling-day
+form asks for the constituency seven times, one column per Local Government Area, and a
+report fills the one its station is in. Read column by column they are seven questions,
+six of them nearly empty, and the tool took its constituency figures from whichever
+single column resolved most often - so a hundred reports from seven areas were reported
+as covering 7 of 53 constituencies when they covered 39.
 
 **The constituency is read as part of the area, not beside it.** Every form
 asks for the Local Government Area and then the constituency inside it, and

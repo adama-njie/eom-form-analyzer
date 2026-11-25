@@ -85,6 +85,12 @@ export interface Percentage {
   n: number;
   byParty: GroupMean[];
   byArea: GroupMean[];
+  /**
+   * What the figure is a share of, where it was worked out rather than
+   * asked for. "32%" under a question headed "Total number of voters who
+   * had already voted" is not a figure a reader can place without it.
+   */
+  basis?: string;
 }
 
 /**
@@ -120,6 +126,11 @@ export interface Dataset {
   geo: boolean;
   /** Column index holding the constituency, if one was found. */
   constituencyColumn: number | null;
+  /**
+   * Every column the constituency question occupies. More than one where
+   * the form asks it once per area, as the polling-day form does.
+   */
+  constituencyColumns: number[];
   /** Resolved constituency per row, where the observer's entry matched. */
   rowConstituency: (string | null)[];
   /** Constituencies that appear in the data, in geographic order. */
@@ -254,22 +265,32 @@ export function buildDataset(table: Table, questions: Question[]): Dataset {
     }
   });
 
-  // The constituency column is whichever column resolves to the most known
-  // constituencies, rather than whichever is named most plausibly.
-  let constituencyColumn: number | null = null;
+  /*
+   * The constituency question is whichever one resolves to the most known
+   * constituencies, rather than whichever is named most plausibly.
+   *
+   * A question, not a column: the polling-day form asks for the
+   * constituency in seven columns, one per Local Government Area, and the
+   * report fills the one its station is in. Read as columns, the best of
+   * them held a seventh of the reports and the tool's constituency
+   * coverage was a seventh of the truth.
+   */
+  let constituencyColumns: number[] = [];
   let bestConstHits = 0;
-  headers.forEach((h, i) => {
-    if (i === areaColumn) return;
-    if (!/(constituenc|district|area|ward)/i.test(h)) return;
+  for (const q of questions) {
+    if (q.kind === 'multi' || q.kind === 'meta') continue;
+    if (areaColumn !== null && q.columns.includes(areaColumn)) continue;
+    if (!/(constituenc|district|area|ward)/i.test(q.label)) continue;
     const hits = rows.reduce(
-      (acc, r) => acc + (resolveConstituency(clean(r[i] ?? '')) ? 1 : 0),
+      (acc, r) => acc + (answersFor(q, r).some((a) => resolveConstituency(a)) ? 1 : 0),
       0,
     );
     if (hits > bestConstHits) {
       bestConstHits = hits;
-      constituencyColumn = i;
+      constituencyColumns = q.columns;
     }
-  });
+  }
+  const constituencyColumn: number | null = constituencyColumns[0] ?? null;
 
   /*
    * The first column whose header names a team and whose values look like
@@ -368,11 +389,13 @@ export function buildDataset(table: Table, questions: Question[]): Dataset {
     ? LGAS.filter((a) => rowArea.includes(a.code)).map((a) => a.name)
     : [...new Set(rowGroup.filter((g): g is string => Boolean(g)))].sort();
 
-  const rowConstituency = rows.map((r) =>
-    constituencyColumn === null
-      ? null
-      : (resolveConstituency(clean(r[constituencyColumn] ?? ''))?.name ?? null),
-  );
+  const rowConstituency = rows.map((r) => {
+    for (const col of constituencyColumns) {
+      const hit = resolveConstituency(clean(r[col] ?? ''));
+      if (hit) return hit.name;
+    }
+    return null;
+  });
   const seenConstituencies = new Set(rowConstituency.filter(Boolean) as string[]);
   const constituencies = LGAS.flatMap((a) =>
     a.constituencies.filter((c) => seenConstituencies.has(c)),
@@ -387,6 +410,7 @@ export function buildDataset(table: Table, questions: Question[]): Dataset {
     groups,
     geo,
     constituencyColumn,
+    constituencyColumns,
     rowConstituency,
     constituencies,
     dateColumn,
@@ -458,9 +482,25 @@ export function answersFor(question: Question, row: string[]): string[] {
     });
     return out;
   }
-  const v = clean(row[question.columns[0]!] ?? '');
+  /*
+   * One answer, which the form may have spread over a column per area.
+   * "B.2 Polling station constituency" is seven columns and a report fills
+   * whichever one its station is in, so the answer is the first that holds
+   * anything.
+   */
+  let v = '';
+  for (const col of question.columns) {
+    const candidate = clean(row[col] ?? '');
+    if (!isBlank(candidate)) {
+      v = candidate;
+      break;
+    }
+  }
   if (isBlank(v)) return [];
-  return [question.kind === 'time' ? bucketTime(v) : v];
+  if (question.kind === 'time') return [bucketTime(v)];
+  // A scored answer is stored as a digit and charted as the word its own
+  // legend gives it. See `parseLegend`.
+  return [question.valueLabels?.[v] ?? v];
 }
 
 /**
@@ -688,6 +728,10 @@ export function analyse(dataset: Dataset, question: Question, rowFilter?: boolea
 
   if (isPercentageQuestion(question)) {
     breakdown.percent = percentageOf(dataset, question, rowFilter) ?? undefined;
+  } else {
+    // A count of votes cast is a share of that station's own list, and only
+    // that reads across stations. See `shareOfRegister`.
+    breakdown.percent = shareOfRegister(dataset, question, rowFilter) ?? undefined;
   }
 
   return breakdown;
@@ -977,9 +1021,9 @@ export function constituencyCoverage(
     if (!c) {
       unnamed.set(area, (unnamed.get(area) ?? 0) + 1);
       const raw =
-        dataset.constituencyColumn === null
-          ? ''
-          : clean(row[dataset.constituencyColumn] ?? '');
+        dataset.constituencyColumns
+          .map((c) => clean(row[c] ?? ''))
+          .find((v) => !isBlank(v)) ?? '';
       if (raw) {
         const m = wrote.get(area) ?? new Map<string, number>();
         m.set(raw, (m.get(raw) ?? 0) + 1);
@@ -1090,6 +1134,300 @@ export function coverage(dataset: Dataset, rowFilter?: boolean[]): Coverage {
       .sort((a, b) => b.reports - a.reports),
     ungroupedRows: ungrouped,
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Turnout                                                             */
+/* ------------------------------------------------------------------ */
+
+/** The question holding how many voters a station's list carries. */
+const REGISTER_HINTS = /(voter list|on the list|registered|register)/i;
+/** The questions holding how many of them had voted by a given moment. */
+const VOTED_HINTS = /\bvoted\b/i;
+/** The moment such a count was taken, which also names a time question. */
+const MOMENT = /\b(arrival|departure|opening|closing)\b/i;
+
+/**
+ * The question that gives each station's electorate.
+ *
+ * Every turnout figure in this tool divides by this one, so it is found
+ * once. A question that mentions voting is a count of votes, not of voters
+ * on the list, however much of the rest of the wording matches.
+ */
+export function registerQuestion(dataset: Dataset): Question | null {
+  return (
+    dataset.questions.find(
+      (q) =>
+        q.kind === 'numeric' && REGISTER_HINTS.test(q.label) && !VOTED_HINTS.test(q.label),
+    ) ?? null
+  );
+}
+
+/** A count of votes cast, with the time question that says when it was read. */
+export interface TurnoutReading {
+  time: Question;
+  count: Question;
+  /** "arrival" or "departure": the word both questions have in common. */
+  moment: string;
+}
+
+/**
+ * The readings a form takes of how far voting had got.
+ *
+ * The polling-day form asks twice - on arrival and on departure - and each
+ * time it asks for the clock time too. The pair is found by the word they
+ * share, so a form that asks a third time, or names the moments
+ * differently, needs no code change. A count with no time beside it is not
+ * a reading: "people who voted with a duty certificate" is a total for the
+ * day, and plotting it against the clock would invent a figure.
+ */
+export function turnoutReadings(dataset: Dataset): TurnoutReading[] {
+  const times = dataset.questions.filter((q) => q.kind === 'time');
+  const out: TurnoutReading[] = [];
+  for (const count of dataset.questions) {
+    if (count.kind !== 'numeric' || !VOTED_HINTS.test(count.label)) continue;
+    const moment = MOMENT.exec(count.label)?.[1]?.toLowerCase();
+    if (!moment) continue;
+    const time = times.find((t) => MOMENT.exec(t.label)?.[1]?.toLowerCase() === moment);
+    if (time) out.push({ time, count, moment });
+  }
+  return out;
+}
+
+export interface Turnout {
+  /** Mean turnout per hour of the day, earliest first. */
+  points: GroupMean[];
+  /** How many readings went into the curve. */
+  readings: number;
+  /** The question the readings were divided by. */
+  register: Question;
+}
+
+/**
+ * How far voting had got, by the hour.
+ *
+ * The one thing a polling-day form can say about the day as a whole. Each
+ * report carries two readings - how many had voted when the observer
+ * arrived, and how many when they left - and each carries the time it was
+ * taken, so a few hundred reports draw the shape of the day.
+ *
+ * Each reading is a share of that station's own list and the hour's figure
+ * is the mean of those shares: one station one vote, as everywhere else in
+ * this tool, because a national turnout would need every station in the
+ * country rather than the observed ones. A reading above the station's own
+ * list is dropped rather than charted; it is not a share of anything.
+ */
+export function turnoutByHour(dataset: Dataset, rowFilter?: boolean[]): Turnout | null {
+  const register = registerQuestion(dataset);
+  const readings = turnoutReadings(dataset);
+  if (!register || readings.length === 0) return null;
+
+  const registerCol = register.columns[0];
+  if (registerCol === undefined) return null;
+
+  const byHour = new Map<string, number[]>();
+  let n = 0;
+  dataset.table.rows.forEach((row, i) => {
+    if (rowFilter && !rowFilter[i]) return;
+    const listed = Number(clean(row[registerCol] ?? ''));
+    if (!Number.isFinite(listed) || listed <= 0) return;
+    for (const r of readings) {
+      const col = r.count.columns[0];
+      if (col === undefined) continue;
+      const voted = Number(clean(row[col] ?? ''));
+      const hour = answersFor(r.time, row)[0];
+      if (!hour || !Number.isFinite(voted) || voted < 0) continue;
+      const pct = (voted / listed) * 100;
+      if (pct > 100) continue;
+      byHour.set(hour, [...(byHour.get(hour) ?? []), pct]);
+      n += 1;
+    }
+  });
+  if (byHour.size === 0) return null;
+
+  const points = [...byHour.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([label, xs]) => ({
+      label,
+      mean: xs.reduce((a, b) => a + b, 0) / xs.length,
+      n: xs.length,
+    }));
+  return { points, readings: n, register };
+}
+
+/**
+ * A count of votes cast, as the share of the station's list that it is.
+ *
+ * "D.2 Total number of voters who had already voted" counted in bands says
+ * how many stations had served between 200 and 399 voters, which puts a
+ * station of 2,000 beside a station of 300 and means nothing in either. The
+ * same answer as a share of that station's own list is turnout, which is
+ * the figure a mission reports.
+ */
+export function shareOfRegister(
+  dataset: Dataset,
+  question: Question,
+  rowFilter?: boolean[],
+): Percentage | null {
+  if (question.kind !== 'numeric' || !VOTED_HINTS.test(question.label)) return null;
+  const register = registerQuestion(dataset);
+  const col = question.columns[0];
+  const registerCol = register?.columns[0];
+  if (!register || col === undefined || registerCol === undefined) return null;
+  if (col === registerCol) return null;
+
+  const all: number[] = [];
+  const byParty = new Map<string, number[]>();
+  const byArea = new Map<string, number[]>();
+
+  dataset.table.rows.forEach((row, i) => {
+    if (rowFilter && !rowFilter[i]) return;
+    const listed = Number(clean(row[registerCol] ?? ''));
+    const voted = Number(clean(row[col] ?? ''));
+    if (!Number.isFinite(listed) || listed <= 0) return;
+    if (!Number.isFinite(voted) || voted < 0) return;
+    const pct = (voted / listed) * 100;
+    if (pct > 100) return;
+    all.push(pct);
+    const party = dataset.rowParty[i];
+    if (party) byParty.set(party, [...(byParty.get(party) ?? []), pct]);
+    const area = dataset.rowGroup[i];
+    if (area) byArea.set(area, [...(byArea.get(area) ?? []), pct]);
+  });
+
+  if (all.length === 0) return null;
+  const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const ordered = (m: Map<string, number[]>, order: string[]): GroupMean[] =>
+    order
+      .filter((label) => m.has(label))
+      .map((label) => ({ label, mean: mean(m.get(label)!), n: m.get(label)!.length }));
+
+  const of = register.label
+    .replace(/^(what is the )?total number of /i, '')
+    .replace(/[.:]\s*$/, '')
+    .toLowerCase();
+  return {
+    mean: mean(all),
+    n: all.length,
+    byParty: ordered(byParty, dataset.parties),
+    byArea: ordered(byArea, dataset.groups),
+    basis: `As a share of ${of}`,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* The figures a summary page carries                                  */
+/* ------------------------------------------------------------------ */
+
+/** Scale points that make a question an assessment rather than a tally. */
+const RATING_WORDS = /(very good|very bad|excellent|good|bad|poor|satisfactory)/i;
+
+/**
+ * The questions that ask an observer to rate what they saw.
+ *
+ * Found by their scale rather than by their section letter, which used to
+ * be J: the polling-day form rates five things in section J and the opening
+ * form rates one in section G, and a tool that knows only about J reports
+ * nothing at all for a morning's observation.
+ */
+export function ratingQuestions(dataset: Dataset): Question[] {
+  return dataset.questions.filter(
+    (q) =>
+      q.kind === 'ordinal' &&
+      (q.scale?.length ?? 0) > 1 &&
+      q.scale!.some((v) => RATING_WORDS.test(v)),
+  );
+}
+
+/** How a rating question came out: its mean, and the share rated above halfway. */
+export interface Rating {
+  question: Question;
+  mean: number;
+  /** The scale's length, so 3.4 can be read as 3.4 out of 4. */
+  points: number;
+  /** Reports rating it in the better half of the scale. */
+  good: number;
+  /** Those reports as a share of the ones that rated it. */
+  goodPct: number;
+  /** The scale points counted as good, for the line beside the figure. */
+  goodLabels: string[];
+}
+
+export function ratingOf(
+  dataset: Dataset,
+  question: Question,
+  rowFilter?: boolean[],
+): Rating | null {
+  const scale = question.scale;
+  if (!scale || scale.length < 2) return null;
+  const b = analyse(dataset, question, rowFilter);
+  if (b.meanScore === undefined) return null;
+  /*
+   * The better half of the scale.
+   *
+   * Four points gives the top two, five gives the top two as well: the
+   * midpoint of an odd scale - "Not good/Not bad" - is not a good rating
+   * and a summary figure that counted it as one would overstate the day.
+   */
+  const goodLabels = scale.slice(Math.ceil(scale.length / 2));
+  const countOf = (label: string) => b.total.find((c) => c.label === label)?.n ?? 0;
+  const answered = scale.reduce((t, label) => t + countOf(label), 0);
+  const good = goodLabels.reduce((t, label) => t + countOf(label), 0);
+  if (answered === 0) return null;
+  return {
+    question,
+    mean: b.meanScore,
+    points: scale.length,
+    good,
+    goodPct: (good / answered) * 100,
+    goodLabels,
+  };
+}
+
+/**
+ * The question asking what kind of place the station is.
+ *
+ * Rural against urban, permanent against temporary: a handful of answers
+ * that describe the station rather than anything that happened in it, which
+ * is why it belongs on the coverage page and not among the findings.
+ */
+export function stationTypeQuestion(dataset: Dataset): Question | null {
+  return (
+    dataset.questions.find(
+      (q) =>
+        (q.kind === 'categorical' || q.kind === 'binary') &&
+        /\b(polling station|station|centre|center|ps)\b/i.test(q.label) &&
+        /\btype\b/i.test(q.label),
+    ) ?? null
+  );
+}
+
+/**
+ * How many polling stations the reports came from.
+ *
+ * Distinct stations, not reports: two observers at one station on the same
+ * day is one station observed, and a coverage figure that counted it twice
+ * would overstate the deployment. The station's number is preferred to its
+ * name, because two villages can name a school the same thing.
+ */
+export function stationsObserved(dataset: Dataset, rowFilter?: boolean[]): number | null {
+  const named = (what: RegExp) =>
+    dataset.questions.find(
+      (q) =>
+        q.kind !== 'meta' &&
+        /\b(polling station|station|centre|center|ps)\b/i.test(q.label) &&
+        what.test(q.label),
+    );
+  const q = named(/\b(number|code)\b/i) ?? named(/\bname\b/i);
+  if (!q) return null;
+
+  const seen = new Set<string>();
+  dataset.table.rows.forEach((row, i) => {
+    if (rowFilter && !rowFilter[i]) return;
+    const v = answersFor(q, row)[0];
+    if (v) seen.add(v.toLowerCase());
+  });
+  return seen.size > 0 ? seen.size : null;
 }
 
 /* ------------------------------------------------------------------ */

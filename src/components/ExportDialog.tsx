@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Dataset } from '@/lib/analyse';
-import { findings } from '@/lib/analyse';
+import { findings, turnoutByHour } from '@/lib/analyse';
 import {
   PRESETS,
   countOwnSlides,
@@ -102,12 +102,7 @@ export default function ExportDialog({
     () => countOwnSlides(dataset, selectedQuestions(dataset, sel)),
     [dataset, sel],
   );
-  const slides = estimateSlides(
-    sel,
-    chosen.size,
-    heavy,
-    dataset.geo && dataset.constituencies.length > 0,
-  );
+  const slides = estimateSlides(sel, chosen.size, heavy, turnoutByHour(dataset) !== null);
   const nothingChosen =
     !sel.coverage && !sel.maps && !sel.findingsTable && !sel.ratings && chosen.size === 0;
 

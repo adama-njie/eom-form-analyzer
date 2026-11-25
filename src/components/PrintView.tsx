@@ -73,7 +73,7 @@ export default function PrintView({
               <span className="stat-value">{cov.reports}</span>
             </div>
             <div className="stat">
-              <span className="stat-label">Areas covered</span>
+              <span className="stat-label">LGAs</span>
               <span className="stat-value">
                 {cov.groupsCovered} / {cov.groupsTotal}
               </span>

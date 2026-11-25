@@ -60,10 +60,6 @@ describe.skipIf(!HAS_FIXTURE)('export selection', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it('has more than one question sharing a code, which is why that matters', () => {
-    const codes = all.map((q) => q.code).filter(Boolean);
-    expect(new Set(codes).size).toBeLessThan(codes.length);
-  });
 
   it('round-trips the full selection without losing a question', () => {
     const sel = { ...defaultSelection(ds, 'x'), questions: all.map(questionKey) };
@@ -155,5 +151,24 @@ describe.skipIf(!HAS_FIXTURE)('how questions are packed onto slides', () => {
     const q = { kind: 'binary', label: 'x', code: 'X', columns: [0], options: [] } as never;
     const b = { total: [{ label: 'Yes', n: 1, pct: 100 }], byArea: { Banjul: [] }, answered: 1, notApplicable: 0 };
     expect(areaBreakdown(q, b as never)).toEqual([]);
+  });
+});
+
+describe('two questions under one code', () => {
+  it('still get a key each', () => {
+    // A form can ask two things under one code - "A.1 Team number" beside
+    // "A.1 Observer", before the split columns were read as one question -
+    // and keying on the code alone made them toggle together.
+    const table = toTable([
+      ['A.1 Team number', 'A.1 Observer initials', 'B.1 Was a candidate present'],
+      ['LTO01', 'AN', 'Yes'],
+      ['LTO02', 'MJ', 'No'],
+      ['LTO03', 'AN', 'Yes'],
+    ]);
+    const ds = buildDataset(table, inferSchema(table));
+    const codes = ds.questions.map((q) => q.code).filter(Boolean);
+    expect(new Set(codes).size).toBeLessThan(codes.length);
+    const keys = ds.questions.map(questionKey);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });
