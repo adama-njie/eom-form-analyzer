@@ -461,10 +461,14 @@ the shares page cannot hold - a question of more than five answers, a number in 
 cloud of words - and for a question broken down by party, which is a comparison the shares
 page does not draw.
 
-The three panels are the same height, because the whole point of the page is that the
-columns can be read across. A chart that carries its own legend gives it the bottom of its
-plot area, which left the areas drawn an inch shorter than the nation beside them, so the
-legend is drawn once under all three and belongs to the slide rather than to a chart.
+The three panels draw their columns against the same height, because the whole point of
+the page is that they can be read across. A chart gives its legend and its category names
+the bottom of its own box: the legend is therefore drawn once under all three and belongs
+to the slide rather than to a chart, and each panel's box is as tall as the columns plus
+the room its own names need - one line where the names sit level, the diagonal of the
+longest where they have to be turned. The area names then run further down the slide than
+"National" does, which is what the mission's own reports do, and the columns above them
+are the same height.
 
 **Every yes/no question is now on a map.** It used to be the three questions the findings
 ranked highest, which meant a map was drawn only where a keyword in the question text had

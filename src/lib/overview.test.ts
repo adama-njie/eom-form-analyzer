@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
-import { buildDeck } from './pptx';
+import { buildDeck, labelBand } from './pptx';
 import { defaultSelection, exportableQuestions, questionKey } from './selection';
 import {
   buildDataset,
@@ -8,6 +8,7 @@ import {
   sharesAcross,
   teamQuestion,
   teamReports,
+  type SharePanel,
 } from './analyse';
 import { inferSchema, toTable } from './schema';
 
@@ -164,6 +165,27 @@ describe('a question across the country', () => {
      */
     const texts = await slides();
     expect(texts.filter((x) => x.includes('F.1 Is the PS layout'))).toHaveLength(1);
+  });
+
+  it('gives each panel the room its own names need, so the columns match', () => {
+    /*
+     * A chart gives its category names the bottom of its own box, so the
+     * panel of area names - turned on their side, because they do not fit
+     * side by side - drew columns shorter than the one headed National
+     * beside it, and the two were read against different scales.
+     */
+    const panel = (labels: string[]): SharePanel => ({
+      title: 'x',
+      groups: labels.map((label) => ({ label, n: 1, counts: [] })),
+    });
+    const level = labelBand(panel(['Rural (5)', 'Urban (4)']), 4);
+    expect(level.rotate).toBe(0);
+    const turned = labelBand(
+      panel(['Banjul (1)', 'Kanifing (1)', 'Mansa Konko (1)', 'Janjanbureh (2)']),
+      3,
+    );
+    expect(turned.rotate).toBe(-45);
+    expect(turned.height).toBeGreaterThan(level.height);
   });
 
   it('carries a legend of its own, so the three panels are one height', async () => {

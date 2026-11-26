@@ -23,6 +23,7 @@ import {
   type Percentage,
   type Rating,
   type SectionOverview,
+  type SharePanel,
   type Shares,
   type TeamPanel,
 } from './analyse';
@@ -393,6 +394,19 @@ function addCoverageSlide(
     tiles.push([
       `${headline.question.code} ${headline.goodLabels.join(' or ').toLowerCase()}`,
       `${Math.round(headline.goodPct)}%`,
+    ]);
+    /*
+     * And the mean of the same question, out of its own scale.
+     *
+     * The share in the better half says how many reports were content;
+     * the mean says how content, and a day rated Good on every report
+     * and a day rated Very good on every report are both 100% in the
+     * tile beside this one. Two decimals, because the difference
+     * between 3.44 and 3.4 is the difference the figure is there for.
+     */
+    tiles.push([
+      `${headline.question.code} mean score`,
+      `${headline.mean.toFixed(2)} / ${headline.points}`,
     ]);
   } else {
     /*
@@ -1035,11 +1049,30 @@ function addSharesSlide(pptx: PptxGenJS, planned: Planned): void {
    * for all three, so it belongs to the slide.
    */
   const legendH = 0.46;
-  const chartH = PAD.bottom - top - titleH - legendH;
+
+  /*
+   * Every panel's columns are drawn against the same height.
+   *
+   * A chart gives its category names the bottom of its own box, so the
+   * panel of seven area names - too long to sit horizontally, and turned
+   * on their side by PowerPoint - drew columns an inch shorter than the
+   * one headed "National" beside it, and a reader comparing the two was
+   * comparing two different scales. Each panel's box is therefore as tall
+   * as the columns plus the room its own names need, so what is left for
+   * the columns is the same in all three and the longer names simply run
+   * further down the slide. The rotation is set rather than left to
+   * PowerPoint, which otherwise decides it per chart and by its own
+   * measurement of the text.
+   */
+  const widths = shares.panels.map((_, i) => (free * weights[i]!) / total);
+  const bands = shares.panels.map((p, i) => labelBand(p, widths[i]!));
+  const chartH =
+    PAD.bottom - top - titleH - legendH - Math.max(...bands.map((b) => b.height));
 
   let x = PAD.x;
   shares.panels.forEach((panel, i) => {
-    const w = (free * weights[i]!) / total;
+    const w = widths[i]!;
+    const band = bands[i]!;
     s.addText(panel.title, {
       ...place({ x, y: top, w, h: titleH }, 'shares title'),
       fontSize: TYPE.chartTitleSmall, color: INK, fontFace: FONT,
@@ -1055,7 +1088,10 @@ function addSharesSlide(pptx: PptxGenJS, planned: Planned): void {
         values: panel.groups.map((g) => Math.round(g.counts[j]?.pct ?? 0)),
       })),
       {
-        ...place({ x, y: top + titleH, w, h: chartH }, `shares ${q.code} ${i}`),
+        ...place(
+          { x, y: top + titleH, w, h: chartH + band.height },
+          `shares ${q.code} ${i}`,
+        ),
         ...BARE,
         barDir: 'col',
         barGrouping: 'percentStacked',
@@ -1067,6 +1103,7 @@ function addSharesSlide(pptx: PptxGenJS, planned: Planned): void {
         dataLabelFontSize: TYPE.dataLabel,
         dataLabelFormatCode: '0"%";;;',
         catAxisLabelFontSize: TYPE.category,
+        catAxisLabelRotate: band.rotate,
         showLegend: false,
       },
     );
@@ -1075,10 +1112,28 @@ function addSharesSlide(pptx: PptxGenJS, planned: Planned): void {
 
   addLegendRow(pptx, s, shares.answers, colours, {
     x: PAD.x,
-    y: top + titleH + chartH,
+    y: PAD.bottom - legendH,
     w: CONTENT.w,
     h: legendH,
   });
+}
+
+/**
+ * The height a panel's category names will take, and how they are set.
+ *
+ * Names that fit side by side are left level and take one line. Names
+ * that do not are turned through 45 degrees, which is what PowerPoint
+ * does to them anyway, and then the band they need is the height of the
+ * longest one on the diagonal.
+ */
+export function labelBand(panel: SharePanel, w: number): { height: number; rotate: number } {
+  const pt = TYPE.category;
+  const line = (pt * 1.4) / 72;
+  const longest = Math.max(...panel.groups.map((g) => `${g.label} (${g.n})`.length));
+  // Half the point size per character is Arial's rough average.
+  const textW = (longest * pt * 0.5) / 72;
+  if (textW <= w / panel.groups.length) return { height: line, rotate: 0 };
+  return { height: textW * Math.SQRT1_2 + line * 0.5, rotate: -45 };
 }
 
 /**

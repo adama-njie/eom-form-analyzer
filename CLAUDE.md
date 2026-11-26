@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 250 tests
+npm test           # vitest, 251 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 207 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 208 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -189,8 +189,10 @@ geography.
   It was `/^J\./`, and the opening form rates one thing in section G, so a
   morning's observation reported nothing at all.
 - **The coverage slide is the briefing's front page.** Reports, LGAs,
-  constituencies, polling stations and the headline rating, four to a row
-  and wrapping to a second row, then reports by area, by team and by
+  constituencies, polling stations and the headline rating - both the
+  share in the better half of its scale and the mean out of that scale,
+  because a day rated Good on every report and a day rated Very good on
+  every report are both 100% - four to a row and wrapping to a second row, then reports by area, by team and by
   station type. The count of teams is not among them: the size of the
   deployment is the mission's own figure, known before a report was
   filed, and the chart lower down the slide names every team that filed.
@@ -240,11 +242,14 @@ geography.
   one holding nine, and the columns are of reports rather than of
   answers, so NA is a segment and every column is full height - a
   composition, not the rate the findings table and the maps print. Every
-  column carries its own base in its name. The three panels are the same
-  height, which is the whole point of the page, so the legend is the
-  slide's own - `addLegendRow` - and not a chart's: a chart's legend
-  takes the bottom of its own plot area and left the areas drawn shorter
-  than the nation beside them.
+  column carries its own base in its name. Every panel's columns are
+  drawn against the same height, which is the whole point of the page:
+  a chart gives its legend and its category names the bottom of its own
+  box, so the legend is the slide's own - `addLegendRow` - and each
+  panel's box is as tall as the columns plus the band `labelBand` says
+  its names need, which leaves the columns the same height in all three
+  and lets the longer names run further down the slide. The rotation is
+  set rather than left to PowerPoint, which decides it per chart.
 - **A section of questions asked the same way opens on one page.** Ten
   questions answered Yes or No are ten pages of two bars, and a reader
   who has to turn ten of them to find the one that stands out will not
