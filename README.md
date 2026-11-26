@@ -393,6 +393,11 @@ says nothing about either; the same answer as a share of that station's list is 
 That applies to the readings alone, so a count of duty-certificate voters stays a count,
 and so does the voter list itself, because summing it is a real figure.
 
+The curve is read after section C rather than in the overview. It is an answer the
+observers gave as they left - section I on the Gambian form - and the mission reads the
+conditions at the station before the arithmetic of the day; a deck whose questions include
+no section C has nowhere to put it but the front, where it was.
+
 **A scored question wears the words from its own legend.** The forms score the overall
 assessments 1 to 4 and put the key in a column header of its own - "4=Very good 3=Good
 2=Bad 1=Very bad" - so the deck carried five charts of 1, 2, 3 and 4 with the key nowhere
@@ -507,6 +512,11 @@ axis reads as a team that filed nothing. The columns are found in the headers ra
 in one question: a form where two observers each write their own number fills two columns
 on one report, which is the signature of columns that only share a stem, and the tool
 leaves those apart on purpose - but they are still one page to the person reading it.
+
+**A mean score is written to one decimal place.** Two decimals said more than the scale
+knows: a mean of 3.44 out of 4 is drawn from reports that each answered 3 or 4, and the
+second decimal moves with a single report. One place, in the one function that writes it,
+so the deck, the dashboard, the Word report and its sentences all print the same figure.
 
 **A decimal is a full stop, even on a German laptop.** Everything the tool writes itself
 is formatted as en-GB. A chart's data labels are not written by the tool at all: PowerPoint

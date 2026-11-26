@@ -40,18 +40,25 @@ const HEADER = [
   'B.4 Polling station number',
   'B.5 Polling station type',
   'C.3 Did you observe any particular problem in the vicinity of the PS?',
+  'D.1 Total number of voters on the voter list',
   'F.3 Is the PS overcrowded?',
+  'I.1 Time of departure',
+  'I.2 Total number of voters who had voted at the time of your departure',
   '4=Very good  3=Good  2=Bad  1=Very bad',
   'J.1 The overall conduct of the voting in this PS was',
 ];
 
+/** Polling day, as a workbook writes it: one serial per clock time. */
+const DAY = 46_361;
+const clock = (hours: number) => String(DAY + (hours * 60) / 1440);
+
 const ROWS = [
-  ['STO', 'Banjul', 'BA-001', 'Urban', 'Yes', 'No', '', '3'],
-  ['STO', 'Banjul', 'BA-002', 'Urban', 'Yes', 'Yes', '', '4'],
-  ['LTO', 'Kanifing', 'KA-003', 'Rural', 'No', 'No', '', '2'],
-  ['LTO', 'Kanifing', 'KA-004', 'Rural', 'Yes', 'No', '', '3'],
-  ['STO', 'Basse', 'BA-005', 'Urban', 'No', 'No', '', '4'],
-  ['STO', 'Basse', 'BA-006', 'Rural', 'Yes', 'Yes', '', '3'],
+  ['STO', 'Banjul', 'BA-001', 'Urban', 'Yes', '1000', 'No', clock(13), '400', '', '3'],
+  ['STO', 'Banjul', 'BA-002', 'Urban', 'Yes', '800', 'Yes', clock(16), '480', '', '4'],
+  ['LTO', 'Kanifing', 'KA-003', 'Rural', 'No', '500', 'No', clock(13), '200', '', '2'],
+  ['LTO', 'Kanifing', 'KA-004', 'Rural', 'Yes', '400', 'No', clock(16), '240', '', '3'],
+  ['STO', 'Basse', 'BA-005', 'Urban', 'No', '900', 'No', clock(13), '270', '', '4'],
+  ['STO', 'Basse', 'BA-006', 'Rural', 'Yes', '600', 'Yes', clock(16), '360', '', '3'],
 ];
 
 function form(rows = ROWS) {
@@ -96,6 +103,18 @@ describe('the order of the deck', () => {
     expect(at(texts, 'C.3 Did you observe')).toBeLessThan(at(texts, 'J.1 The overall conduct'));
   });
 
+  it('reads the turnout curve after section C, where the day is read', async () => {
+    /*
+     * It is drawn from the reading each observer took as they left, so it
+     * answers section I rather than the overview, and the mission reads
+     * it after the conditions at the station. It used to be page three.
+     */
+    const texts = await slides();
+    const curve = at(texts, 'Turnout through the day');
+    expect(curve).toBeGreaterThan(at(texts, 'C.3 Did you observe'));
+    expect(curve).toBeLessThan(at(texts, 'D.1 Total number of voters'));
+  });
+
   it('puts the overall assessments where section J is, at the end', async () => {
     // They used to be slide four, before section A had been reached.
     const texts = await slides();
@@ -119,16 +138,25 @@ describe('the order of the deck', () => {
 
 describe('the coverage slide', () => {
   it('does not say the same figure twice', async () => {
-    // One report per station makes "Reports" and "Polling stations" the
-    // same number, and two tiles saying six teach a reader nothing twice.
+    /*
+     * One report per station makes the reports and the stations the same
+     * number, and two tiles saying six teach a reader nothing twice. The
+     * one tile is named for the stations, which is what a briefing opens
+     * on, and the word "Reports" is then not on the slide at all.
+     */
     const texts = await slides();
-    expect(texts[1]).not.toContain('Polling stations');
+    expect(texts[1]).toContain('Polling stations visited');
+    expect(texts[1]).not.toContain('>Reports<');
   });
 
-  it('counts stations where they differ from reports', async () => {
-    const twice = [...ROWS, ['STO', 'Basse', 'BA-006', 'Rural', 'No', 'No', '', '4']];
+  it('counts the stations and the reports where they differ', async () => {
+    const twice = [
+      ...ROWS,
+      ['STO', 'Basse', 'BA-006', 'Rural', 'No', '600', 'No', clock(16), '380', '', '4'],
+    ];
     const texts = await slides(twice);
-    expect(texts[1]).toContain('Polling stations');
+    expect(texts[1]).toContain('Polling stations visited');
+    expect(texts[1]).toContain('>Reports<');
   });
 
   it('draws the station type as a ring, with the count and the share', async () => {

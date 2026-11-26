@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CONTENT, columnWidth, fitsAt, linesNeeded, wrapText } from './layout';
 import { slideLabelPt } from './mapImage';
-import { CHART_MIN, MIN, TYPE } from './theme';
+import { CHART_MIN, LABEL_MIN, MIN, TYPE } from './theme';
 import { describeFinding, describeFindingBody } from './narrative';
 import type { Finding } from './analyse';
 
@@ -24,13 +24,16 @@ describe('the type floor', () => {
     }
   });
 
-  it('sets nothing in a chart below 16pt', () => {
-    // A label written on the mark it belongs to has only that mark's width,
-    // and PowerPoint drops the ones that do not fit. See `CHART_MIN`.
-    for (const name of ['dataLabel', 'category', 'legend'] as const) {
+  it('sets nothing in a chart below 16pt, and no value on a mark below 14pt', () => {
+    // A name beside a chart competes with the marks for the room; a value
+    // written on a mark has only that mark's width, and PowerPoint drops
+    // the ones that do not fit. See `CHART_MIN` and `LABEL_MIN`.
+    for (const name of ['category', 'legend'] as const) {
       expect(TYPE[name], name).toBeGreaterThanOrEqual(CHART_MIN);
       expect(TYPE[name], name).toBeLessThan(MIN);
     }
+    expect(TYPE.dataLabel).toBeGreaterThanOrEqual(LABEL_MIN);
+    expect(TYPE.dataLabel).toBeLessThan(CHART_MIN);
   });
 
   it('sets no title below 24pt', () => {

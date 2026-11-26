@@ -31,6 +31,7 @@ import {
   findings,
   rateByPlace,
   ratingQuestions,
+  scoreLabel,
   textValues,
   reportsByPlace,
   turnoutByHour,
@@ -360,7 +361,7 @@ export async function buildReport(
         ['Question', 'Mean', 'Scale', 'Ratings'],
         scored.map((r) => [
           `${r.q.code} ${r.q.label}`,
-          r.b.meanScore!.toFixed(2),
+          scoreLabel(r.b.meanScore!),
           `1–${r.q.scale?.length ?? '?'}`,
           String(r.b.answered),
         ]),

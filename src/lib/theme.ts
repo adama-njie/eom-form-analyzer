@@ -108,15 +108,23 @@ export const MIN = 18;
  * The smallest type on a chart.
  *
  * Two points under the floor the rest of the slide keeps to, and only
- * inside a chart. A data label is written on the mark it belongs to, so it
- * has only the width of that mark: at 18pt "100%" did not fit a column of
- * a 100% stacked chart and PowerPoint dropped it, and a category name of
- * two words took the width the columns needed. The label is still read at
- * the back of the room - it is set on a filled mark in white, which is the
- * highest contrast on the slide - and a figure that is drawn is worth more
- * than one that is set two points larger and not drawn at all.
+ * inside a chart, where a name competes with the marks for the room: a
+ * category name of two words at 18pt took the width the columns needed.
  */
 export const CHART_MIN = 16;
+
+/**
+ * A value written on the mark itself.
+ *
+ * Two points under the names around it. A data label has only the width
+ * of the mark it is written on, and the mark is as wide as the share it
+ * draws: at 18pt "100%" did not fit the column of a 100% stacked chart
+ * and PowerPoint drew nothing at all. It is set in white on a filled
+ * mark, which is the highest contrast on the slide, so it is still read
+ * from the back of the room - and a figure that is drawn is worth more
+ * than one set two points larger and dropped.
+ */
+export const LABEL_MIN = 14;
 
 /**
  * Type sizes, in points.
@@ -135,7 +143,7 @@ export const TYPE = {
   /** A chart's title within a question's slide, such as the by-area one. */
   chartTitleSmall: 20,
   /** Values printed on or beside the marks. */
-  dataLabel: CHART_MIN,
+  dataLabel: LABEL_MIN,
   /** Category names along the axis. */
   category: CHART_MIN,
   legend: CHART_MIN,

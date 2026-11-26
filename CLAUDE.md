@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 251 tests
+npm test           # vitest, 252 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 208 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 209 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -165,7 +165,8 @@ geography.
   Every report records how many of a station's voters had voted when the
   observer left and the time they left, so the reports together draw the
   curve. The count is paired with its clock time by the word the two
-  questions share - departure - rather than by question code.
+  questions share - departure - rather than by question code, and the
+  page is read after section C rather than in the overview.
   **The departure reading only.** The form asks the same thing on
   arrival, but that figure is what the staff reported had happened before
   the mission was in the room, and counting both would put every station
@@ -188,7 +189,8 @@ geography.
 - **A rating question is found by its scale, not by its section letter.**
   It was `/^J\./`, and the opening form rates one thing in section G, so a
   morning's observation reported nothing at all.
-- **The coverage slide is the briefing's front page.** Reports, LGAs,
+- **The coverage slide is the briefing's front page.** Polling stations
+  visited, LGAs,
   constituencies, polling stations and the headline rating - both the
   share in the better half of its scale and the mean out of that scale,
   because a day rated Good on every report and a day rated Very good on
@@ -197,7 +199,10 @@ geography.
   deployment is the mission's own figure, known before a report was
   filed, and the chart lower down the slide names every team that filed.
   Where the form scores nothing there is no rating to open on, and the
-  count of teams keeps the row full. Distinct stations, not reports: two observers at one
+  count of teams keeps the row full. The first tile is the count of
+  reports, named for the stations where a form is filled in once per
+  station, which is what a briefing opens on; where two observers filed
+  from one station the two figures differ and both are shown. Distinct stations, not reports: two observers at one
   station is one station observed - and where that comes to the same
   number as the reports, which it does on a form filled in once per
   station, the tile is left off rather than printed twice. The station
@@ -207,9 +212,13 @@ geography.
   `ratingOf`, so the dashboard shows the same ones. "Constituencies" is
   shown only where the form asks for one; it used to read "0 / 53" on a
   form that never asks, which says the deployment reached none of them.
-- **The deck reads in the form's own order.** An overview first -
-  coverage and turnout - and then section A through to the end, with the
-  overall assessments last, because they are section J. There is no
+- **The deck reads in the form's own order.** Coverage first, and then
+  section A through to the end, with the turnout curve after section C -
+  it is drawn from the reading each observer took as they left, so it
+  answers section I rather than the overview, and `TURNOUT_AFTER` is
+  where that is written. A deck whose questions include no section C has
+  nowhere to put it but the front, where it was. The overall assessments
+  are last, because they are section J. There is no
   ranked-findings slide: it put C.7 and F.6 on page four, before section A
   had been reached, and the ranking is on the dashboard and in the Word
   report, which are read rather than presented.
@@ -343,10 +352,16 @@ geography.
   across a column. Constituency answers are resolved against the gazetteer so
   spelling variants collapse; unrecognised answers stay as written.
 - **Nothing on a slide is set below 18pt**, and a question title below 24pt.
-  Inside a chart the floor is `CHART_MIN`, two points lower, and only
-  there: a data label has the width of the mark it is written on, and at
-  18pt "100%" did not fit a column of a 100% stacked chart, so PowerPoint
-  drew nothing at all. `typefloor.test.ts` enforces both.
+  Inside a chart the floor is `CHART_MIN`, two points lower, and a value
+  written on a mark is `LABEL_MIN`, two points lower again: a data label
+  has only the width of the mark it is on, and at 18pt "100%" did not fit
+  a column of a 100% stacked chart, so PowerPoint drew nothing at all.
+  `typefloor.test.ts` enforces all three.
+- **A mean score is written to one decimal place.** `scoreLabel`, in the
+  deck, on the dashboard, in the Word report and in its sentences. Two
+  decimals said more than the scale knows: a mean of 3.44 out of 4 is
+  drawn from reports that each answered 3 or 4, and the second decimal
+  moves with a single report.
 - **A category name is wrapped, not cut.** `wrapText` breaks a question
   over the lines the axis has room for, because a category axis label is
   one string and PowerPoint gives it whatever width it decides the axis

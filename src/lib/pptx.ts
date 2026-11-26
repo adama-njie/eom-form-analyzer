@@ -9,6 +9,7 @@ import {
   ratingOf,
   ratingQuestions,
   reportsByPlace,
+  scoreLabel,
   sectionOverviews,
   sharesAcross,
   isTeamQuestion,
@@ -213,12 +214,29 @@ export function buildDeck(
   // is in the deck and stays in the overview when it is not.
   const areaAsked = questions.some((q) => isAreaQuestion(dataset, q));
 
+  /*
+   * The turnout curve reads with the day, not before it.
+   *
+   * It is drawn from the reading each observer took as they left, so it
+   * is an answer to section I rather than to the overview; the mission
+   * reads it after the conditions at the station - section C - which is
+   * where it now sits. A deck with no section C in it has nowhere to put
+   * it but the front, where it was.
+   */
+  const turnoutPage =
+    sel.coverage && turnoutByHour(dataset, filter) !== null
+      ? () => addTurnoutSlide(pptx, dataset, filter)
+      : undefined;
+  const afterSection = questions.some((q) => q.section === TURNOUT_AFTER)
+    ? turnoutPage
+    : undefined;
+
   addTitleSlide(pptx, sel, dataset.division);
   if (sel.coverage) addCoverageSlide(pptx, dataset, cov, filter);
-  if (sel.coverage) addTurnoutSlide(pptx, dataset, filter);
+  if (turnoutPage && !afterSection) turnoutPage();
   if (canDrawMaps && !areaAsked) addMapSlide(pptx, dataset, filter);
 
-  addQuestionSlides(pptx, dataset, questions, filter, canDrawMaps);
+  addQuestionSlides(pptx, dataset, questions, filter, canDrawMaps, afterSection);
 
   if (sel.ratings) addRatingsSlide(pptx, dataset, filter);
 
@@ -367,8 +385,18 @@ function addCoverageSlide(
     .map((q) => ratingOf(dataset, q, filter))
     .find((r): r is Rating => r !== null);
 
+  /*
+   * Reports, or the stations they came from.
+   *
+   * On a form filled in once per polling station the count of reports is
+   * the count of stations visited, and that is the figure a briefing
+   * opens on, so the tile says which it is. Where two observers filed
+   * from one station the two differ and both are shown: the reports are
+   * the evidence, the stations are the coverage.
+   */
+  const oneEach = stations !== null && stations === cov.reports;
   const tiles: [string, string][] = [
-    ['Reports', String(cov.reports)],
+    [oneEach ? 'Polling stations visited' : 'Reports', String(cov.reports)],
     [
       dataset.geo ? AREA_WORDS[dataset.division].tile : 'Districts',
       `${cov.groupsCovered} / ${cov.groupsTotal}`,
@@ -385,8 +413,8 @@ function addCoverageSlide(
    * station was visited by two observers they differ, and then both are
    * worth the room.
    */
-  if (stations !== null && stations !== cov.reports) {
-    tiles.push(['Polling stations', String(stations)]);
+  if (stations !== null && !oneEach) {
+    tiles.push(['Polling stations visited', String(stations)]);
   }
   if (headline) {
     // The question's own words for the good end of its scale, so the figure
@@ -406,7 +434,7 @@ function addCoverageSlide(
      */
     tiles.push([
       `${headline.question.code} mean score`,
-      `${headline.mean.toFixed(2)} / ${headline.points}`,
+      `${scoreLabel(headline.mean)} / ${headline.points}`,
     ]);
   } else {
     /*
@@ -770,7 +798,7 @@ function addRatingsSlide(
       labels: topDown(scored).map(
         (r) => wrapText(`${r.q.code} ${r.q.label}`, 5.4, 2, TYPE.category),
       ),
-      values: topDown(scored).map((r) => Number(r.b.meanScore!.toFixed(2))),
+      values: topDown(scored).map((r) => Number(r.b.meanScore!.toFixed(1))),
     }],
     {
       ...place({ x: PAD.x, y: top, w: CONTENT.w, h: PAD.bottom - top }, 'ratings chart'),
@@ -779,12 +807,13 @@ function addRatingsSlide(
       showValue: true, dataLabelPosition: 'outEnd',
       dataLabelColor: MUTED, dataLabelFontSize: TYPE.dataLabel,
       // Without an explicit format PowerPoint inherits the cell's General
-      // format and prints a mean of 3.47 as "3", which is the one number on
-      // this slide where the decimal is the whole point.
+      // format and prints a mean of 3.5 as "3", which is the one number on
+      // this slide where the decimal is the whole point. One place, as
+      // `scoreLabel` writes it everywhere else.
       // The locale prefix asks for a full stop: a chart label is otherwise
       // written with whatever decimal separator the reader's Windows is
       // set to, and these decks are read in several of them.
-      dataLabelFormatCode: `${DECIMAL}0.00`,
+      dataLabelFormatCode: `${DECIMAL}0.0`,
       catAxisLabelFontSize: TYPE.category, showLegend: false,
       valAxisMinVal: 0, valAxisMaxVal: points,
     },
@@ -875,12 +904,17 @@ function plan(dataset: Dataset, q: Question, filter: boolean[] | undefined): Pla
   };
 }
 
+/** The section the turnout curve is read after. */
+const TURNOUT_AFTER = 'C';
+
 function addQuestionSlides(
   pptx: PptxGenJS,
   dataset: Dataset,
   questions: Question[],
   filter: boolean[] | undefined,
   canDrawMaps = false,
+  /** The turnout page, drawn once section C has had its pages. */
+  afterSection?: () => void,
 ): void {
   const planned = questions
     .map((q) => plan(dataset, q, filter))
@@ -891,9 +925,14 @@ function addQuestionSlides(
   const overviews = sectionOverviews(dataset, questions, filter);
   const opened = new Set<string>();
 
+  let pending = afterSection;
   for (let i = 0; i < planned.length; ) {
     const first = planned[i]!;
     if (first.q.section && !opened.has(first.q.section)) {
+      if (pending && opened.has(TURNOUT_AFTER)) {
+        pending();
+        pending = undefined;
+      }
       opened.add(first.q.section);
       for (const o of overviews.filter((x) => x.section === first.q.section)) {
         addSectionSlide(pptx, o);
@@ -945,6 +984,8 @@ function addQuestionSlides(
       if (!sharesFirst) addSharesSlide(pptx, p);
     }
   }
+  // Where section C is the last one in the deck, the curve closes it.
+  if (pending && opened.has(TURNOUT_AFTER)) pending();
 }
 
 /**

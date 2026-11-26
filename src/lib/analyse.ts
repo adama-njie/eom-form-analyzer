@@ -112,6 +112,20 @@ export function meanLabel(value: number): string {
   return value < 10 && !Number.isInteger(tenth) ? tenth.toFixed(1) : String(Math.round(value));
 }
 
+/**
+ * A mean score, written for a reader: one decimal place.
+ *
+ * Two decimals said more than the scale knows. A mean of 3.44 out of 4 is
+ * drawn from reports that each answered 3 or 4, and the second decimal
+ * moves with a single report; the figure is a summary of a briefing's
+ * worth of judgement, not a measurement. One place everywhere it is
+ * written - the deck, the dashboard, the Word report and the sentences
+ * in it - so the same figure reads the same in all of them.
+ */
+export function scoreLabel(value: number): string {
+  return value.toFixed(1);
+}
+
 export interface Dataset {
   table: Table;
   questions: Question[];

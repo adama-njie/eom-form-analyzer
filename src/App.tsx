@@ -20,6 +20,7 @@ import {
   ratingOf,
   ratingQuestions,
   reportsByPlace,
+  scoreLabel,
   stationsObserved,
   textValues,
   turnoutByHour,
@@ -766,7 +767,7 @@ function Overview({
                 <Stat
                   key={`${q.code}-${q.columns[0]}`}
                   label={`${q.code} ${q.label}`}
-                  value={r ? `${r.mean.toFixed(2)} / ${r.points}` : '—'}
+                  value={r ? `${scoreLabel(r.mean)} / ${r.points}` : '—'}
                   sub={
                     r
                       ? `${fmtPct(r.goodPct)} ${r.goodLabels.join(' or ').toLowerCase()}`
@@ -903,7 +904,7 @@ function QuestionCard({
         <>
           <BarList counts={b.total} judged scale={q.scale} />
           {b.meanScore !== undefined && (
-            <p className="muted small">Mean score {b.meanScore.toFixed(2)} on a {q.scale?.length}-point scale.</p>
+            <p className="muted small">Mean score {scoreLabel(b.meanScore)} on a {q.scale?.length}-point scale.</p>
           )}
         </>
       )}

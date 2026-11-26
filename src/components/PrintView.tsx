@@ -7,6 +7,7 @@ import {
   coverage,
   displayCounts,
   findings,
+  scoreLabel,
   textValues,
   reportsByPlace,
   type Dataset,
@@ -161,7 +162,7 @@ export default function PrintView({
                       {q.code} {q.label}
                     </th>
                     <td style={{ textAlign: 'right' }}>
-                      {b.meanScore ? b.meanScore.toFixed(2) : '—'}
+                      {b.meanScore ? scoreLabel(b.meanScore) : '—'}
                     </td>
                     <td style={{ textAlign: 'right' }}>{b.answered}</td>
                   </tr>

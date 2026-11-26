@@ -12,7 +12,7 @@
  */
 
 import type { Breakdown, Dataset, Finding } from './analyse';
-import { analyse, coverage, findings, meanLabel, realTotal } from './analyse';
+import { analyse, coverage, findings, meanLabel, realTotal, scoreLabel } from './analyse';
 import type { Question } from './schema';
 
 function pct(v: number): string {
@@ -111,7 +111,7 @@ export function describe(q: Question, b: Breakdown, geo: boolean): string {
     );
   } else if (q.kind === 'ordinal' && b.meanScore !== undefined) {
     sentences.push(
-      `${b.answered} ratings, averaging ${b.meanScore.toFixed(2)} on a ${q.scale?.length}-point scale. The commonest answer was "${top.label}" (${pct(top.pct)}).`,
+      `${b.answered} ratings, averaging ${scoreLabel(b.meanScore)} on a ${q.scale?.length}-point scale. The commonest answer was "${top.label}" (${pct(top.pct)}).`,
     );
   } else {
     sentences.push(
@@ -214,7 +214,7 @@ export function executiveSummary(dataset: Dataset, filter?: boolean[]): string[]
     const worst = scored[0]!;
     const best = scored[scored.length - 1]!;
     paras.push(
-      `Across the overall assessment questions, the lowest mean was ${worst.q.code} "${worst.q.label}" at ${worst.b.meanScore!.toFixed(2)}, and the highest ${best.q.code} "${best.q.label}" at ${best.b.meanScore!.toFixed(2)}.`,
+      `Across the overall assessment questions, the lowest mean was ${worst.q.code} "${worst.q.label}" at ${scoreLabel(worst.b.meanScore!)}, and the highest ${best.q.code} "${best.q.label}" at ${scoreLabel(best.b.meanScore!)}.`,
     );
   }
 
