@@ -1635,6 +1635,48 @@ function drawAnswerChart(
     return;
   }
 
+  /*
+   * A block of tick boxes is drawn as the share of the reports.
+   *
+   * One report ticks several options, so a count answers "how many
+   * reports named the army" and leaves the reader to remember how many
+   * reports there were in order to know whether that is many. The
+   * reference deck prints the share of all its reports for exactly these
+   * questions - "unauthorised persons: 1.9%" - with the count beside it,
+   * and the count is here in the option's own name, as the base is on
+   * every other chart in this deck. The share is of every report in the
+   * export and not of the ones that reached the question, so two of these
+   * blocks can be read against each other: a follow-up asked only of the
+   * reports that answered Yes would otherwise be a share of a different
+   * denominator on every page.
+   */
+  if (q.kind === 'multi' && b.reports > 0) {
+    const named = counts.map((c) => `${c.label} (${c.n})`);
+    const share = counts.map((c) => Math.round((c.n / b.reports) * 1000) / 10);
+    slide.addChart(
+      pptx.ChartType.bar,
+      [{ name: 'Share of reports', labels: topDown(named), values: topDown(share) }],
+      {
+        ...placed,
+        ...BARE,
+        barDir: 'bar', chartColors: topDown(colours), barGapWidthPct: 55,
+        showValue: true, dataLabelPosition: 'outEnd',
+        dataLabelColor: MUTED, dataLabelFontSize: TYPE.dataLabel,
+        // The locale prefix, as everywhere a chart label carries a
+        // decimal: PowerPoint writes these as the file is opened.
+        dataLabelFormatCode: `${DECIMAL}0.0"%"`,
+        catAxisLabelFontSize: TYPE.category,
+        showTitle: true,
+        title: `Share of all ${b.reports} reports. The number ticking each is in brackets.`,
+        titleFontSize: TYPE.sub,
+        titleColor: MUTED,
+        showLegend: false,
+        valAxisMinVal: 0,
+      },
+    );
+    return;
+  }
+
   slide.addChart(
     pptx.ChartType.bar,
     [{ name: 'Reports', labels: topDown(labels), values: topDown(values) }],
@@ -1648,7 +1690,6 @@ function drawAnswerChart(
     showLegend: false,
     },
   );
-  void b;
 }
 
 /**

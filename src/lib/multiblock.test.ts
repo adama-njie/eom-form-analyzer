@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import JSZip from 'jszip';
+import { analyse, buildDataset } from './analyse';
+import { buildDeck } from './pptx';
+import { defaultSelection, exportableQuestions, questionKey } from './selection';
 import { inferSchema, type Table } from './schema';
 
 /**
@@ -67,5 +71,48 @@ describe('multi-answer blocks', () => {
       'Voting booth(s)',
       '(Tamper-evident) bags',
     ]);
+  });
+});
+
+describe('a block of tick boxes', () => {
+  const dataset = () => buildDataset(LANGUAGES, inferSchema(LANGUAGES));
+
+  it('counts each option as a share of the reports, not of the ticks', () => {
+    /*
+     * One report ticks several options, so the ticks add up to more than
+     * the reports: Mandinka on three reports of four is 75%, and it used
+     * to be drawn as 43% - three of the seven boxes ticked, which answers
+     * a question nobody asked.
+     */
+    const ds = dataset();
+    const b = analyse(ds, ds.questions.find((q) => q.code === 'B.15')!);
+    expect(b.reports).toBe(4);
+    const mandinka = b.total.find((c) => c.label === 'Mandinka')!;
+    expect(mandinka.n).toBe(3);
+    expect(Math.round(mandinka.pct)).toBe(75);
+  });
+
+  it('says on the slide what the share is of', () => {
+    // A percentage on a slide says what it is a share of, always.
+    const ds = dataset();
+    const deck = buildDeck(ds, undefined, {
+      selection: {
+        ...defaultSelection(ds, 'test'),
+        coverage: false,
+        maps: false,
+        ratings: false,
+        questions: exportableQuestions(ds).map(questionKey),
+      },
+      includeMaps: false,
+    });
+    return deck.write({ outputType: 'nodebuffer' }).then(async (buf) => {
+      const zip = await JSZip.loadAsync(buf as Buffer);
+      const charts = Object.keys(zip.files).filter((f) => /ppt\/charts\/chart\d+\.xml$/.test(f));
+      const texts = await Promise.all(charts.map((f) => zip.files[f]!.async('string')));
+      const page = texts.find((x) => x.includes('Mandinka'))!;
+      expect(page).toContain('Share of all 4 reports');
+      // The count is in the option's own name, as the base is elsewhere.
+      expect(page).toContain('Mandinka (3)');
+    });
   });
 });

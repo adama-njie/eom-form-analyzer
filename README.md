@@ -663,6 +663,16 @@ reading "No speech delivered" and not one of the seven languages. It is the
 last bracketed group, with one level of nesting allowed inside it so that
 "(Voting booth(s))" still parses. `multiblock.test.ts` covers both.
 
+**A tick box is a share of the reports, not of the ticks.** One report ticks several options,
+so the ticks add up to more than the reports: Mandinka on three reports of four is 75%, and
+dividing by the ticks drew it as 43% - three of the seven boxes ticked, which answers a
+question nobody asked and reads as the smaller figure. The deck charts that share, with the
+number of reports ticking each option in the option's own name and the base written over the
+chart, which is the reference report's own treatment of "unauthorised persons present". The
+share is of every report in the export rather than of the ones that reached the question: a
+follow-up asked only of the reports that answered Yes would otherwise be a share of a
+different denominator on every page, and two of them could not be read against each other.
+
 **Report charts render synchronously.** `canvas.toBlob` is asynchronous and browsers throttle its
 callback in a background tab, so a report of 140 charts would stall if the window were minimised
 partway through. The renderer uses `toDataURL` instead and decodes the base64 itself.

@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 252 tests
+npm test           # vitest, 254 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 209 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 211 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -312,6 +312,17 @@ geography.
   similarity — two spellings of a name stay apart.
 - **Multi-answer blocks** are matched on the *last* bracketed group in the
   header, so "B.15 Language(s) of the speeches (Mandinka)" keeps its block.
+- **A tick box is a share of the reports, not of the ticks.** One report
+  ticks several options, so the ticks outnumber the reports: Mandinka on
+  three reports of four is 75%, and dividing by the ticks drew it as
+  43%, which answers a question nobody asked. `analyse` sets a multi
+  block's `pct` against `reports`, and the deck charts that share with
+  the count in the option's own name and the base written over the
+  chart - the reference deck's own treatment of "unauthorised persons".
+  The share is of every report in the export rather than of the ones
+  that reached the question, so a follow-up asked only of the reports
+  that answered Yes is not a share of a different denominator on every
+  page.
 - **Numbers are counted in bands from the start**, not banded at the chart.
   The bands are what `byArea` and `byParty` hold, so a numeric question can be
   compared across party and area.

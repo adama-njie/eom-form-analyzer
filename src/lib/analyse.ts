@@ -49,6 +49,13 @@ export interface Breakdown {
   byParty: Record<string, Count[]>;
   /** Reports that answered at all, excluding NA and DK. */
   answered: number;
+  /**
+   * Reports the breakdown was taken over, answered or not.
+   *
+   * The base for a multi-answer block, where one report ticks several
+   * options and the count of ticks is not a count of reports.
+   */
+  reports: number;
   /** Reports that returned NA or DK. */
   notApplicable: number;
   /**
@@ -720,9 +727,11 @@ export function analyse(dataset: Dataset, question: Question, rowFilter?: boolea
   const numbers: number[] = [];
   let answered = 0;
   let notApplicable = 0;
+  let reports = 0;
 
   rows.forEach((row, i) => {
     if (!include(i)) return;
+    reports += 1;
     const answers = answersFor(question, row);
     if (answers.length === 0) return;
 
@@ -793,7 +802,23 @@ export function analyse(dataset: Dataset, question: Question, rowFilter?: boolea
     byParty,
     answered,
     notApplicable,
+    reports,
   };
+
+  /*
+   * A multi-answer block's share is of the reports, not of the ticks.
+   *
+   * One report ticks several options, so the ticks add up to more than
+   * the reports and a share of them answers a question nobody asked:
+   * "UNITE 9 (22%)" read as nine of the stations in twenty-two per cent
+   * of them, when it was nine stations out of nine and twenty-two per
+   * cent of the boxes ticked. The share of reports is the figure the
+   * mission uses - an option ticked on a fifth of the reports - and it
+   * is what a reader takes the percentage to mean anyway.
+   */
+  if (question.kind === 'multi' && reports > 0) {
+    breakdown.total = breakdown.total.map((c) => ({ ...c, pct: (c.n / reports) * 100 }));
+  }
 
   if (numbers.length > 0) {
     breakdown.numeric = {
