@@ -70,8 +70,20 @@ export interface Question {
 /* Value domains                                                       */
 /* ------------------------------------------------------------------ */
 
-/** Values that mean "no answer", in any of the forms seen so far. */
-const BLANKS = new Set(['', '.', '-', 'n/a', 'none']);
+/**
+ * Values that mean "no answer", in any of the forms seen so far.
+ *
+ * "n/a" is not among them, although it was. The polling-day form offers
+ * N/A as an answer of its own - "G.11 Are duty certificate voters added
+ * to the voter list?" is Yes, No or N/A - and read as a blank it made
+ * the six observers who answered N/A indistinguishable from six who
+ * skipped the question: the deck printed the question against a base of
+ * three. A question most reports could not answer is a result, and a
+ * question most reports did not reach is a different one. N/A is in
+ * `NON_ANSWERS` instead, which charts it last and keeps it out of every
+ * rate.
+ */
+const BLANKS = new Set(['', '.', '-', 'none']);
 
 /** Answers that are present but carry no information about the question. */
 export const NON_ANSWERS = new Set(['NA', 'DK', 'N/A', 'Not applicable']);
@@ -171,12 +183,26 @@ function matchScale(values: Set<string>): string[] | undefined {
   if (present.length < 2) return undefined;
   for (const scale of SCALES) {
     const lower = scale.map((s) => s.toLowerCase());
-    if (present.every((v) => lower.includes(v.toLowerCase()))) {
-      // Keep only the points actually used, in the scale's own order.
-      return scale.filter((s) => present.some((v) => v.toLowerCase() === s.toLowerCase()));
-    }
+    /*
+     * The whole scale, including the points nobody used.
+     *
+     * It used to be only the points that were answered, and section G
+     * asks eight questions on one scale: seven were answered Always,
+     * Mostly or Sometimes and the eighth was answered Never once. That
+     * made the eighth a different scale from the other seven, so it was
+     * dropped from the page that puts the section on one chart, and
+     * "Mostly" was a different colour on it, because the colour of a
+     * point is its position along its own scale. The better half of a
+     * scale is a different half too.
+     */
+    if (present.every((v) => lower.includes(v.toLowerCase()))) return scale;
   }
   return undefined;
+}
+
+/** Whether a legend names every answer a column holds. */
+function keyedBy(legend: Record<string, string>, values: Set<string>): boolean {
+  return [...values].every((v) => NON_ANSWERS.has(v) || legend[v] !== undefined);
 }
 
 function looksNumeric(values: string[]): boolean {
@@ -322,6 +348,9 @@ function classify(
   // claims it first.
   if (distinct.size === 1 && !code && !META_HEADERS.test(header)) return null;
   if (META_HEADERS.test(header)) return { kind: 'meta' };
+  // A column holding nothing but N/A answers no question: every rate it
+  // could carry is nought out of nought.
+  if (distinct.size > 0 && [...distinct].every((v) => NON_ANSWERS.has(v))) return null;
   if (looksLikeTime(vals)) return { kind: 'time' };
   const scale = matchScale(distinct);
   /*
@@ -337,10 +366,9 @@ function classify(
    * the tool cannot name is a number.
    */
   const digits = scale?.every((v) => /^\d+$/.test(v)) ?? false;
-  const keyed =
-    legend !== null &&
-    [...distinct].every((v) => NON_ANSWERS.has(v) || legend[v] !== undefined);
-  if (scale && (!digits || keyed)) return { kind: 'ordinal', scale };
+  if (scale && (!digits || (legend !== null && keyedBy(legend, distinct)))) {
+    return { kind: 'ordinal', scale };
+  }
   if (looksNumeric(vals)) return { kind: 'numeric' };
   if (
     distinct.size <= 3 &&
@@ -483,7 +511,7 @@ export function inferSchema(table: Table): Question[] {
      * numbers is left alone.
      */
     let valueLabels: Record<string, string> | undefined;
-    if (legend && kind === 'ordinal' && scale && scale.every((v) => legend![v] !== undefined)) {
+    if (legend && kind === 'ordinal' && scale && keyedBy(legend, distinct)) {
       valueLabels = legend;
       // The whole scale the form offers, not only the points the observers
       // used: "the better half of the scale" is a different half on a

@@ -408,6 +408,28 @@ scale is kept, including points nobody used, because the better half of a four-p
 scale is a different half from the better half of the three points that happened to be
 answered.
 
+**N/A is an answer, and "n/a" was being read as a blank.** The polling-day form offers
+N/A on some of its questions - "G.11 Are duty certificate voters added to the voter list?"
+is Yes, No or N/A - and six of nine observers answered it. The tool had "n/a" in its list
+of values that mean no answer, so those six reports were indistinguishable from six that
+never reached the question, and the deck drew G.11 against a base of three. A question
+most reports could not answer is a result; a question most reports did not reach is a
+different one, and the difference is the whole point of printing the base. N/A is now
+charted like any other answer, last and in orange, and left out of every rate, which is
+what the tool already did with "NA" and "DK". A column holding nothing but N/A is still
+dropped, because every rate it could carry is nought out of nought.
+
+**A scale keeps all of its points, including the ones nobody used.** Section G asks eight
+questions on the same scale - Never, Sometimes, Mostly, Always - and on a nine-report
+export seven of them were answered on three of those points while the eighth was answered
+Never exactly once. Read as the points that were used, that made the eighth question a
+scale of its own: it was left off the page that puts the whole section on one chart, which
+is precisely the question a reader of that page is looking for, and "Mostly" was drawn in
+a different colour on it, because a point's colour is its position along its own scale.
+The scale is now the whole scale wherever the answers fit one, which is the same reason
+the legend's own scale is kept whole: the better half of a four-point scale is a different
+half from the better half of three.
+
 **A column of bare digits is a rating only where a legend says so.** "1 2 3 4 5" is one of
 the scales the tool knows, because that is how the forms store a rating. It is also how a
 form stores a count of people: "E.1 How many polling staff members are present" offers 0

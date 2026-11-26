@@ -3,6 +3,7 @@ import JSZip from 'jszip';
 import { buildDeck, labelBand } from './pptx';
 import { defaultSelection, exportableQuestions, questionKey } from './selection';
 import {
+  analyse,
   buildDataset,
   sectionOverviews,
   sharesAcross,
@@ -296,5 +297,68 @@ describe('a question across the country', () => {
 
   it('is not drawn for the question that names the area itself', () => {
     expect(sharesAcross(form(), q('B.1'))).toBeNull();
+  });
+});
+
+/**
+ * A section asked on one scale, where one question reached the bottom of
+ * it and the others did not, and a Yes/No question the form also offers
+ * N/A on.
+ */
+const G_HEADER = [
+  'B.1 Polling station administrative area',
+  'G.1 Did the polling staff check the voter cards?',
+  'G.2 Was the voter list marked next to the name?',
+  'G.3 Was the name called out?',
+  'G.8 Were the bells audible?',
+  'G.11 Are duty certificate voters added to the voter list?',
+];
+
+const G_ROWS = [
+  ['Banjul', 'Always', 'Always', 'Mostly', 'Mostly', 'Yes'],
+  ['Banjul', 'Mostly', 'Mostly', 'Always', 'Never', 'N/A'],
+  ['Kanifing', 'Always', 'Sometimes', 'Mostly', 'Always', 'N/A'],
+  ['Basse', 'Mostly', 'Always', 'Always', 'Mostly', 'No'],
+];
+
+function gForm() {
+  const table = toTable([G_HEADER, ...G_ROWS]);
+  return buildDataset(table, inferSchema(table));
+}
+
+describe('a scale and the answers nobody gave', () => {
+  it('keeps the whole scale, so one odd answer does not split a section', () => {
+    /*
+     * G.8 is the only question anyone answered Never. Keyed on the
+     * points that were used, it was a scale of four beside seven scales
+     * of three, so it was dropped from the section's own page - and
+     * "Mostly" was a different colour on it, because a point's colour
+     * is its position along its own scale.
+     */
+    const ds = gForm();
+    const scales = new Set(
+      ds.questions.filter((x) => x.kind === 'ordinal').map((x) => x.scale!.join('|')),
+    );
+    expect([...scales]).toEqual(['Never|Sometimes|Mostly|Always']);
+    const g = sectionOverviews(ds, ds.questions).find((o) => o.section === 'G')!;
+    expect(g.rows.map((r) => r.question.code)).toEqual(['G.1', 'G.2', 'G.3', 'G.8']);
+  });
+
+  it('counts an answer of N/A, which is not the same as no answer', () => {
+    /*
+     * The form offers N/A on G.11, and "n/a" used to be read as a blank:
+     * two observers who answered it were indistinguishable from two who
+     * never reached the question, and the deck printed the question
+     * against a base of two out of four.
+     */
+    const ds = gForm();
+    const b = analyse(ds, ds.questions.find((x) => x.code === 'G.11')!);
+    expect(b.total.map((c) => [c.label, c.n])).toEqual([
+      ['Yes', 1],
+      ['No', 1],
+      ['N/A', 2],
+    ]);
+    // The rate is still of the reports that could answer it.
+    expect(b.answered).toBe(2);
   });
 });

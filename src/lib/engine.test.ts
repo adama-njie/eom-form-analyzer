@@ -84,10 +84,16 @@ describe.skipIf(!HAS_FIXTURE)('question inference', () => {
     expect(q?.options[0]?.label).toBe('Bussing activities');
   });
 
-  it('detects an ordinal scale and keeps it in order', () => {
+  it('detects an ordinal scale, whole and in order', () => {
+    /*
+     * The whole scale, not the points this question happened to be
+     * answered on: a question answered Mostly and Always is the same
+     * scale as the one beside it that was answered Never once, and the
+     * page that puts a section on one chart reads them together.
+     */
     const q = byCode('G.1');
     expect(q?.kind).toBe('ordinal');
-    expect(q?.scale).toEqual(['Mostly', 'Always']);
+    expect(q?.scale).toEqual(['Never', 'Sometimes', 'Mostly', 'Always']);
   });
 
   it('detects the 1-5 rating questions', () => {

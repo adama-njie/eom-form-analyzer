@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 260 tests
+npm test           # vitest, 262 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 217 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 219 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -164,6 +164,18 @@ geography.
   0 and so was read as the count it is. `classify` now takes the digit
   scale only where the legend names every digit in the column, and a
   number the tool cannot name stays a number.
+- **A scale keeps all its points, including the ones nobody used.**
+  `matchScale` returns the whole scale, not the points that were
+  answered. Section G asks eight questions on Never / Sometimes /
+  Mostly / Always; seven were answered on three of those points and the
+  eighth was answered Never once, which made it a scale of its own. It
+  was dropped from the page that puts the section on one chart - a
+  group of one is not a section - and "Mostly" was a different colour
+  on it, because `colourFor` places a point along its own scale. The
+  better half of a scale is a different half too. The legend is applied
+  on the answers the column holds rather than on the scale, so a
+  four-point legend still names a column of digits read against the
+  five-point one.
 - **A scored question wears the words from its own legend.** The forms put
   the key in a column of its own - "4=Very good 3=Good 2=Bad 1=Very bad" -
   and store the digit, so a rating chart read 1, 2, 3, 4 with the key
@@ -315,7 +327,15 @@ geography.
   A flagged question used to be shaded in orange, so two maps of the same
   shape were different colours for a reason no reader could see.
 - **NA is charted**, last, and excluded from every rate. A question answered
-  No on 18 reports and NA on 15 must not be drawn as "100% No".
+  No on 18 reports and NA on 15 must not be drawn as "100% No". **And
+  "N/A" is one of them, not a blank.** It was in `BLANKS`, so the six
+  observers who answered N/A to "G.11 Are duty certificate voters added
+  to the voter list?" were indistinguishable from six who never reached
+  the question, and the deck printed it against a base of three out of
+  nine. A question most reports could not answer and a question most
+  reports did not reach are different results. A column holding nothing
+  but N/A is still dropped: every rate it could carry is nought out of
+  nought.
 - **A question is never broken down by itself.** The party question compared
   across party is one bar per party answering with its own name.
 - **A horizontal bar chart in PowerPoint draws its first category at the
