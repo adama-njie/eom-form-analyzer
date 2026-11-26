@@ -139,15 +139,23 @@ describe('turnout', () => {
     expect(readings.some((r) => r.count.code === 'D.3')).toBe(false);
   });
 
-  it('is the mean share of each station list, by the hour it was read', () => {
+  it('is the mean share of each station list, by the hour the observer left', () => {
+    /*
+     * The departure reading only, one point per station. The arrival
+     * figure is what the staff said had happened before the mission was
+     * there, and counting both would put every station on the curve
+     * twice - once on the way in and once on the way out.
+     */
     const t = turnoutByHour(form())!;
-    expect(t.readings).toBe(10);
-    const seven = t.points.find((p) => p.label === '07:00')!;
-    // 100 of 1,000 and 50 of 500: one station one vote, as everywhere else.
-    expect(seven.mean).toBeCloseTo(10, 5);
-    expect(seven.n).toBe(2);
-    expect(t.points.map((p) => p.label)).toEqual(['07:00', '09:00', '13:00', '16:00']);
-    expect(t.points[0]!.mean).toBeLessThan(t.points[3]!.mean);
+    expect(t.readings).toBe(5);
+    expect(t.points.map((p) => p.label)).toEqual(['13:00', '16:00']);
+    // 400 of 1,000 and 200 of 500: one station one vote, as everywhere else.
+    expect(t.points[0]!.mean).toBeCloseTo(40, 5);
+    expect(t.points[0]!.n).toBe(2);
+    // 480 of 800, 240 of 400 and 260 of 400.
+    expect(t.points[1]!.mean).toBeCloseTo((60 + 60 + 65) / 3, 5);
+    expect(t.points[1]!.n).toBe(3);
+    expect(t.points[0]!.mean).toBeLessThan(t.points[1]!.mean);
   });
 
   it('turns a count of votes cast into the share of the list that it is', () => {

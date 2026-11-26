@@ -1225,6 +1225,17 @@ const REGISTER_HINTS = /(voter list|on the list|registered|register)/i;
 const VOTED_HINTS = /\bvoted\b/i;
 /** The moment such a count was taken, which also names a time question. */
 const MOMENT = /\b(arrival|departure|opening|closing)\b/i;
+/**
+ * The moment the curve is drawn from: the one the observer leaves on.
+ *
+ * A form takes the same reading twice, and only the second is the
+ * observer's own. The arrival figure is what the polling staff said had
+ * happened before anyone from the mission was in the room, and putting
+ * both on one curve gives a station two points, so a station observed
+ * from 07:00 to 13:00 would be counted once in the morning and again
+ * after lunch.
+ */
+const READING_MOMENT = /\b(departure|closing)\b/i;
 
 /**
  * The question that gives each station's electorate.
@@ -1285,10 +1296,15 @@ export interface Turnout {
 /**
  * How far voting had got, by the hour.
  *
- * The one thing a polling-day form can say about the day as a whole. Each
- * report carries two readings - how many had voted when the observer
- * arrived, and how many when they left - and each carries the time it was
- * taken, so a few hundred reports draw the shape of the day.
+ * The one thing a polling-day form can say about the day as a whole. Every
+ * report records how many of that station's voters had voted when the
+ * observer left, and the time they left, so a few hundred reports draw the
+ * shape of the day.
+ *
+ * The departure reading only. The form takes the same reading on arrival
+ * as well, but that one is what the staff reported had happened before the
+ * mission was in the room, and counting both would give one station two
+ * points on the curve.
  *
  * Each reading is a share of that station's own list and the hour's figure
  * is the mean of those shares: one station one vote, as everywhere else in
@@ -1298,7 +1314,7 @@ export interface Turnout {
  */
 export function turnoutByHour(dataset: Dataset, rowFilter?: boolean[]): Turnout | null {
   const register = registerQuestion(dataset);
-  const readings = turnoutReadings(dataset);
+  const readings = turnoutReadings(dataset).filter((r) => READING_MOMENT.test(r.moment));
   if (!register || readings.length === 0) return null;
 
   const registerCol = register.columns[0];

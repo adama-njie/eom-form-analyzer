@@ -366,17 +366,26 @@ before anything classifies it, and the question gets the chart it was always mea
 have: one column per hour, the morning on the left.
 
 **Turnout is the one thing a polling-day form can say about the election rather than
-about the stations observed.** Every report reads how many voters had voted when the
-observer arrived and again when they left, each against that station's own list and each
-with the time it was taken; a few hundred reports therefore draw the shape of the day.
-The two halves of a reading are paired by the word they share - arrival, departure - so a
-form that asks a third time needs no code change. Each point is the mean of the shares,
-one station one vote, and not a national turnout: that would need every station in the
-country rather than the ones that were visited. The same logic makes a count of votes
-cast a share rather than a band. "How many stations had served between 200 and 399
-voters" puts a station of 2,000 beside a station of 300 and says nothing about either;
-the same answer as a share of that station's list is turnout. The list itself stays a
-count, because summing it is a real figure.
+about the stations observed.** Every report records how many of that station's voters had
+voted when the observer left, and the time they left, each against the station's own voter
+list; a few hundred reports therefore draw the shape of the day. The count is paired with
+its clock time by the word the two questions share - departure - so a form that words it
+differently needs no code change.
+
+The departure reading only, and that is a judgement rather than a convenience. The form
+asks the same thing on arrival, but the arrival figure is what the polling staff reported
+had happened before anyone from the mission was in the room, and putting both on one curve
+gives a single station two points - one on the way in, one on the way out - which on real
+data flattens the rise into a straight line across the day. A form that never asks on
+departure gets no curve at all, which is the honest outcome: it did not observe one.
+
+Each point is the mean of the shares, one station one vote, and not a national turnout:
+that would need every station in the country rather than the ones that were visited. The
+same logic makes a count of votes cast a share rather than a band. "How many stations had
+served between 200 and 399 voters" puts a station of 2,000 beside a station of 300 and
+says nothing about either; the same answer as a share of that station's list is turnout.
+That applies to the readings alone, so a count of duty-certificate voters stays a count,
+and so does the voter list itself, because summing it is a real figure.
 
 **A scored question wears the words from its own legend.** The forms score the overall
 assessments 1 to 4 and put the key in a column header of its own - "4=Very good 3=Good

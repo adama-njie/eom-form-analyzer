@@ -162,15 +162,24 @@ geography.
   including points nobody used, because "the better half of the scale" is a
   different half otherwise.
 - **Turnout is the one thing a polling-day form can say about the day.**
-  Each report reads how many had voted on arrival and on departure, against
-  that station's own list, and each reading carries a clock time, so the
-  reports together draw the curve. The pairing is by the word the two
-  questions share - arrival, departure - rather than by question code.
+  Every report records how many of a station's voters had voted when the
+  observer left and the time they left, so the reports together draw the
+  curve. The count is paired with its clock time by the word the two
+  questions share - departure - rather than by question code.
+  **The departure reading only.** The form asks the same thing on
+  arrival, but that figure is what the staff reported had happened before
+  the mission was in the room, and counting both would put every station
+  on the curve twice, once on the way in and once on the way out; it
+  flattened the real curve into a straight line across the day. A form
+  that never asks on departure therefore gets no curve, which is correct:
+  it has not observed one. `READING_MOMENT` is where that is decided.
   Each point is the mean of those shares, one station one vote: a national
   turnout would need every station in the country, not the observed ones.
-  A count of votes cast is therefore charted as that share and not in
-  bands, which would put a station of 2,000 beside one of 300; the list
-  itself stays a count, because summing it is a real figure.
+  A count of votes cast is charted as that share and not in bands, which
+  would put a station of 2,000 beside one of 300 - but only where it is a
+  reading taken against a clock time, so "people who voted with a duty
+  certificate" stays the count it is. The voter list itself also stays a
+  count, because summing it is a real figure.
 - **A worked-out percentage says what it is a share of.** The hedge this
   tool removed was "mean of 36 estimates" beside a figure the form asked
   for as a percentage. "As a share of voters on the voter list" under a
