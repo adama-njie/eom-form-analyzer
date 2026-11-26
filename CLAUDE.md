@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 243 tests
+npm test           # vitest, 250 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 200 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 207 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -189,9 +189,13 @@ geography.
   It was `/^J\./`, and the opening form rates one thing in section G, so a
   morning's observation reported nothing at all.
 - **The coverage slide is the briefing's front page.** Reports, LGAs,
-  constituencies, polling stations, teams and the headline rating, four to
-  a row and wrapping to a second row, then reports by area, by team and by
-  station type. Distinct stations, not reports: two observers at one
+  constituencies, polling stations and the headline rating, four to a row
+  and wrapping to a second row, then reports by area, by team and by
+  station type. The count of teams is not among them: the size of the
+  deployment is the mission's own figure, known before a report was
+  filed, and the chart lower down the slide names every team that filed.
+  Where the form scores nothing there is no rating to open on, and the
+  count of teams keeps the row full. Distinct stations, not reports: two observers at one
   station is one station observed - and where that comes to the same
   number as the reports, which it does on a form filled in once per
   station, the tile is left off rather than printed twice. The station
@@ -207,13 +211,19 @@ geography.
   ranked-findings slide: it put C.7 and F.6 on page four, before section A
   had been reached, and the ranking is on the dashboard and in the Word
   report, which are read rather than presented.
-- **A question runs to three pages: counts, geography, shares.** Its own
-  slide counts the answers, the map says where, and the shares page is
-  the one that bears comparison between places. Each is drawn only where
-  it has something to add, so most questions are two pages and some are
-  one. The order is fixed in `addQuestionSlides` and the pages that
-  follow a question are counted for the dialogue by `countExtraPages`,
-  from the same rules - `mapKindFor` and `sharesAcross` - that draw them.
+- **A question of a few answers is its shares and then its map.** The
+  page that counted the answers - a ring, with the same answers stacked
+  across the areas beside it - is not drawn where the shares page is,
+  because the shares page says the same thing in the one form that bears
+  comparison between places of different size, and the two pages running
+  one after the other were a briefing reading itself twice.
+  `needsCountsPage` is that decision, read by the deck and by the export
+  dialogue, which counts the pages before the analyst presses the button.
+  A question the shares page cannot hold keeps its counting page - more
+  than five answers, a number in bands, a cloud of words - and so does a
+  question broken down by party, which the shares page does not draw. The
+  order is fixed in `addQuestionSlides`: the question's own page, then the
+  map, and the shares after it where the question had a page of counts.
 - **Which map a question gets is `mapKindFor`'s decision, and only its.**
   The question naming the area is followed by the map of where the
   reports came from, which is why that map is no longer in the overview;
@@ -225,12 +235,16 @@ geography.
   the one question never put there.
 - **A question's shares are the nation, the kind of station, and each
   area, as 100% stacked columns.** `sharesAcross`, drawn by
-  `addSharesSlide`, which is the reference deck's second page for a
-  question. Counts cannot be compared between an area holding eighty
-  reports and one holding nine, and the columns are of reports rather
-  than of answers, so NA is a segment and every column is full height - a
+  `addSharesSlide`, which is the reference deck's page for a question.
+  Counts cannot be compared between an area holding eighty reports and
+  one holding nine, and the columns are of reports rather than of
+  answers, so NA is a segment and every column is full height - a
   composition, not the rate the findings table and the maps print. Every
-  column carries its own base in its name.
+  column carries its own base in its name. The three panels are the same
+  height, which is the whole point of the page, so the legend is the
+  slide's own - `addLegendRow` - and not a chart's: a chart's legend
+  takes the bottom of its own plot area and left the areas drawn shorter
+  than the nation beside them.
 - **A section of questions asked the same way opens on one page.** Ten
   questions answered Yes or No are ten pages of two bars, and a reader
   who has to turn ten of them to find the one that stands out will not
@@ -264,9 +278,13 @@ geography.
   names (West Coast, North Bank, Lower River, Upper River) are aliases that
   still resolve on import, and the area question's own answers are resolved
   too, so one slide never shows both spellings.
-- **Yes is light blue, No is dark blue, NA is orange — always.** The palette
+- **Yes is dark blue, No is light blue, NA is orange — always.** The palette
   does not change with whether Yes is the bad answer on this question. Which
   answer is the worrying one is the findings table's job.
+- **A shaded map is the deck's blue, pale to deep.** `ACCENT_DEEP` on the
+  deck, in the Word report and on screen, with the ramp carrying the rate.
+  A flagged question used to be shaded in orange, so two maps of the same
+  shape were different colours for a reason no reader could see.
 - **NA is charted**, last, and excluded from every rate. A question answered
   No on 18 reports and NA on 15 must not be drawn as "100% No".
 - **A question is never broken down by itself.** The party question compared
@@ -320,7 +338,16 @@ geography.
   across a column. Constituency answers are resolved against the gazetteer so
   spelling variants collapse; unrecognised answers stay as written.
 - **Nothing on a slide is set below 18pt**, and a question title below 24pt.
-  `typefloor.test.ts` enforces it.
+  Inside a chart the floor is `CHART_MIN`, two points lower, and only
+  there: a data label has the width of the mark it is written on, and at
+  18pt "100%" did not fit a column of a 100% stacked chart, so PowerPoint
+  drew nothing at all. `typefloor.test.ts` enforces both.
+- **A category name is wrapped, not cut.** `wrapText` breaks a question
+  over the lines the axis has room for, because a category axis label is
+  one string and PowerPoint gives it whatever width it decides the axis
+  is worth: "C.3 Did you observe any particular problem ..." left the
+  reader to guess which problem. The break is written into the label so
+  PowerPoint honours it rather than deciding for itself.
 
 ## Verifying a deck
 

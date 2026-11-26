@@ -142,7 +142,7 @@ export default function MapTab({
         <GambiaMap
           rates={rates}
           suffix={suffix}
-          colour={showingCoverage ? '#12239E' : '#E66C37'}
+          colour="#12239E"
           selected={selected || null}
           onSelect={(p) => onSelect(p ?? '')}
           division={dataset.division}

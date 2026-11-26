@@ -94,6 +94,50 @@ export function fitsAt(text: string, widthInches: number, lines: number, pt: num
 }
 
 /**
+ * Break a label over up to `lines` lines, on word boundaries.
+ *
+ * A category axis label is a single string, and PowerPoint gives it the
+ * width it decides the axis is worth: "C.3 Did you observe any particular
+ * problem in the vicinity of the polling station?" was drawn as "C.3 Did
+ * you observe any particular problem ..." and the reader was left to guess
+ * which problem. Breaking it here puts the whole question on the chart -
+ * the break is written into the label, so PowerPoint honours it rather
+ * than deciding for itself - and only the question too long for the lines
+ * it is given is cut.
+ */
+export function wrapText(
+  text: string,
+  widthInches: number,
+  lines: number,
+  pt: number,
+): string {
+  const per = charsPerLine(widthInches, pt);
+  const out: string[] = [];
+  let line = '';
+  for (const word of text.split(/\s+/)) {
+    const next = line ? `${line} ${word}` : word;
+    if (next.length <= per || !line) {
+      line = next;
+      continue;
+    }
+    out.push(line);
+    line = word;
+    if (out.length === lines) break;
+  }
+  if (out.length < lines && line) out.push(line);
+  if (out.length === lines) {
+    // What is left over is cut on the last line rather than dropped
+    // silently: an ellipsis is a reader's cue to look the question up.
+    const used = out.join(' ').length;
+    if (used < text.length) {
+      const last = out[lines - 1]!;
+      out[lines - 1] = `${last.slice(0, Math.max(0, per - 1)).trimEnd()}…`;
+    }
+  }
+  return out.join('\n');
+}
+
+/**
  * Fit a string to a width at a given font size, shrinking before truncating.
  * Question labels vary from four words to forty, and a title that silently
  * overlaps the chart below it is worse than one set a point smaller.

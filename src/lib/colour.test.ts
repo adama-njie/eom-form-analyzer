@@ -6,12 +6,12 @@ import { ACCENT, ACCENT_DEEP, CAT, NOT_APPLICABLE } from './theme';
 describe('answer colours', () => {
   /*
    * The point of these is consistency, not prettiness. A briefing moves
-   * through forty slides, and a reader who has learnt that light blue is Yes
+   * through forty slides, and a reader who has learnt that dark blue is Yes
    * on slide 6 must not meet an orange Yes on slide 7.
    */
   it('gives Yes and No the same two colours in every kind of chart', () => {
     const counts = [{ label: 'Yes' }, { label: 'No' }];
-    const expected = [ACCENT, ACCENT_DEEP];
+    const expected = [ACCENT_DEEP, ACCENT];
     expect(fillsFor(counts, { judged: true, perMark: true })).toEqual(expected);
     expect(fillsFor(counts, { judged: false, perMark: true })).toEqual(expected);
     expect(fillsFor(counts, { judged: false, perMark: false })).toEqual(expected);
@@ -46,7 +46,7 @@ describe('answer colours', () => {
       judged: false,
       perMark: true,
     });
-    expect(fills).toEqual([ACCENT, ACCENT_DEEP, NOT_APPLICABLE]);
+    expect(fills).toEqual([ACCENT_DEEP, ACCENT, NOT_APPLICABLE]);
   });
 });
 

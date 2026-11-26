@@ -322,9 +322,11 @@ export async function buildReport(
         children.push(
           chartParagraph(
             mapPng(
+              // The deck's blue, here too: the shading says which areas are
+              // high, and the colour is the same on every map in the report.
               rateByPlace(dataset, f.question, f.label, filter),
               '%',
-              FLAG,
+              ACCENT_DEEP,
               640,
               dataset.division,
             ),

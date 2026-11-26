@@ -1,18 +1,20 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
-import { analyse, buildDataset } from './analyse';
+import { analyse, buildDataset, sharesAcross } from './analyse';
 import { inferSchema, toTable } from './schema';
 import {
   PRESETS,
   areaBreakdown,
-  countOwnSlides,
+  countQuestionPages,
   defaultSelection,
   estimateSlides,
   exportableQuestions,
+  needsCountsPage,
   needsOwnSlide,
   questionKey,
   selectedQuestions,
+  slideBreakdown,
   type ExportSelection,
 } from './selection';
 
@@ -133,7 +135,7 @@ describe.skipIf(!HAS_FIXTURE)('how questions are packed onto slides', () => {
   it('counts the slides the deck will actually produce', () => {
     const ds = gambia();
     const all = exportableQuestions(ds);
-    const heavy = countOwnSlides(ds, all);
+    const pages = countQuestionPages(ds, all);
     const sel: ExportSelection = {
       ...defaultSelection(ds, 'test'),
       coverage: false,
@@ -142,9 +144,20 @@ describe.skipIf(!HAS_FIXTURE)('how questions are packed onto slides', () => {
       ratings: false,
       questions: all.map(questionKey),
     };
-    // The cover and the question slides.
-    const expected = 1 + heavy + Math.ceil((all.length - heavy) / 2);
-    expect(estimateSlides(sel, all.length, heavy)).toBe(expected);
+    // The cover and the question pages, and nothing else asked for.
+    expect(estimateSlides(sel, pages)).toBe(1 + pages);
+    /*
+     * Fewer pages than questions, and not because every question was
+     * dropped: two short questions share a page, and a question drawn as
+     * shares has no page of counts at all.
+     */
+    const counted = all.filter((q) => {
+      const b = analyse(ds, q);
+      return needsCountsPage(sharesAcross(ds, q, undefined, b) !== null, slideBreakdown(q, b).parties);
+    }).length;
+    expect(pages).toBeLessThan(all.length);
+    expect(pages).toBeLessThanOrEqual(counted);
+    expect(pages).toBeGreaterThanOrEqual(Math.ceil(counted / 2));
   });
 
   it('never compares across areas when there is only one area', () => {

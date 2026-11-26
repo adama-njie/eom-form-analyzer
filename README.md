@@ -190,7 +190,13 @@ Arial throughout, the Power BI default fills, `#252423` for titles and
 `#6C6966` for everything secondary.
 
 **Nothing on a slide is set below 18pt, and no title below 24pt.** `MIN` in
-`theme.ts` is that floor and `typefloor.test.ts` holds every size to it. Where
+`theme.ts` is that floor and `typefloor.test.ts` holds every size to it. Inside a chart
+the floor is two points lower, `CHART_MIN`, and only there: a data label is written on the
+mark it belongs to and has only that mark's width, so at 18pt "100%" did not fit the
+column of a 100% stacked chart and PowerPoint dropped it rather than drawing it smaller. A
+figure that is drawn is worth more than one set two points larger and not drawn at all,
+and the label is set in white on a filled mark, which is the highest contrast on the
+slide. Where
 the floor and the available space conflict, the space gives way: a question
 whose title will not fit a half-width column at 24pt is given the whole slide
 rather than having its title shrunk or cut. The floor reaches the maps too,
@@ -438,19 +444,27 @@ eight; the ranking is still on the dashboard and in the Word report, which are r
 desk rather than presented in a room. A briefing deck that jumps about is one the
 presenter has to apologise for.
 
-**A question is read three ways, and the deck says so in three pages.** Its own page
-counts the answers - a ring or a bar chart, and the same answers stacked across the
-parties and the areas. The page after it is the map. The page after that is the shares:
-the nation, the kind of polling station, and then a column per area, each one a full-height
-100% stacked column. The third page exists because the first cannot do its job between
-places of different size: an area holding eighty reports and an area holding nine are not
-comparable as counts, and the bar that is twice as long is twice as long because twice as
-many observers were sent there. The columns are of reports rather than of answers, so NA
-is a segment of the column like any other and every column reaches the top; that is a
-composition, not the rate the findings table and the maps print, which is always of the
-reports that could answer. Each column carries the number of reports behind it in its own
-name, because a share of nine and a share of eighty are drawn at the same height and are
-not the same evidence.
+**A question of a few answers is drawn as shares, and then as a map.** The shares page
+is the nation, the kind of polling station, and then a column per area, each one a
+full-height 100% stacked column; the map follows it. There used to be a page before both
+of them, counting the answers as a ring with the same answers stacked across the areas
+beside it, and it was dropped because the page after it said the same thing better. A
+count cannot be compared between places of different size: an area holding eighty reports
+and an area holding nine are not comparable, and the bar that is twice as long is twice as
+long because twice as many observers were sent there. The columns are of reports rather
+than of answers, so NA is a segment of the column like any other and every column reaches
+the top; that is a composition, not the rate the findings table and the maps print, which
+is always of the reports that could answer. Each column carries the number of reports
+behind it in its own name, because a share of nine and a share of eighty are drawn at the
+same height and are not the same evidence. The counting page survives for the questions
+the shares page cannot hold - a question of more than five answers, a number in bands, a
+cloud of words - and for a question broken down by party, which is a comparison the shares
+page does not draw.
+
+The three panels are the same height, because the whole point of the page is that the
+columns can be read across. A chart that carries its own legend gives it the bottom of its
+plot area, which left the areas drawn an inch shorter than the nation beside them, so the
+legend is drawn once under all three and belongs to the slide rather than to a chart.
 
 **Every yes/no question is now on a map.** It used to be the three questions the findings
 ranked highest, which meant a map was drawn only where a keyword in the question text had
@@ -459,6 +473,10 @@ waiting outside?" matches none of them, so the question a mission most wants to 
 geographically was the one question the deck never put on the map. Any question with two
 answers is now shaded across the areas - on No where No is the worrying answer, on Yes
 where Yes is - and anything with three to five answers gets a pie on each area, as before.
+Every shaded map is the deck's blue, pale where the share is low and deep where it is
+high. A flagged question used to be shaded in the orange the deck spends on a problem, so
+two maps of the same shape were different colours for a reason no reader could see; the
+ramp already says which areas are high.
 The map of where the reports came from moved too: it is the answer to the question that
 asks which area the station was in, so it now follows that question instead of opening the
 deck ahead of section A.
@@ -595,10 +613,10 @@ contradicts the order the bands are in. Colour is used for a rating scale, for
 the slices of a ring, which cannot be told apart otherwise, and for Yes, No and
 NA, which have fixed colours of their own.
 
-**Yes is light blue, No is dark blue and NA is orange. Always.** They used to
+**Yes is dark blue, No is light blue and NA is orange. Always.** They used to
 depend on whether the question was one where Yes is the bad answer, so "Was
 security provided for the candidate?" drew Yes in orange while "Were media
-present?" drew it in light blue, and a reader moving between two slides had to
+present?" drew it in blue, and a reader moving between two slides had to
 go back to the legend to be sure which was which. Which answer is the worrying
 one is the findings table's job; the palette's job is to be predictable. NA
 was grey, which reads as absence and is honest, but on a projector a grey

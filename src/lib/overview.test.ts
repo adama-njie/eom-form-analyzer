@@ -47,12 +47,12 @@ function form() {
 const q = (code: string) => form().questions.find((x) => x.code === code)!;
 
 /** The deck's slides, in order, as text. Maps need a browser; these do not. */
-async function slides(): Promise<string[]> {
+async function slides(coverage = false): Promise<string[]> {
   const ds = form();
   const deck = buildDeck(ds, undefined, {
     selection: {
       ...defaultSelection(ds, 'test'),
-      coverage: false,
+      coverage,
       ratings: false,
       questions: exportableQuestions(ds).map(questionKey),
     },
@@ -74,6 +74,16 @@ describe('the deck a section makes', () => {
     const page = texts.findIndex((x) => x.includes('Section F'));
     expect(page).toBeGreaterThan(0);
     expect(texts.findIndex((x) => x.includes('F.1 Is the PS layout'))).toBeGreaterThan(page);
+  });
+
+  it('opens on the rating of the day rather than the count of teams', async () => {
+    // The size of the deployment is the mission's own figure, and the
+    // chart lower down the slide - which is a chart part rather than text
+    // on the slide - names every team that filed.
+    const texts = await slides(true);
+    const page = texts.find((x) => x.includes('Coverage'))!;
+    expect(page).toContain('J.1 good or very good');
+    expect(page).not.toContain('>Teams<');
   });
 
   it('draws the teams as a chart per team type', async () => {
@@ -144,6 +154,28 @@ describe('a section on one page', () => {
 });
 
 describe('a question across the country', () => {
+  it('is the whole of what the deck draws for the question', async () => {
+    /*
+     * The ring that counted the answers, with the same answers stacked
+     * across the areas beside it, said what this page says in the one
+     * form that cannot be compared between an area of two reports and an
+     * area of eighty. Both pages, one after the other, was the briefing
+     * reading itself twice.
+     */
+    const texts = await slides();
+    expect(texts.filter((x) => x.includes('F.1 Is the PS layout'))).toHaveLength(1);
+  });
+
+  it('carries a legend of its own, so the three panels are one height', async () => {
+    // A chart's own legend takes the bottom of its plot area, and the
+    // panel that had it drew its columns shorter than the two beside it.
+    const texts = await slides();
+    const page = texts.find((x) => x.includes('F.1 Is the PS layout'))!;
+    expect(page).toContain('<a:t>Yes</a:t>');
+    expect(page).toContain('<a:t>No</a:t>');
+  });
+
+
   it('is the nation, the kind of station, and then each area', () => {
     const shares = sharesAcross(form(), q('F.1'))!;
     expect(shares.panels.map((p) => p.title)).toEqual([

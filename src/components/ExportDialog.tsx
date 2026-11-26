@@ -4,7 +4,7 @@ import { findings, turnoutByHour } from '@/lib/analyse';
 import {
   PRESETS,
   countExtraPages,
-  countOwnSlides,
+  countQuestionPages,
   estimateSlides,
   exportableQuestions,
   questionKey,
@@ -99,8 +99,8 @@ export default function ExportDialog({
 
   // Exact rather than approximate: the same packing rule the deck uses, so
   // the number in the dialogue is the number of slides that come out.
-  const heavy = useMemo(
-    () => countOwnSlides(dataset, selectedQuestions(dataset, sel)),
+  const questionPages = useMemo(
+    () => countQuestionPages(dataset, selectedQuestions(dataset, sel)),
     [dataset, sel],
   );
   // The section pages, the shares pages and the maps that follow the
@@ -111,8 +111,7 @@ export default function ExportDialog({
   );
   const slides = estimateSlides(
     sel,
-    chosen.size,
-    heavy,
+    questionPages,
     turnoutByHour(dataset) !== null,
     extras,
   );

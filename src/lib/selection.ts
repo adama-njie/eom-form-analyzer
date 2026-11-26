@@ -169,13 +169,54 @@ export function needsOwnSlide(q: Question, b: Breakdown): boolean {
   return !fitsAt(title, columnWidth(2), TITLE_LINES, TYPE.chartTitle);
 }
 
-/** How many of the chosen questions will take a slide to themselves. */
-export function countOwnSlides(
+/**
+ * Whether a question still needs a page counting its answers.
+ *
+ * The shares page says everything the counts page said about a question
+ * of a handful of answers, and says it in the one form that can be
+ * compared between areas of different size, so drawing both put a ring
+ * and a stack of area bars on one page and the same answers as columns on
+ * the next. Where the question is also broken down by party the counts
+ * page is the only place that comparison appears, and it stays.
+ *
+ * Read by the deck, which draws the page, and by the dialogue, which
+ * counts it before the analyst presses the button.
+ */
+export function needsCountsPage(hasShares: boolean, parties: string[]): boolean {
+  return !hasShares || parties.length > 0;
+}
+
+/**
+ * The pages the chosen questions take, packed as the deck packs them.
+ *
+ * Two short questions share a page, a long one takes its own, and a
+ * question whose answers are drawn as shares has no counts page at all.
+ */
+export function countQuestionPages(
   dataset: Dataset,
   questions: Question[],
   filter?: boolean[],
 ): number {
-  return questions.filter((q) => needsOwnSlide(q, analyse(dataset, q, filter))).length;
+  const planned = questions.map((q) => {
+    const b = analyse(dataset, q, filter);
+    return {
+      full: needsOwnSlide(q, b),
+      counts: needsCountsPage(
+        sharesAcross(dataset, q, filter, b) !== null,
+        slideBreakdown(q, b).parties,
+      ),
+    };
+  });
+  let n = 0;
+  for (let i = 0; i < planned.length; ) {
+    const first = planned[i]!;
+    i += 1;
+    if (!first.counts) continue;
+    n += 1;
+    const second = planned[i];
+    if (!first.full && second && !second.full && second.counts) i += 1;
+  }
+  return n;
 }
 
 /**
@@ -228,7 +269,7 @@ export function countExtraPages(
   let n = sectionOverviews(dataset, questions, filter).length;
   for (const q of questions) {
     const b = analyse(dataset, q, filter);
-    if (sharesAcross(dataset, q, filter, b)) n += 1;
+    if (sharesAcross(dataset, q, filter, b) !== null) n += 1;
     // The area's own map is the overview map, moved rather than added.
     const kind = selection.maps ? mapKindFor(dataset, q, b) : null;
     if (kind && kind !== 'area') n += 1;
@@ -373,18 +414,18 @@ export function selectedQuestions(dataset: Dataset, selection: ExportSelection):
  */
 export function estimateSlides(
   selection: ExportSelection,
-  questionCount: number,
-  heavy = 0,
+  /** The pages the questions themselves take. See `countQuestionPages`. */
+  questionPages = 0,
   /** True where the form supports a turnout curve, which adds a page. */
   turnout = false,
-  /** Pages that follow a question: its shares, its map. */
+  /** Pages that follow a question: its section, its shares, its map. */
   extras = 0,
 ): number {
   let n = 1; // cover
   if (selection.coverage) n += turnout ? 2 : 1;
   if (selection.maps) n += 1;
   if (selection.ratings) n += 1;
-  n += heavy + Math.ceil(Math.max(0, questionCount - heavy) / 2);
+  n += questionPages;
   n += extras;
   return n;
 }

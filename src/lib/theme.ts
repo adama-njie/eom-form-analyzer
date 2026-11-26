@@ -105,6 +105,20 @@ export const HEADER_BLUE = '3C6CB4';
 export const MIN = 18;
 
 /**
+ * The smallest type on a chart.
+ *
+ * Two points under the floor the rest of the slide keeps to, and only
+ * inside a chart. A data label is written on the mark it belongs to, so it
+ * has only the width of that mark: at 18pt "100%" did not fit a column of
+ * a 100% stacked chart and PowerPoint dropped it, and a category name of
+ * two words took the width the columns needed. The label is still read at
+ * the back of the room - it is set on a filled mark in white, which is the
+ * highest contrast on the slide - and a figure that is drawn is worth more
+ * than one that is set two points larger and not drawn at all.
+ */
+export const CHART_MIN = 16;
+
+/**
  * Type sizes, in points.
  *
  * Taken from the mission's own reference reports and scaled for this deck's
@@ -121,10 +135,10 @@ export const TYPE = {
   /** A chart's title within a question's slide, such as the by-area one. */
   chartTitleSmall: 20,
   /** Values printed on or beside the marks. */
-  dataLabel: MIN,
+  dataLabel: CHART_MIN,
   /** Category names along the axis. */
-  category: MIN,
-  legend: MIN,
+  category: CHART_MIN,
+  legend: CHART_MIN,
   /** A tile's big number. */
   figure: 40,
   /** A tile's caption. */

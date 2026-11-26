@@ -81,12 +81,16 @@ async function slideTexts(includeMaps: boolean): Promise<string[]> {
 }
 
 describe('a question on the map', () => {
-  it('follows its own slide with a map of the same answers', async () => {
+  it('follows the question with a map of the same answers', async () => {
     stubCanvas();
     const texts = await slideTexts(true);
     const typePages = texts.filter((x) => x.includes('Type of event'));
-    // The chart, the country, and then the shares behind it.
-    expect(typePages).toHaveLength(3);
+    // The shares, which are the question's own page where it has one, and
+    // then the country. The ring and the stack of area bars the deck used
+    // to draw first said the same thing in a form that cannot be compared
+    // between an area of one report and an area of three.
+    expect(typePages).toHaveLength(2);
+    expect(typePages[0]).not.toContain('<p:pic>');
     expect(typePages[1]).toContain('<p:pic>');
   });
 
@@ -98,7 +102,7 @@ describe('a question on the map', () => {
     stubCanvas();
     const texts = await slideTexts(true);
     const pages = texts.filter((x) => x.includes('Was a candidate present'));
-    expect(pages).toHaveLength(3);
+    expect(pages).toHaveLength(2);
     expect(pages[1]).toContain('Reports answering Yes');
     expect(pages[1]).toContain('<p:pic>');
   });
@@ -106,8 +110,8 @@ describe('a question on the map', () => {
   it('is left out when maps are turned off', async () => {
     stubCanvas();
     const texts = await slideTexts(false);
-    // The chart and its shares, and nothing with a picture on it.
-    expect(texts.filter((x) => x.includes('Type of event'))).toHaveLength(2);
+    // The shares, and nothing with a picture on it.
+    expect(texts.filter((x) => x.includes('Type of event'))).toHaveLength(1);
     expect(texts.some((x) => x.includes('<p:pic>'))).toBe(false);
   });
 });
