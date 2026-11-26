@@ -1201,7 +1201,12 @@ export function coverage(dataset: Dataset, rowFilter?: boolean[]): Coverage {
     groupsTotal: universe.length,
     registerShare,
     constituenciesCovered: seen.size,
-    constituenciesTotal: dataset.geo ? ALL_CONSTITUENCIES.length : 0,
+    // Only where the form asks for a constituency. It used to be 53
+    // whenever the areas were Gambian, so a form that never asks printed
+    // a tile reading "0 / 53", which says the deployment reached none of
+    // them rather than that the question was not on the form.
+    constituenciesTotal:
+      dataset.geo && dataset.constituencyColumns.length > 0 ? ALL_CONSTITUENCIES.length : 0,
     byGroup,
     byTeam: [...teams.entries()]
       .map(([team, n]) => ({ team, reports: n }))
@@ -1337,6 +1342,11 @@ export function turnoutByHour(dataset: Dataset, rowFilter?: boolean[]): Turnout 
  * station of 2,000 beside a station of 300 and means nothing in either. The
  * same answer as a share of that station's own list is turnout, which is
  * the figure a mission reports.
+ *
+ * Only for the questions that are turnout readings - the ones asked
+ * against a clock time. "People who voted with a duty certificate" also
+ * counts votes, and 0.1% of the register is a true but useless answer to
+ * it; what a mission wants there is how many there were.
  */
 export function shareOfRegister(
   dataset: Dataset,
@@ -1344,6 +1354,9 @@ export function shareOfRegister(
   rowFilter?: boolean[],
 ): Percentage | null {
   if (question.kind !== 'numeric' || !VOTED_HINTS.test(question.label)) return null;
+  if (!turnoutReadings(dataset).some((r) => r.count.columns[0] === question.columns[0])) {
+    return null;
+  }
   const register = registerQuestion(dataset);
   const col = question.columns[0];
   const registerCol = register?.columns[0];

@@ -73,6 +73,17 @@ import { NON_ANSWERS, type Question } from './schema';
  * the worrying one is the findings table's job; the palette's job is to be
  * predictable.
  */
+/**
+ * Ask PowerPoint for an English number format, so a decimal is a full stop.
+ *
+ * A chart's data labels are written by PowerPoint as the file is opened,
+ * using the regional settings of the machine it is opened on, so a mean of
+ * 3.31 is drawn as "3,31" on a German-configured laptop. The locale prefix
+ * pins the format to English; where a reader's copy ignores it, the
+ * separator is a Windows setting rather than anything in this file.
+ */
+const DECIMAL = '[$-409]';
+
 /** Answers whose colour is fixed, whatever the chart or the question. */
 function hasOwnColour(label: string): boolean {
   return label === 'Yes' || label === 'No' || NON_ANSWERS.has(label);
@@ -174,17 +185,33 @@ export function buildDeck(
   const canDrawMaps =
     sel.maps && (options.includeMaps ?? true) && dataset.geo && typeof document !== 'undefined';
 
+  /*
+   * The deck reads in the order the form is laid out.
+   *
+   * An overview first - what was observed, how the day went, where the
+   * reports came from - and then section A, section B and so on to the
+   * end, with each question's map directly after the question it maps.
+   * The ranked findings used to come before any of it, so a reader met
+   * C.7 and F.6 on page four and section A on page eight; the ranking is
+   * on screen and in the Word report, which are read rather than
+   * presented. The overall assessments are section J, so they now sit
+   * where section J sits, at the end.
+   */
   addTitleSlide(pptx, sel, dataset.division);
   if (sel.coverage) addCoverageSlide(pptx, dataset, cov, filter);
   if (sel.coverage) addTurnoutSlide(pptx, dataset, filter);
   if (canDrawMaps) addMapSlide(pptx, dataset, filter);
-  if (sel.findingsTable && probs.length > 0) addFindingsSlide(pptx, probs);
-  if (canDrawMaps && sel.findingsTable) {
-    for (const f of probs.slice(0, 3)) addFindingMapSlide(pptx, dataset, filter, f);
-  }
-  if (sel.ratings) addRatingsSlide(pptx, dataset, filter);
 
-  addQuestionSlides(pptx, dataset, selectedQuestions(dataset, sel), filter, canDrawMaps);
+  addQuestionSlides(
+    pptx,
+    dataset,
+    selectedQuestions(dataset, sel),
+    filter,
+    canDrawMaps,
+    canDrawMaps && sel.findingsTable ? probs.slice(0, 3) : [],
+  );
+
+  if (sel.ratings) addRatingsSlide(pptx, dataset, filter);
 
   return pptx;
 }
@@ -341,7 +368,17 @@ function addCoverageSlide(
   if (cov.constituenciesTotal > 0) {
     tiles.push(['Constituencies', `${cov.constituenciesCovered} / ${cov.constituenciesTotal}`]);
   }
-  if (stations !== null) tiles.push(['Polling stations', String(stations)]);
+  /*
+   * Polling stations, where that is a different figure from reports.
+   *
+   * On a form filled in once per station the two are the same number,
+   * and two tiles saying 100 teach a reader nothing twice. Where a
+   * station was visited by two observers they differ, and then both are
+   * worth the room.
+   */
+  if (stations !== null && stations !== cov.reports) {
+    tiles.push(['Polling stations', String(stations)]);
+  }
   tiles.push(['Teams', String(cov.byTeam.length)]);
   if (headline) {
     // The question's own words for the good end of its scale, so the figure
@@ -408,7 +445,14 @@ function addCoverageSlide(
       )
     : [];
 
-  const charts: { title: string; labels: string[]; values: number[]; colour: string }[] = [];
+  const charts: {
+    title: string;
+    labels: string[];
+    values: number[];
+    /** One colour for a bar chart, one per slice for a ring. */
+    colours: string[];
+    ring?: boolean;
+  }[] = [];
   if (areaRows.length > 0) {
     charts.push({
       title: dataset.geo
@@ -416,7 +460,7 @@ function addCoverageSlide(
         : 'Reports by district',
       labels: areaRows.map((g) => g.label),
       values: areaRows.map((g) => g.reports),
-      colour: ACCENT_DEEP,
+      colours: [ACCENT_DEEP],
     });
   }
   if (teamRows.length > 0) {
@@ -424,15 +468,23 @@ function addCoverageSlide(
       title: 'Reports by team',
       labels: teamRows.map((t) => t.team),
       values: teamRows.map((t) => t.reports),
-      colour: ACCENT,
+      colours: [ACCENT],
     });
   }
   if (typeRows.length > 1 && typeQ) {
+    /*
+     * A ring, not bars. Two or three kinds of station are a split of one
+     * whole rather than three quantities to compare, and the reference's
+     * own front page draws its station type the same way. Both figures
+     * are on it: the count answers how many were seen, the share answers
+     * what kind of deployment it was.
+     */
     charts.push({
       title: `${typeQ.code} ${typeQ.label}`.trim(),
       labels: typeRows.map((c) => c.label),
       values: typeRows.map((c) => c.n),
-      colour: ACCENT_DEEP,
+      colours: typeRows.map((c, i) => colourFor(c.label, i)),
+      ring: true,
     });
   }
   if (charts.length === 0) return;
@@ -440,13 +492,40 @@ function addCoverageSlide(
   const cols = columns(charts.length);
   charts.forEach((c, i) => {
     const col = cols[i]!;
+    const box = place(
+      { x: col.x, y: chartTop, w: col.w, h: chartH },
+      `coverage chart ${i}`,
+    );
+    if (c.ring) {
+      s.addChart(
+        pptx.ChartType.doughnut,
+        [{ name: 'Reports', labels: c.labels, values: c.values }],
+        {
+          ...box,
+          ...BARE,
+          chartColors: c.colours,
+          holeSize: 55,
+          showValue: true,
+          showPercent: true,
+          dataLabelColor: ON_FILL,
+          dataLabelFontSize: TYPE.dataLabel,
+          showLegend: true,
+          legendPos: 'b',
+          legendFontSize: TYPE.legend,
+          showTitle: true,
+          titleFontSize: TYPE.chartTitleSmall,
+          title: fitText(c.title, col.w, 2, TYPE.chartTitleSmall, TYPE.chartTitleSmall).text,
+        },
+      );
+      return;
+    }
     s.addChart(
       pptx.ChartType.bar,
       [{ name: 'Reports', labels: c.labels, values: c.values }],
       {
-        ...place({ x: col.x, y: chartTop, w: col.w, h: chartH }, `coverage chart ${i}`),
+        ...box,
         ...BARE,
-        barDir: 'bar', chartColors: [c.colour],
+        barDir: 'bar', chartColors: c.colours,
         showValue: true, dataLabelPosition: 'outEnd',
         dataLabelColor: MUTED, dataLabelFontSize: TYPE.dataLabel,
         catAxisLabelFontSize: TYPE.category,
@@ -479,17 +558,21 @@ function addTurnoutSlide(
   if (!t || t.points.length < 2) return;
 
   const s = pptx.addSlide({ masterName: 'BASE' });
+  // The slide carries the curve and the base it rests on, and not the
+  // arithmetic: how the mean is worked out is in the README and in
+  // CLAUDE.md, where it can be read rather than presented.
   const top = heading(
     s,
     'Turnout through the day',
     `Mean share of each station's list that had voted, from ${t.readings} readings.`,
   );
+
   s.addChart(
     pptx.ChartType.line,
     [{
       name: 'Turnout',
       labels: t.points.map((p) => p.label),
-      values: t.points.map((p) => Math.round(p.mean * 10) / 10),
+      values: t.points.map((p) => Math.round(p.mean)),
     }],
     {
       ...place({ x: PAD.x, y: top, w: CONTENT.w, h: PAD.bottom - top }, 'turnout chart'),
@@ -499,7 +582,10 @@ function addTurnoutSlide(
       lineDataSymbolSize: 9,
       showValue: true,
       dataLabelPosition: 't',
-      dataLabelFormatCode: '0.0"%"',
+      // Whole percentages. A tenth of a point says nothing here, and a
+      // decimal on a chart label is printed with whatever decimal
+      // separator the reader's Windows is set to.
+      dataLabelFormatCode: '0"%"',
       dataLabelColor: MUTED,
       dataLabelFontSize: TYPE.dataLabel,
       catAxisLabelFontSize: TYPE.category,
@@ -591,49 +677,6 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-function addFindingsSlide(pptx: PptxGenJS, probs: ReturnType<typeof findings>): void {
-  const s = pptx.addSlide({ masterName: 'BASE' });
-  const top = heading(
-    s,
-    'Ranked findings',
-    'Questions whose answer indicates a problem, most frequent first. A triage aid, not a conclusion.',
-  );
-
-  const colW = [1.15, 6.3, 0.65, CONTENT.w - 1.15 - 6.3 - 0.65];
-  const rows: PptxGenJS.TableRow[] = [
-    ['Rate', 'Question', 'n', 'Above that rate in'].map((t) => ({
-      text: t,
-      options: {
-        color: ON_FILL, fill: { color: ACCENT_DEEP },
-        fontSize: TYPE.table, fontFace: FONT,
-      },
-    })),
-    // Banded rows rather than ruled ones. The reference's tables separate by
-    // fill, and a hairline round every cell is exactly the ink that was
-    // asked to go.
-    ...probs.map((f, i) => {
-      const fill = { color: i % 2 === 0 ? 'FFFFFF' : PANEL };
-      return [
-        { text: `${f.pct.toFixed(1)}%`, options: { color: FLAG, fontSize: TYPE.table, fontFace: FONT, fill } },
-        { text: `${f.question.code} ${f.question.label}`.trim(), options: { color: INK, fontSize: TYPE.table, fontFace: FONT, fill } },
-        { text: String(f.n), options: { color: INK, fontSize: TYPE.table, fontFace: FONT, fill } },
-        {
-          text: f.hotspots.slice(0, 3).map((h) => `${h.group} ${h.pct.toFixed(0)}%`).join(', ') || '-',
-          options: { color: MUTED, fontSize: TYPE.caption, fontFace: FONT, fill },
-        },
-      ];
-    }),
-  ];
-
-  const available = PAD.bottom - top;
-  const rowH = Math.min(0.66, available / rows.length);
-  s.addTable(rows, {
-    ...place({ x: PAD.x, y: top, w: CONTENT.w, h: rowH * rows.length }, 'findings table'),
-    colW, rowH, fontSize: TYPE.table, fontFace: FONT, valign: 'middle',
-    border: { type: 'none' },
-  });
-}
-
 function addRatingsSlide(
   pptx: PptxGenJS,
   dataset: Dataset,
@@ -674,7 +717,10 @@ function addRatingsSlide(
       // Without an explicit format PowerPoint inherits the cell's General
       // format and prints a mean of 3.47 as "3", which is the one number on
       // this slide where the decimal is the whole point.
-      dataLabelFormatCode: '0.00',
+      // The locale prefix asks for a full stop: a chart label is otherwise
+      // written with whatever decimal separator the reader's Windows is
+      // set to, and these decks are read in several of them.
+      dataLabelFormatCode: `${DECIMAL}0.00`,
       catAxisLabelFontSize: TYPE.category, showLegend: false,
       valAxisMinVal: 0, valAxisMaxVal: points,
     },
@@ -738,6 +784,8 @@ function addQuestionSlides(
   questions: Question[],
   filter: boolean[] | undefined,
   canDrawMaps = false,
+  /** The flagged questions worth a map, each drawn after its own slide. */
+  mapped: ReturnType<typeof findings> = [],
 ): void {
   const planned = questions
     .map((q) => plan(dataset, q, filter))
@@ -764,7 +812,11 @@ function addQuestionSlides(
 
     // The same answers on the country, straight after the chart of them.
     if (canDrawMaps) {
-      for (const p of drawn) addPieMapSlide(pptx, dataset, p);
+      for (const p of drawn) {
+        addPieMapSlide(pptx, dataset, p);
+        const flagged = mapped.find((f) => f.question === p.q);
+        if (flagged) addFindingMapSlide(pptx, dataset, filter, flagged);
+      }
     }
   }
 }
@@ -1044,7 +1096,7 @@ function drawPercentage(
         valAxisMinVal: 0,
         showValue: true,
         dataLabelPosition: 'outEnd',
-        dataLabelFormatCode: fine ? '0.0"%"' : '0"%"',
+        dataLabelFormatCode: fine ? `${DECIMAL}0.0"%"` : '0"%"',
         dataLabelColor: MUTED,
         dataLabelFontSize: TYPE.dataLabel,
         catAxisLabelFontSize: TYPE.category,

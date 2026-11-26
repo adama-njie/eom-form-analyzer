@@ -304,7 +304,9 @@ export function estimateSlides(
   let n = 1; // cover
   if (selection.coverage) n += turnout ? 2 : 1;
   if (selection.maps) n += 2;
-  if (selection.findingsTable) n += 1 + 3; // table plus mapped findings
+  // The ranked findings are no longer a slide of their own: the deck maps
+  // the three most frequent, each after the question it belongs to.
+  if (selection.findingsTable && selection.maps) n += 3;
   if (selection.ratings) n += 1;
   n += heavy + Math.ceil(Math.max(0, questionCount - heavy) / 2);
   return n;

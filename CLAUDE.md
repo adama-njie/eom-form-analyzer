@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 224 tests
+npm test           # vitest, 231 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 181 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 188 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -183,8 +183,28 @@ geography.
   constituencies, polling stations, teams and the headline rating, four to
   a row and wrapping to a second row, then reports by area, by team and by
   station type. Distinct stations, not reports: two observers at one
-  station is one station observed. The figures come from `stationsObserved`,
-  `stationTypeQuestion` and `ratingOf`, so the dashboard shows the same ones.
+  station is one station observed - and where that comes to the same
+  number as the reports, which it does on a form filled in once per
+  station, the tile is left off rather than printed twice. The station
+  type is a ring with the count and the share on it, because two kinds of
+  station are a split of one whole and not two quantities to compare. The
+  figures come from `stationsObserved`, `stationTypeQuestion` and
+  `ratingOf`, so the dashboard shows the same ones. "Constituencies" is
+  shown only where the form asks for one; it used to read "0 / 53" on a
+  form that never asks, which says the deployment reached none of them.
+- **The deck reads in the form's own order.** An overview first - coverage,
+  turnout, where the reports came from - and then section A through to the
+  end, with each question's pie map or finding map directly after the
+  question it maps and the overall assessments last, because they are
+  section J. There is no ranked-findings slide: it put C.7 and F.6 on page
+  four, before section A had been reached, and the ranking is on the
+  dashboard and in the Word report, which are read rather than presented.
+- **A decimal is a full stop.** Everything this tool writes itself is
+  formatted `en-GB`, and a chart's data labels - which PowerPoint renders
+  on opening, in the regional settings of the machine it is opened on -
+  carry the `[$-409]` locale prefix in their format code so a mean of 3.31
+  is not drawn as "3,31". Chart labels needing no decimal do not get one:
+  the turnout curve is whole percentages.
 - **An LGA is named by its administrative capital.** Banjul, Kanifing,
   Brikama, Kerewan, Mansa Konko, Kuntaur, Janjanbureh, Basse. The regional
   names (West Coast, North Bank, Lower River, Upper River) are aliases that

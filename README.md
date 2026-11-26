@@ -420,6 +420,22 @@ size of the Janjanbureh on a campaign deck and two decks in one briefing should 
 a reader wondering which is which. The cover says which division the document counts, next
 to the period it covers.
 
+**The deck is read in the order the form is written.** An overview comes first - what was
+observed, how far voting got through the day, where the reports came from - and then
+section A, section B and so on to the end, with each question's map on the page after the
+question it maps and the overall assessments last, where section J is. It used to open
+with the ranked findings, so a reader met C.7 and F.6 on page four and section A on page
+eight; the ranking is still on the dashboard and in the Word report, which are read at a
+desk rather than presented in a room. A briefing deck that jumps about is one the
+presenter has to apologise for.
+
+**A decimal is a full stop, even on a German laptop.** Everything the tool writes itself
+is formatted as en-GB. A chart's data labels are not written by the tool at all: PowerPoint
+renders them when the file is opened, using the regional settings of the machine it is
+opened on, so a mean rating of 3.31 arrives as "3,31" wherever the comma is the decimal
+separator. The format codes now carry a locale prefix asking for English, and the labels
+that never needed a decimal - the turnout curve - no longer have one.
+
 **The constituency is read as part of the area, not beside it.** Every form
 asks for the Local Government Area and then the constituency inside it, and
 the two are a hierarchy: Bakau and Serekunda West are in Kanifing. Flattening
