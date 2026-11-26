@@ -312,6 +312,7 @@ function classify(
   header: string,
   code: string,
   vals: string[],
+  legend: Record<string, string> | null,
 ): { kind: QuestionKind; scale?: string[] } | null {
   const distinct = new Set(vals);
 
@@ -323,7 +324,23 @@ function classify(
   if (META_HEADERS.test(header)) return { kind: 'meta' };
   if (looksLikeTime(vals)) return { kind: 'time' };
   const scale = matchScale(distinct);
-  if (scale) return { kind: 'ordinal', scale };
+  /*
+   * A column of bare digits is a rating only where a legend says so.
+   *
+   * "1 2 3 4 5" is in the list of scales because the forms store a rating
+   * as the digit and spell the words out in a legend column of their own.
+   * Without that legend there is nothing to say the digits are a scale,
+   * and "E.1 How many polling staff members are present" - answered 1, 3,
+   * 4 and 5 - was drawn in the rating palette with 1 shaded as the worst
+   * answer on the slide, beside "E.1.1 How many of the polling staff are
+   * female", which held a 0 and so was read as the count it is. A number
+   * the tool cannot name is a number.
+   */
+  const digits = scale?.every((v) => /^\d+$/.test(v)) ?? false;
+  const keyed =
+    legend !== null &&
+    [...distinct].every((v) => NON_ANSWERS.has(v) || legend[v] !== undefined);
+  if (scale && (!digits || keyed)) return { kind: 'ordinal', scale };
   if (looksNumeric(vals)) return { kind: 'numeric' };
   if (
     distinct.size <= 3 &&
@@ -413,7 +430,7 @@ export function inferSchema(table: Table): Question[] {
       if (cols.length > 1 && multiple <= rows.length * 0.1) {
         const vals = cols.flatMap((c) => valuesFor(c));
         const parsed = parseCode(split.base);
-        const kindOf = classify(split.base, parsed.code, vals);
+        const kindOf = classify(split.base, parsed.code, vals, legend);
         if (kindOf) {
           questions.push({
             code: parsed.code,
@@ -447,7 +464,7 @@ export function inferSchema(table: Table): Question[] {
     // Single column. Classify it by what is in it.
     const vals = valuesFor(i);
     const distinct = new Set(vals);
-    const kindOf = classify(header, code, vals);
+    const kindOf = classify(header, code, vals, legend);
     if (!kindOf) {
       i += 1;
       continue;

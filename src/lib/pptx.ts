@@ -1062,7 +1062,11 @@ function addSharesSlide(pptx: PptxGenJS, planned: Planned): void {
   if (!shares) return;
 
   const s = pptx.addSlide({ masterName: 'BASE' });
-  const top = heading(s, `${q.code} ${q.label}`.trim());
+  const top = heading(
+    s,
+    `${q.code} ${q.label}`.trim(),
+    'Each column is the reports that answered it, and the figure above the column is how many.',
+  );
   const colours = fillsFor(
     shares.answers.map((label) => ({ label })),
     { judged: JUDGED.test(q.label), scale: q.scale, perMark: true },
@@ -1090,25 +1094,29 @@ function addSharesSlide(pptx: PptxGenJS, planned: Planned): void {
    * for all three, so it belongs to the slide.
    */
   const legendH = 0.46;
+  /** The row of bases, above the columns rather than under them. */
+  const baseH = (TYPE.category * 1.7) / 72;
 
   /*
-   * Every panel's columns are drawn against the same height.
+   * Every panel's columns are drawn against the same height, exactly.
    *
    * A chart gives its category names the bottom of its own box, so the
-   * panel of seven area names - too long to sit horizontally, and turned
-   * on their side by PowerPoint - drew columns an inch shorter than the
-   * one headed "National" beside it, and a reader comparing the two was
-   * comparing two different scales. Each panel's box is therefore as tall
-   * as the columns plus the room its own names need, so what is left for
-   * the columns is the same in all three and the longer names simply run
-   * further down the slide. The rotation is set rather than left to
-   * PowerPoint, which otherwise decides it per chart and by its own
-   * measurement of the text.
+   * panel of seven area names - too long to sit side by side, and turned
+   * through 45 degrees - drew columns shorter than the one headed
+   * "National" beside it, and a reader comparing the two was comparing
+   * two different scales. Sizing each box as the columns plus the room
+   * its own names need came close and no closer, because the room
+   * PowerPoint gives a label is PowerPoint's own measurement of it. So
+   * the plot area is set rather than left to be fitted: every panel is
+   * the same box, and inside it the columns occupy the same rectangle,
+   * whatever its names do underneath. `layoutTarget` is the plot area
+   * itself, so the figure is the columns and not the chart around them.
    */
   const widths = shares.panels.map((_, i) => (free * weights[i]!) / total);
   const bands = shares.panels.map((p, i) => labelBand(p, widths[i]!));
-  const chartH =
-    PAD.bottom - top - titleH - legendH - Math.max(...bands.map((b) => b.height));
+  const frameY = top + titleH;
+  const frameH = PAD.bottom - legendH - frameY;
+  const plotH = frameH - baseH - Math.max(...bands.map((b) => b.height));
 
   let x = PAD.x;
   shares.panels.forEach((panel, i) => {
@@ -1119,21 +1127,27 @@ function addSharesSlide(pptx: PptxGenJS, planned: Planned): void {
       fontSize: TYPE.chartTitleSmall, color: INK, fontFace: FONT,
       align: 'center', valign: 'middle',
     });
+
+    /*
+     * Room at the left for a turned name, which runs as far to the left
+     * of its own tick as it runs below it. With the plot area set by
+     * hand there is nothing to push it inwards, so the first name in a
+     * panel of seven was cut off at the edge of the chart.
+     */
+    const slot = w / panel.groups.length;
+    const inset = band.rotate === 0 ? 0 : Math.min(0.3, Math.max(0, band.height - slot / 2) / w);
+
     s.addChart(
       pptx.ChartType.bar,
       shares.answers.map((label, j) => ({
         name: label,
-        // The base under every column: a share of nine reports and a share
-        // of eighty are the same height and not the same evidence.
-        labels: panel.groups.map((g) => `${g.label} (${g.n})`),
+        labels: panel.groups.map((g) => g.label),
         values: panel.groups.map((g) => Math.round(g.counts[j]?.pct ?? 0)),
       })),
       {
-        ...place(
-          { x, y: top + titleH, w, h: chartH + band.height },
-          `shares ${q.code} ${i}`,
-        ),
+        ...place({ x, y: frameY, w, h: frameH }, `shares ${q.code} ${i}`),
         ...BARE,
+        layout: { x: inset, y: baseH / frameH, w: 1 - inset, h: plotH / frameH },
         barDir: 'col',
         barGrouping: 'percentStacked',
         barGapWidthPct: 40,
@@ -1148,6 +1162,30 @@ function addSharesSlide(pptx: PptxGenJS, planned: Planned): void {
         showLegend: false,
       },
     );
+
+    /*
+     * The base over each column rather than inside its name.
+     *
+     * "Mansa Konko (1)" is half again as long as "Mansa Konko", and the
+     * names are what decides how much of the slide is left for the
+     * columns. A share of nine reports and a share of eighty are drawn
+     * at the same height and are not the same evidence, so the figure
+     * stays on the page - above the column it belongs to, where every
+     * column is full height and the row of them reads straight across.
+     */
+    const plotX = x + inset * w;
+    const plotW = w * (1 - inset);
+    panel.groups.forEach((g, j) => {
+      const centre = plotX + ((j + 0.5) * plotW) / panel.groups.length;
+      s.addText(String(g.n), {
+        ...place(
+          { x: centre - plotW / (2 * panel.groups.length), y: frameY, w: plotW / panel.groups.length, h: baseH },
+          `shares base ${q.code} ${i} ${j}`,
+        ),
+        fontSize: TYPE.category, color: MUTED, fontFace: FONT,
+        align: 'center', valign: 'bottom',
+      });
+    });
     x += w + PAD.gap;
   });
 
@@ -1170,11 +1208,16 @@ function addSharesSlide(pptx: PptxGenJS, planned: Planned): void {
 export function labelBand(panel: SharePanel, w: number): { height: number; rotate: number } {
   const pt = TYPE.category;
   const line = (pt * 1.4) / 72;
-  const longest = Math.max(...panel.groups.map((g) => `${g.label} (${g.n})`.length));
-  // Half the point size per character is Arial's rough average.
-  const textW = (longest * pt * 0.5) / 72;
+  const longest = Math.max(...panel.groups.map((g) => g.label.length));
+  /*
+   * Arial averages a little over half its point size per character, and
+   * the band is generous with what is left over: the plot area is set by
+   * hand, so a name with less room than it needs is cut off rather than
+   * given more - "Mansa Konko" was drawn as "Mansa K...".
+   */
+  const textW = (longest * pt * 0.58) / 72;
   if (textW <= w / panel.groups.length) return { height: line, rotate: 0 };
-  return { height: textW * Math.SQRT1_2 + line * 0.5, rotate: -45 };
+  return { height: textW * Math.SQRT1_2 + line, rotate: -45 };
 }
 
 /**

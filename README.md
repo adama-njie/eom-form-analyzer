@@ -191,9 +191,11 @@ Arial throughout, the Power BI default fills, `#252423` for titles and
 
 **Nothing on a slide is set below 18pt, and no title below 24pt.** `MIN` in
 `theme.ts` is that floor and `typefloor.test.ts` holds every size to it. Inside a chart
-the floor is two points lower, `CHART_MIN`, and only there: a data label is written on the
-mark it belongs to and has only that mark's width, so at 18pt "100%" did not fit the
-column of a 100% stacked chart and PowerPoint dropped it rather than drawing it smaller. A
+the floor is four points lower, `CHART_MIN`, and a value written on a mark is two points
+lower again, `LABEL_MIN`, and only there: a data label is written on the mark it belongs
+to and has only that mark's width, so at 18pt "100%" did not fit the column of a 100%
+stacked chart and PowerPoint dropped it rather than drawing it smaller, and at 14pt it
+broke "11%" over two lines and set the per cent sign on a line of its own. A
 figure that is drawn is worth more than one set two points larger and not drawn at all,
 and the label is set in white on a filled mark, which is the highest contrast on the
 slide. Where
@@ -406,6 +408,16 @@ scale is kept, including points nobody used, because the better half of a four-p
 scale is a different half from the better half of the three points that happened to be
 answered.
 
+**A column of bare digits is a rating only where a legend says so.** "1 2 3 4 5" is one of
+the scales the tool knows, because that is how the forms store a rating. It is also how a
+form stores a count of people: "E.1 How many polling staff members are present" offers 0
+to 5 from a dropdown, and the deck drew it in the rating palette, 1 shaded as the worst
+answer on the slide and the five answers stacked across the regions as though a station
+with one member of staff were a station rated Very bad. Beside it sat "E.1.1 How many of
+the polling staff are female", which happened to be answered 0 somewhere and so was read
+as the count it is, and drawn as a bar chart. The digit scale now applies only where the
+legend names every digit in the column. A number the tool cannot name is a number.
+
 **A question the form splits into a column per area is one question.** The polling-day
 form asks for the constituency seven times, one column per Local Government Area, and a
 report fills the one its station is in. Read column by column they are seven questions,
@@ -460,20 +472,28 @@ long because twice as many observers were sent there. The columns are of reports
 than of answers, so NA is a segment of the column like any other and every column reaches
 the top; that is a composition, not the rate the findings table and the maps print, which
 is always of the reports that could answer. Each column carries the number of reports
-behind it in its own name, because a share of nine and a share of eighty are drawn at the
-same height and are not the same evidence. The counting page survives for the questions
+behind it, written above the column, because a share of nine and a share of eighty are
+drawn at the same height and are not the same evidence - and because "Mansa Konko (1)" is
+half again as long as "Mansa Konko", and what the names need is what decides how much of
+the page is left for the columns. The counting page survives for the questions
 the shares page cannot hold - a question of more than five answers, a number in bands, a
 cloud of words - and for a question broken down by party, which is a comparison the shares
 page does not draw.
 
 The three panels draw their columns against the same height, because the whole point of
-the page is that they can be read across. A chart gives its legend and its category names
-the bottom of its own box: the legend is therefore drawn once under all three and belongs
-to the slide rather than to a chart, and each panel's box is as tall as the columns plus
-the room its own names need - one line where the names sit level, the diagonal of the
-longest where they have to be turned. The area names then run further down the slide than
-"National" does, which is what the mission's own reports do, and the columns above them
-are the same height.
+the page is that they can be read across. A chart takes its legend and its category names
+out of its own plot area, so the panel of seven area names - too long to sit side by side,
+and turned through 45 degrees - drew columns an inch shorter than the one headed
+"National" beside it, and a reader comparing the two was comparing two different scales.
+The legend is therefore drawn once under all three and belongs to the slide rather than to
+a chart, and the plot area itself is stated rather than left to be fitted: the same
+rectangle in every panel, whatever the names below it do. Sizing each box as the columns
+plus the room its names need came close and no closer, because the room a label gets is
+PowerPoint's own measurement of it, which is not the tool's. The reservation below the
+plot is now generous, since a stated plot area will not grow and a name given too little
+room is cut off rather than wrapped - "Mansa Konko" came out as "Mansa K...". The area
+names run further down the slide than "National" does, which is what the mission's own
+reports do, and the columns above them are the same height.
 
 **Every yes/no question is now on a map.** It used to be the three questions the findings
 ranked highest, which meant a map was drawn only where a keyword in the question text had

@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 254 tests
+npm test           # vitest, 260 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 211 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 217 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -155,6 +155,15 @@ geography.
   total of 46,361. `readClockTimes` rewrites such a column as "07:40" before
   anything classifies it, and leaves alone any column that dates the report
   itself, because `parseDay` reads the serial and the period filter needs it.
+- **A column of bare digits is a rating only where a legend says so.**
+  "1 2 3 4 5" is one of the scales the tool knows, because the forms
+  store a rating as the digit. A count of people answers in the same
+  digits, so "E.1 How many polling staff members are present" was drawn
+  in the rating palette with 1 shaded as the worst answer on the slide,
+  beside "E.1.1 How many of the polling staff are female", which held a
+  0 and so was read as the count it is. `classify` now takes the digit
+  scale only where the legend names every digit in the column, and a
+  number the tool cannot name stays a number.
 - **A scored question wears the words from its own legend.** The forms put
   the key in a column of its own - "4=Very good 3=Good 2=Bad 1=Very bad" -
   and store the digit, so a rating chart read 1, 2, 3, 4 with the key
@@ -251,14 +260,20 @@ geography.
   one holding nine, and the columns are of reports rather than of
   answers, so NA is a segment and every column is full height - a
   composition, not the rate the findings table and the maps print. Every
-  column carries its own base in its name. Every panel's columns are
-  drawn against the same height, which is the whole point of the page:
-  a chart gives its legend and its category names the bottom of its own
-  box, so the legend is the slide's own - `addLegendRow` - and each
-  panel's box is as tall as the columns plus the band `labelBand` says
-  its names need, which leaves the columns the same height in all three
-  and lets the longer names run further down the slide. The rotation is
-  set rather than left to PowerPoint, which decides it per chart.
+  column carries its own base above it, as a figure of the slide's own,
+  because "Mansa Konko (1)" is half again as long as "Mansa Konko" and
+  the names are what decide how much of the page is left for the
+  columns. Every panel's columns are drawn against the same height,
+  which is the whole point of the page: a chart takes its legend and its
+  category names out of its own plot area, so the legend is the slide's
+  own - `addLegendRow` - and the plot area is stated rather than fitted,
+  `layout` with `layoutTarget` inner, the same rectangle in every panel
+  whatever the names below it do. Sizing each box as the columns plus
+  the band `labelBand` asks for came close and no closer: the room a
+  label gets is PowerPoint's own measurement of it. `labelBand` still
+  sets the rotation and reserves the room the names need under the plot,
+  generously, because a stated plot area will not grow and a name with
+  too little room is cut off - "Mansa Konko" was drawn as "Mansa K...".
 - **A section of questions asked the same way opens on one page.** Ten
   questions answered Yes or No are ten pages of two bars, and a reader
   who has to turn ten of them to find the one that stands out will not
@@ -363,11 +378,12 @@ geography.
   across a column. Constituency answers are resolved against the gazetteer so
   spelling variants collapse; unrecognised answers stay as written.
 - **Nothing on a slide is set below 18pt**, and a question title below 24pt.
-  Inside a chart the floor is `CHART_MIN`, two points lower, and a value
+  Inside a chart the floor is `CHART_MIN`, four points lower, and a value
   written on a mark is `LABEL_MIN`, two points lower again: a data label
   has only the width of the mark it is on, and at 18pt "100%" did not fit
-  a column of a 100% stacked chart, so PowerPoint drew nothing at all.
-  `typefloor.test.ts` enforces all three.
+  a column of a 100% stacked chart, so PowerPoint drew nothing at all,
+  and at 14pt it broke "11%" over two lines and set the per cent sign on
+  a line of its own. `typefloor.test.ts` enforces all three.
 - **A mean score is written to one decimal place.** `scoreLabel`, in the
   deck, on the dashboard, in the Word report and in its sentences. Two
   decimals said more than the scale knows: a mean of 3.44 out of 4 is

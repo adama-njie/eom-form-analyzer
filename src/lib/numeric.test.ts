@@ -132,3 +132,43 @@ describe('comparing a percentage across parties', () => {
     expect(p.byArea[0]!.mean).toBeCloseTo(17.5, 2);
   });
 });
+
+describe('a column of bare digits', () => {
+  /**
+   * The forms store a rating as its digit and spell the scale out in a
+   * legend column of their own, so "1 2 3 4 5" is one of the scales the
+   * tool knows. A count of people answers in the same digits.
+   */
+  const staff = (legend: boolean) => {
+    const header = legend
+      ? ['4=Very good 3=Good 2=Bad 1=Very bad', 'E.1 How many polling staff members are present',
+         'J.1 The overall conduct of the voting in this PS was']
+      : ['E.1 How many polling staff members are present',
+         'J.1 The overall conduct of the voting in this PS was'];
+    const rows = [['5', '4'], ['3', '3'], ['4', '4'], ['5', '2'], ['1', '3']].map((r) =>
+      legend ? ['', ...r] : r,
+    );
+    const table = toTable([header, ...rows]);
+    return buildDataset(table, inferSchema(table));
+  };
+
+  it('is a number where no legend says the digits are a scale', () => {
+    // "How many polling staff members are present" was drawn in the
+    // rating palette, with 1 shaded as the worst answer on the slide.
+    const ds = staff(false);
+    expect(ds.questions.find((x) => x.code === 'E.1')?.kind).toBe('numeric');
+  });
+
+  it('is a rating where the legend names every digit in it', () => {
+    const ds = staff(true);
+    const rating = ds.questions.find((x) => x.code === 'J.1')!;
+    expect(rating.kind).toBe('ordinal');
+    expect(rating.scale).toEqual(['Very bad', 'Bad', 'Good', 'Very good']);
+  });
+
+  it('leaves a count a count even on a form that has a legend', () => {
+    // The legend runs 1 to 4 and the staff counts reach 5, so nothing in
+    // the file names the answer "5".
+    expect(staff(true).questions.find((x) => x.code === 'E.1')?.kind).toBe('numeric');
+  });
+});

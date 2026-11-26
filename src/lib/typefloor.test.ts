@@ -24,7 +24,7 @@ describe('the type floor', () => {
     }
   });
 
-  it('sets nothing in a chart below 16pt, and no value on a mark below 14pt', () => {
+  it('sets nothing in a chart below 14pt, and no value on a mark below 12pt', () => {
     // A name beside a chart competes with the marks for the room; a value
     // written on a mark has only that mark's width, and PowerPoint drops
     // the ones that do not fit. See `CHART_MIN` and `LABEL_MIN`.

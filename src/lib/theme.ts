@@ -107,11 +107,13 @@ export const MIN = 18;
 /**
  * The smallest type on a chart.
  *
- * Two points under the floor the rest of the slide keeps to, and only
+ * Four points under the floor the rest of the slide keeps to, and only
  * inside a chart, where a name competes with the marks for the room: a
- * category name of two words at 18pt took the width the columns needed.
+ * category name of two words at 18pt took the width the columns needed,
+ * and at 16pt seven area names still crowded the page they are the
+ * point of.
  */
-export const CHART_MIN = 16;
+export const CHART_MIN = 14;
 
 /**
  * A value written on the mark itself.
@@ -119,12 +121,13 @@ export const CHART_MIN = 16;
  * Two points under the names around it. A data label has only the width
  * of the mark it is written on, and the mark is as wide as the share it
  * draws: at 18pt "100%" did not fit the column of a 100% stacked chart
- * and PowerPoint drew nothing at all. It is set in white on a filled
- * mark, which is the highest contrast on the slide, so it is still read
- * from the back of the room - and a figure that is drawn is worth more
- * than one set two points larger and dropped.
+ * and PowerPoint drew nothing at all, and at 14pt PowerPoint broke "11%"
+ * over two lines and set the per cent sign on its own. It is in white on
+ * a filled mark, which is the highest contrast on the slide, so it is
+ * still read from the back of the room - and a figure that is drawn is
+ * worth more than one set two points larger and dropped.
  */
-export const LABEL_MIN = 14;
+export const LABEL_MIN = 12;
 
 /**
  * Type sizes, in points.

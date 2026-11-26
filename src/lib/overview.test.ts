@@ -69,6 +69,27 @@ async function slides(coverage = false): Promise<string[]> {
   );
 }
 
+/** The deck's charts, which are parts of their own, not slide text. */
+async function charts(): Promise<string[]> {
+  const ds = form();
+  const deck = buildDeck(ds, undefined, {
+    selection: {
+      ...defaultSelection(ds, 'test'),
+      coverage: false,
+      ratings: false,
+      questions: exportableQuestions(ds).map(questionKey),
+    },
+    includeMaps: false,
+  });
+  const buf = (await deck.write({ outputType: 'nodebuffer' })) as Buffer;
+  const zip = await JSZip.loadAsync(buf);
+  return Promise.all(
+    Object.keys(zip.files)
+      .filter((f) => /ppt\/charts\/chart\d+\.xml$/.test(f))
+      .map((f) => zip.files[f]!.async('string')),
+  );
+}
+
 describe('the deck a section makes', () => {
   it('opens a section with the page that holds all of it', async () => {
     const texts = await slides();
@@ -230,6 +251,47 @@ describe('a question across the country', () => {
       ['Yes', 2, 100],
       ['No', 0, 0],
     ]);
+  });
+
+  it('writes the base above the column rather than into its name', () => {
+    /*
+     * "Mansa Konko (1)" is half again as long as "Mansa Konko", and the
+     * names are what decides how much of the slide is left for the
+     * columns. The figure is still on the page, over the column it
+     * belongs to.
+     */
+    const shares = sharesAcross(form(), q('F.1'))!;
+    expect(shares.panels[2]!.groups.map((g) => g.label)).toEqual([
+      'Banjul',
+      'Kanifing',
+      'Basse',
+    ]);
+    const wide = labelBand(shares.panels[2]!, 9);
+    expect(wide.rotate).toBe(0);
+  });
+
+  it('is on the page as its own figure over each column', async () => {
+    const texts = await slides();
+    const page = texts.find((x) => x.includes('F.1 Is the PS layout'))!;
+    // Six reports nationally, two in each of the three areas.
+    expect(page).toContain('<a:t>6</a:t>');
+    expect(page).toContain('<a:t>2</a:t>');
+    expect(page).not.toContain('National (6)');
+  });
+
+  it('sets the plot area by hand, so no panel loses height to its names', async () => {
+    /*
+     * Left to fit itself, a chart takes the room its category names need
+     * out of its own plot area, and the panel of turned area names drew
+     * columns shorter than the one headed National beside it. The plot
+     * area is therefore stated: the same rectangle in every panel,
+     * whatever the names below it do.
+     */
+    const manual = (await charts()).filter((x) => x.includes('<c:manualLayout>'));
+    expect(manual.length).toBeGreaterThanOrEqual(3);
+    const heights = new Set(manual.map((x) => /<c:h val="([\d.]+)"/.exec(x)![1]));
+    expect(heights.size).toBe(1);
+    expect(manual[0]).toContain('<c:layoutTarget val="inner" />');
   });
 
   it('is not drawn for the question that names the area itself', () => {
