@@ -3,20 +3,27 @@ import {
   analyse,
   coverage,
   displayCounts,
-  findings,
+  isInverted,
   meanLabel,
   rateByPlace,
   ratingOf,
   ratingQuestions,
   reportsByPlace,
+  sectionOverviews,
+  sharesAcross,
+  isTeamQuestion,
   stationTypeQuestion,
   stationsObserved,
+  teamQuestion,
+  teamReports,
   textValues,
   turnoutByHour,
   type Dataset,
   type GroupMean,
   type Percentage,
   type Rating,
+  type SectionOverview,
+  type TeamPanel,
 } from './analyse';
 import { wordCloudPng } from './chartImage';
 import { wordFrequencies, type WordCount } from './text';
@@ -41,14 +48,16 @@ import { drawFlag, euFlag, gambiaFlag } from './flags';
 import { AREA_WORDS, type Division } from './gambia';
 import { mapPng, pieMapPng } from './mapImage';
 import {
+  isAreaQuestion,
   isConstituencyQuestion,
+  mapKindFor,
   needsOwnSlide,
   selectedQuestions,
   slideBreakdown,
   exportFileName,
   type ExportSelection,
 } from './selection';
-import { NON_ANSWERS, type Question } from './schema';
+import { NON_ANSWERS, splitBase, type Question } from './schema';
 
 /**
  * Export the analysis as a PowerPoint deck.
@@ -180,7 +189,6 @@ export function buildDeck(
   });
 
   const cov = coverage(dataset, filter);
-  const probs = findings(dataset, filter, 8);
 
   const canDrawMaps =
     sel.maps && (options.includeMaps ?? true) && dataset.geo && typeof document !== 'undefined';
@@ -197,19 +205,18 @@ export function buildDeck(
    * presented. The overall assessments are section J, so they now sit
    * where section J sits, at the end.
    */
+  const questions = selectedQuestions(dataset, sel);
+  // The map of where the reports came from belongs with the question that
+  // asks where they came from, so it moves next to it when that question
+  // is in the deck and stays in the overview when it is not.
+  const areaAsked = questions.some((q) => isAreaQuestion(dataset, q));
+
   addTitleSlide(pptx, sel, dataset.division);
   if (sel.coverage) addCoverageSlide(pptx, dataset, cov, filter);
   if (sel.coverage) addTurnoutSlide(pptx, dataset, filter);
-  if (canDrawMaps) addMapSlide(pptx, dataset, filter);
+  if (canDrawMaps && !areaAsked) addMapSlide(pptx, dataset, filter);
 
-  addQuestionSlides(
-    pptx,
-    dataset,
-    selectedQuestions(dataset, sel),
-    filter,
-    canDrawMaps,
-    canDrawMaps && sel.findingsTable ? probs.slice(0, 3) : [],
-  );
+  addQuestionSlides(pptx, dataset, questions, filter, canDrawMaps);
 
   if (sel.ratings) addRatingsSlide(pptx, dataset, filter);
 
@@ -639,31 +646,55 @@ function addMapSlide(
   });
 }
 
-/** One finding, mapped. */
-function addFindingMapSlide(
+/**
+ * A yes/no question, shaded across the country.
+ *
+ * Every binary question gets one, not only the ranked findings: a rate per
+ * area is what a two-answer question has to say about the country, and
+ * pies of two slices are the one thing a pie map cannot draw. Which answer
+ * is shaded is the polarity `isInverted` knows - No on "Is the station
+ * accessible?", Yes on "Was there unrest?" - and a question with no known
+ * polarity is shaded on Yes in the ordinary blue rather than in the colour
+ * the deck uses for a problem.
+ */
+function addRateMapSlide(
   pptx: PptxGenJS,
   dataset: Dataset,
   filter: boolean[] | undefined,
-  f: ReturnType<typeof findings>[number],
+  planned: Planned,
 ): void {
+  const { q, b } = planned;
+  if (!dataset.geo || q.kind !== 'binary') return;
+  if (Object.keys(b.byArea).length < 3) return;
+  const inverted = isInverted(q.label);
+  const judged = inverted || JUDGED.test(q.label);
+  const label = inverted ? 'No' : 'Yes';
+  const hit = b.total.find((c) => c.label === label);
+  if (!hit || hit.n === 0) return;
+
   const s = pptx.addSlide({ masterName: 'BASE' });
   // The question is the title. It used to be the subtitle under "C.7 by
   // LGA", and then the sentence underneath the map opened by stating it a
   // second time, so the slide asked the same question twice and spent two
   // lines doing it.
-  const top = heading(s, `${f.question.code} ${f.question.label}`.trim());
+  const top = heading(
+    s,
+    `${q.code} ${q.label}`.trim(),
+    `Reports answering ${label}, as a share of those that answered.`,
+  );
   const img = mapPng(
-    rateByPlace(dataset, f.question, f.label, filter),
+    rateByPlace(dataset, q, label, filter),
     '%',
-    FLAG,
+    judged ? FLAG : ACCENT_DEEP,
     1400,
     dataset.division,
   );
   const w = CONTENT.w;
   const h = (w / img.width) * img.height;
+  if (top + h > PAD.bottom) return;
   s.addImage({
     data: `data:image/png;base64,${toBase64(img.data)}`,
-    ...place({ x: PAD.x, y: top, w, h }, 'finding map'),
+    ...place({ x: PAD.x, y: top, w, h }, 'rate map'),
   });
 }
 
@@ -759,6 +790,8 @@ interface Planned {
   areas: string[];
   /** Set for a prose question: the words to draw instead of a chart. */
   words?: WordCount[];
+  /** Set for the team question: one chart per team type. */
+  teams?: TeamPanel[];
   full: boolean;
 }
 
@@ -774,6 +807,22 @@ function plan(dataset: Dataset, q: Question, filter: boolean[] | undefined): Pla
     return { q, b, counts: [], parties: [], areas: [], words, full: true };
   }
   if (b.total.length === 0) return null;
+  /*
+   * Sixty teams on one axis is a wall; one chart per team type is a page
+   * that can be read. See `teamReports`.
+   *
+   * Every column the form prints the team number in is on that page, so
+   * the ones after the first draw nothing of their own rather than
+   * repeating the page or charting a fifth of the teams on a slide of
+   * their own.
+   */
+  if (isTeamQuestion(dataset, q)) {
+    const teams = teamReports(dataset, filter);
+    if (teams.length === 0) return null;
+    const first = teamQuestion(dataset);
+    if (first && first.columns[0] !== q.columns[0]) return null;
+    return { q, b, counts: [], parties: [], areas: [], teams, full: true };
+  }
   const { parties, areas } = slideBreakdown(q, b);
   return { q, b, counts: displayCounts(q, b), parties, areas, full: needsOwnSlide(q, b) };
 }
@@ -784,15 +833,29 @@ function addQuestionSlides(
   questions: Question[],
   filter: boolean[] | undefined,
   canDrawMaps = false,
-  /** The flagged questions worth a map, each drawn after its own slide. */
-  mapped: ReturnType<typeof findings> = [],
 ): void {
   const planned = questions
     .map((q) => plan(dataset, q, filter))
     .filter((x): x is Planned => x !== null);
 
+  // A section of questions asked the same way opens with all of them on
+  // one chart. See `sectionOverviews`.
+  const overviews = sectionOverviews(dataset, questions, filter);
+  const opened = new Set<string>();
+
   for (let i = 0; i < planned.length; ) {
     const first = planned[i]!;
+    if (first.q.section && !opened.has(first.q.section)) {
+      opened.add(first.q.section);
+      for (const o of overviews.filter((x) => x.section === first.q.section)) {
+        addSectionSlide(pptx, o);
+      }
+    }
+    if (first.teams) {
+      addTeamSlides(pptx, first.q, first.teams);
+      i += 1;
+      continue;
+    }
     const second = planned[i + 1];
     // Two share a slide only when neither needs the room.
     const pair = !first.full && second && !second.full ? second : undefined;
@@ -810,32 +873,268 @@ function addQuestionSlides(
       i += 1;
     }
 
-    // The same answers on the country, straight after the chart of them.
-    if (canDrawMaps) {
-      for (const p of drawn) {
-        addPieMapSlide(pptx, dataset, p);
-        const flagged = mapped.find((f) => f.question === p.q);
-        if (flagged) addFindingMapSlide(pptx, dataset, filter, flagged);
+    /*
+     * Then the map of the same answers, and then the shares behind it.
+     *
+     * Counts, geography, shares: the question's own chart says how many
+     * said what, the map says where, and the shares page is the one that
+     * bears exact comparison between places of different size. The map
+     * stays directly under the question, as the reference deck sets it,
+     * with the arithmetic on the page after. A question with nothing to
+     * add in one of the three draws no slide for it.
+     */
+    for (const p of drawn) {
+      if (canDrawMaps) {
+        const kind = mapKindFor(dataset, p.q, p.b);
+        if (kind === 'area') addMapSlide(pptx, dataset, filter);
+        else if (kind === 'rate') addRateMapSlide(pptx, dataset, filter, p);
+        else if (kind === 'pie') addPieMapSlide(pptx, dataset, p);
       }
+      addSharesSlide(pptx, dataset, p, filter);
     }
   }
 }
 
 /**
- * Whether a question is worth a pie map.
+ * A whole section of questions asked the same way, on one page.
  *
- * Two to five answers, because six slices of a pie the size of Banjul is a
- * pattern of colour rather than a chart, and at least three areas, because
- * a map of one pie is a pie. Binary questions are left out: a yes/no rate
- * is better shaded than sliced, and the ones that matter already get a
- * shaded map of their own from the findings section.
+ * One row per question, each row a full-width 100% stacked bar, so the
+ * section reads as one picture: the reference deck's "Section F" page,
+ * where the one question answered No on a third of reports stands out from
+ * nine answered No on a twentieth without a number being read.
  */
-function wantsPieMap(dataset: Dataset, planned: Planned): boolean {
-  if (!dataset.geo) return false;
-  if (planned.q.kind !== 'categorical' && planned.q.kind !== 'ordinal') return false;
-  const answers = planned.b.total.filter((c) => !NON_ANSWERS.has(c.label));
-  if (answers.length < 2 || answers.length > 5) return false;
-  return Object.keys(planned.b.byArea).length >= 3;
+function addSectionSlide(pptx: PptxGenJS, o: SectionOverview): void {
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  const top = heading(
+    s,
+    `Section ${o.section}`,
+    'Each bar is all of the reports that answered that question.',
+  );
+  const rows = topDown(o.rows);
+  // The polarity of ten questions at once is not one question's polarity,
+  // so the colours are the fixed ones: Yes light, No dark, NA grey, and a
+  // scale shaded along itself.
+  const colours = fillsFor(
+    o.answers.map((label) => ({ label })),
+    { judged: false, scale: o.rows[0]?.question.scale, perMark: true },
+  );
+
+  // The question text, at the one size the deck allows, in the width a
+  // category axis gets before PowerPoint starts dropping labels.
+  const names = rows.map(
+    (r) =>
+      fitText(
+        `${r.question.code} ${r.question.label}`.trim(),
+        5.6,
+        1,
+        TYPE.category,
+        TYPE.category,
+      ).text,
+  );
+
+  s.addChart(
+    pptx.ChartType.bar,
+    o.answers.map((label, i) => ({
+      name: label,
+      labels: names,
+      values: rows.map((r) => Math.round(r.counts[i]?.pct ?? 0)),
+    })),
+    {
+      ...place({ x: PAD.x, y: top, w: CONTENT.w, h: PAD.bottom - top }, 'section chart'),
+      ...BARE,
+      barDir: 'bar',
+      barGrouping: 'percentStacked',
+      barGapWidthPct: 40,
+      chartColors: colours,
+      showValue: true,
+      dataLabelPosition: 'ctr',
+      dataLabelColor: ON_FILL,
+      dataLabelFontSize: TYPE.dataLabel,
+      // Hide the zeros: a stacked bar labels every series on every row,
+      // including the answers nobody gave.
+      dataLabelFormatCode: '0"%";;;',
+      catAxisLabelFontSize: TYPE.category,
+      showLegend: true,
+      legendPos: 't',
+      legendFontSize: TYPE.legend,
+    },
+  );
+}
+
+/**
+ * One question's answers as shares: nationally, by station type, by area.
+ *
+ * The question's own slide counts the answers, which is what a briefing
+ * opens with; this is the page that bears comparison between places, since
+ * a count cannot be compared between an area holding eighty reports and
+ * one holding nine. Every column carries the reports behind it.
+ */
+function addSharesSlide(
+  pptx: PptxGenJS,
+  dataset: Dataset,
+  planned: Planned,
+  filter: boolean[] | undefined,
+): void {
+  const { q, b } = planned;
+  const shares = sharesAcross(dataset, q, filter, b);
+  if (!shares) return;
+
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  const top = heading(s, `${q.code} ${q.label}`.trim());
+  const colours = fillsFor(
+    shares.answers.map((label) => ({ label })),
+    { judged: JUDGED.test(q.label), scale: q.scale, perMark: true },
+  );
+
+  /*
+   * A panel is as wide as the columns in it.
+   *
+   * Given an equal share of the slide each, the national panel drew one
+   * column four inches wide beside eight areas drawn as slivers. The
+   * constant is the room the panel's own title and axis labels need
+   * whatever is in it.
+   */
+  const weights = shares.panels.map((p) => p.groups.length + 1.2);
+  const total = weights.reduce((a, w) => a + w, 0);
+  const free = CONTENT.w - PAD.gap * (shares.panels.length - 1);
+  const titleH = 0.56;
+
+  let x = PAD.x;
+  shares.panels.forEach((panel, i) => {
+    const w = (free * weights[i]!) / total;
+    s.addText(panel.title, {
+      ...place({ x, y: top, w, h: titleH }, 'shares title'),
+      fontSize: TYPE.chartTitleSmall, color: INK, fontFace: FONT,
+      align: 'center', valign: 'middle',
+    });
+    s.addChart(
+      pptx.ChartType.bar,
+      shares.answers.map((label, j) => ({
+        name: label,
+        // The base under every column: a share of nine reports and a share
+        // of eighty are the same height and not the same evidence.
+        labels: panel.groups.map((g) => `${g.label} (${g.n})`),
+        values: panel.groups.map((g) => Math.round(g.counts[j]?.pct ?? 0)),
+      })),
+      {
+        ...place(
+          { x, y: top + titleH, w, h: PAD.bottom - top - titleH },
+          `shares ${q.code} ${i}`,
+        ),
+        ...BARE,
+        barDir: 'col',
+        barGrouping: 'percentStacked',
+        barGapWidthPct: 40,
+        chartColors: colours,
+        showValue: true,
+        dataLabelPosition: 'ctr',
+        dataLabelColor: ON_FILL,
+        dataLabelFontSize: TYPE.dataLabel,
+        dataLabelFormatCode: '0"%";;;',
+        catAxisLabelFontSize: TYPE.category,
+        // One legend for the slide, under the widest panel, which is the
+        // last: repeating it three times spends the width the columns need.
+        showLegend: i === shares.panels.length - 1,
+        legendPos: 'b',
+        legendFontSize: TYPE.legend,
+      },
+    );
+    x += w + PAD.gap;
+  });
+}
+
+/**
+ * Every team, with the reports it filed, grouped by team type.
+ *
+ * The form asks for the team number once per team type, so the columns are
+ * the types and the answers in them are the teams. A chart per type puts
+ * each team beside the others doing the same job, which is the comparison
+ * worth making: a long-term team that filed nine reports beside one that
+ * filed none.
+ */
+/**
+ * The most teams one column of the page can show.
+ *
+ * A category name needs about 1.6 times its own type size of chart height
+ * before PowerPoint starts printing every other one - which on a chart of
+ * teams reads as teams that filed nothing - and what the page has to give
+ * is the slide's height less its heading and the column's own title.
+ */
+const TEAMS_PER_COLUMN = Math.floor((PAD.bottom - 1.55) / ((TYPE.category * 1.6) / 72));
+/** The most columns that fit across the slide with their names readable. */
+const COLUMNS_PER_SLIDE = 4;
+
+function addTeamSlides(pptx: PptxGenJS, q: Question, panels: TeamPanel[]): void {
+  /*
+   * A team type with forty teams runs down more than one column.
+   *
+   * Twenty bars is what a slide's height holds at 18pt, which is the
+   * smallest type this deck sets; the forty short-term teams of a real
+   * deployment would otherwise be drawn at six point or, worse, drawn with
+   * every other name missing, which reads as teams that filed nothing.
+   */
+  const chunks: TeamPanel[] = [];
+  for (const panel of panels) {
+    // Evenly: twenty-seven teams in columns of thirteen leaves a column
+    // holding one bar across the full width of it, and three columns of
+    // nine are the same teams drawn as a chart.
+    const columns = Math.max(1, Math.ceil(panel.counts.length / TEAMS_PER_COLUMN));
+    const size = Math.ceil(panel.counts.length / columns);
+    for (let i = 0; i < panel.counts.length; i += size) {
+      chunks.push({ label: panel.label, counts: panel.counts.slice(i, i + size) });
+    }
+  }
+
+  for (let i = 0; i < chunks.length; i += COLUMNS_PER_SLIDE) {
+    const page = chunks.slice(i, i + COLUMNS_PER_SLIDE);
+    const s = pptx.addSlide({ masterName: 'BASE' });
+    // The page is every team type, so its title is the question without
+    // the one type the first column happened to be headed with.
+    const title = `${q.code} ${splitBase(q.label)?.base ?? q.label}`.trim();
+    const top = heading(s, i === 0 ? title : `${title} (continued)`);
+    const titleH = 0.44;
+    const w = (CONTENT.w - PAD.gap * (page.length - 1)) / page.length;
+    // A column of two teams and a column of twenty, both given the full
+    // height, draw bars of very different thickness and the short one
+    // reads as a different unit. Every bar on the slide is the same depth
+    // instead, set by the longest column, and a short column is a short
+    // chart.
+    const most = Math.max(...page.map((p) => p.counts.length));
+    const barH = (PAD.bottom - top - titleH) / most;
+
+    page.forEach((panel, j) => {
+      const x = PAD.x + j * (w + PAD.gap);
+      s.addText(panel.label, {
+        ...place({ x, y: top, w, h: titleH }, 'team panel title'),
+        fontSize: TYPE.chartTitleSmall, color: INK, fontFace: FONT,
+        align: 'center', valign: 'middle',
+      });
+      s.addChart(
+        pptx.ChartType.bar,
+        [{
+          name: 'Reports',
+          labels: topDown(panel.counts.map((c) => c.label)),
+          values: topDown(panel.counts.map((c) => c.n)),
+        }],
+        {
+          ...place(
+            { x, y: top + titleH, w, h: panel.counts.length * barH + 0.1 },
+            `teams ${panel.label} ${j}`,
+          ),
+          ...BARE,
+          barDir: 'bar',
+          chartColors: [ACCENT_DEEP],
+          barGapWidthPct: 45,
+          showValue: true,
+          dataLabelPosition: 'outEnd',
+          dataLabelColor: MUTED,
+          dataLabelFontSize: TYPE.dataLabel,
+          catAxisLabelFontSize: TYPE.category,
+          showLegend: false,
+        },
+      );
+    });
+  }
 }
 
 /**
@@ -848,7 +1147,6 @@ function wantsPieMap(dataset: Dataset, planned: Planned): boolean {
  * area names in alphabetical order cannot.
  */
 function addPieMapSlide(pptx: PptxGenJS, dataset: Dataset, planned: Planned): void {
-  if (!wantsPieMap(dataset, planned)) return;
   const { q, b } = planned;
 
   const order = b.total.filter((c) => !NON_ANSWERS.has(c.label)).map((c) => c.label);

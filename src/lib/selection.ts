@@ -11,7 +11,16 @@
  */
 
 import type { Breakdown, Dataset } from './analyse';
-import { analyse, displayCounts, findings, isWordCloud } from './analyse';
+import {
+  analyse,
+  displayCounts,
+  findings,
+  isInverted,
+  isWordCloud,
+  sectionOverviews,
+  sharesAcross,
+} from './analyse';
+import { NON_ANSWERS } from './schema';
 import { columnWidth, fitsAt } from './layout';
 import { periodSlug, type Period } from './period';
 import type { Question } from './schema';
@@ -73,6 +82,16 @@ export function exportableQuestions(dataset: Dataset): Question[] {
     if (q.kind === 'text') return isConstituencyQuestion(dataset, q) || isWordCloud(dataset, q);
     return true;
   });
+}
+
+/**
+ * Whether this question is the one naming the area.
+ *
+ * It is charted like any other question - a bar per area - and then mapped,
+ * because the map is the one view of it that shows where the gaps are.
+ */
+export function isAreaQuestion(dataset: Dataset, q: Question): boolean {
+  return dataset.areaColumn !== null && q.columns.includes(dataset.areaColumn);
 }
 
 /** Whether this question is the one naming the constituency. */
@@ -157,6 +176,64 @@ export function countOwnSlides(
   filter?: boolean[],
 ): number {
   return questions.filter((q) => needsOwnSlide(q, analyse(dataset, q, filter))).length;
+}
+
+/**
+ * Which map, if any, follows a question.
+ *
+ * One decision in one place, because the dialogue has to count the pages
+ * the deck is about to draw and the deck has to draw them.
+ *
+ * - The question that names the area is followed by the map of where the
+ *   reports came from.
+ * - A yes/no question is shaded on the answer that matters: a rate per
+ *   area is all a two-answer question has to say about the country, and
+ *   pies of two slices are the one thing a pie map cannot draw.
+ * - Anything else with two to five answers gets a pie on each area. Six
+ *   slices of a pie the size of Banjul is a pattern of colour, not a
+ *   chart, and a map of one pie is a pie.
+ */
+export function mapKindFor(
+  dataset: Dataset,
+  q: Question,
+  b: Breakdown,
+): 'area' | 'rate' | 'pie' | null {
+  if (!dataset.geo) return null;
+  if (isAreaQuestion(dataset, q)) return 'area';
+  if (Object.keys(b.byArea).length < 3) return null;
+  if (q.kind === 'binary') {
+    const label = isInverted(q.label) ? 'No' : 'Yes';
+    const hit = b.total.find((c) => c.label === label);
+    return hit && hit.n > 0 ? 'rate' : null;
+  }
+  if (q.kind !== 'categorical' && q.kind !== 'ordinal') return null;
+  const answers = b.total.filter((c) => !NON_ANSWERS.has(c.label)).length;
+  return answers >= 2 && answers <= 5 ? 'pie' : null;
+}
+
+/**
+ * The pages the deck draws around the chosen questions.
+ *
+ * A section's own page, a question's shares across the country, and its
+ * map. The dialogue prints the number of slides an export will come to and
+ * an analyst trusts it, so it is counted from the same rules the deck
+ * draws from rather than guessed at.
+ */
+export function countExtraPages(
+  dataset: Dataset,
+  questions: Question[],
+  selection: ExportSelection,
+  filter?: boolean[],
+): number {
+  let n = sectionOverviews(dataset, questions, filter).length;
+  for (const q of questions) {
+    const b = analyse(dataset, q, filter);
+    if (sharesAcross(dataset, q, filter, b)) n += 1;
+    // The area's own map is the overview map, moved rather than added.
+    const kind = selection.maps ? mapKindFor(dataset, q, b) : null;
+    if (kind && kind !== 'area') n += 1;
+  }
+  return n;
 }
 
 export interface Preset {
@@ -300,14 +377,14 @@ export function estimateSlides(
   heavy = 0,
   /** True where the form supports a turnout curve, which adds a page. */
   turnout = false,
+  /** Pages that follow a question: its shares, its map. */
+  extras = 0,
 ): number {
   let n = 1; // cover
   if (selection.coverage) n += turnout ? 2 : 1;
-  if (selection.maps) n += 2;
-  // The ranked findings are no longer a slide of their own: the deck maps
-  // the three most frequent, each after the question it belongs to.
-  if (selection.findingsTable && selection.maps) n += 3;
+  if (selection.maps) n += 1;
   if (selection.ratings) n += 1;
   n += heavy + Math.ceil(Math.max(0, questionCount - heavy) / 2);
+  n += extras;
   return n;
 }

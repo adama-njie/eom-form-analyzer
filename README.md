@@ -438,6 +438,54 @@ eight; the ranking is still on the dashboard and in the Word report, which are r
 desk rather than presented in a room. A briefing deck that jumps about is one the
 presenter has to apologise for.
 
+**A question is read three ways, and the deck says so in three pages.** Its own page
+counts the answers - a ring or a bar chart, and the same answers stacked across the
+parties and the areas. The page after it is the map. The page after that is the shares:
+the nation, the kind of polling station, and then a column per area, each one a full-height
+100% stacked column. The third page exists because the first cannot do its job between
+places of different size: an area holding eighty reports and an area holding nine are not
+comparable as counts, and the bar that is twice as long is twice as long because twice as
+many observers were sent there. The columns are of reports rather than of answers, so NA
+is a segment of the column like any other and every column reaches the top; that is a
+composition, not the rate the findings table and the maps print, which is always of the
+reports that could answer. Each column carries the number of reports behind it in its own
+name, because a share of nine and a share of eighty are drawn at the same height and are
+not the same evidence.
+
+**Every yes/no question is now on a map.** It used to be the three questions the findings
+ranked highest, which meant a map was drawn only where a keyword in the question text had
+matched the tool's list of words that describe a problem. "Is there a long queue of voters
+waiting outside?" matches none of them, so the question a mission most wants to see
+geographically was the one question the deck never put on the map. Any question with two
+answers is now shaded across the areas - on No where No is the worrying answer, on Yes
+where Yes is - and anything with three to five answers gets a pie on each area, as before.
+The map of where the reports came from moved too: it is the answer to the question that
+asks which area the station was in, so it now follows that question instead of opening the
+deck ahead of section A.
+
+**A section of questions asked the same way opens on one page.** Section F asks ten
+questions and every one of them is answered Yes or No; as ten pages of two bars each, the
+one that stands out is found only by a reader who turns all ten. Read as one chart - a row
+per question, each row a full-width 100% stacked bar - the section states itself: a
+question answered No on a third of reports is visible beside nine answered No on a
+twentieth, without a number being read. The questions' own pages still follow. What makes
+two questions comparable is their scale and not the answers that happened to be given: a
+question answered No on every report has an answer set of one, and keyed on that it would
+be split onto a chart of its own - which is exactly the question a reader wants in the row
+above the others.
+
+**The teams are a chart per team type.** The form asks for the team number once per team
+type, so the columns are the types and the answers inside them are the teams. Read as one
+chart they are sixty bars in no order; read as a chart per type, with every team of that
+type beside the others doing the same job, the page answers what it is there for - which
+teams are reporting, and which have not reported at all. Thirteen teams to a column,
+because a category name needs about one and a half times its own type size of chart height
+before PowerPoint quietly starts printing every other one, and a team missing from the
+axis reads as a team that filed nothing. The columns are found in the headers rather than
+in one question: a form where two observers each write their own number fills two columns
+on one report, which is the signature of columns that only share a stem, and the tool
+leaves those apart on purpose - but they are still one page to the person reading it.
+
 **A decimal is a full stop, even on a German laptop.** Everything the tool writes itself
 is formatted as en-GB. A chart's data labels are not written by the tool at all: PowerPoint
 renders them when the file is opened, using the regional settings of the machine it is

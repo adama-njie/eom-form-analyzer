@@ -85,9 +85,13 @@ describe('the order of the deck', () => {
   it('opens with the overview and then follows the form', async () => {
     const texts = await slides();
     expect(at(texts, 'Coverage')).toBe(1);
-    // The map belongs to the overview; the questions start after it.
-    expect(at(texts, 'Reports by Local Government Area')).toBe(2);
-    expect(at(texts, 'A.0 Team type')).toBe(3);
+    expect(at(texts, 'A.0 Team type')).toBe(2);
+    // The map of where the reports came from belongs to the question that
+    // asks where they came from, so it follows B.1 rather than opening the
+    // deck ahead of section A.
+    expect(at(texts, 'Reports by Local Government Area')).toBe(
+      at(texts, 'B.1 Polling station administrative area') + 1,
+    );
     expect(at(texts, 'A.0 Team type')).toBeLessThan(at(texts, 'C.3 Did you observe'));
     expect(at(texts, 'C.3 Did you observe')).toBeLessThan(at(texts, 'J.1 The overall conduct'));
   });

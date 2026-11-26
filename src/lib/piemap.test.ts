@@ -85,20 +85,29 @@ describe('a question on the map', () => {
     stubCanvas();
     const texts = await slideTexts(true);
     const typePages = texts.filter((x) => x.includes('Type of event'));
-    // The chart, and then the country.
-    expect(typePages).toHaveLength(2);
+    // The chart, the country, and then the shares behind it.
+    expect(typePages).toHaveLength(3);
     expect(typePages[1]).toContain('<p:pic>');
   });
 
-  it('does not map a yes/no question, which is better shaded than sliced', async () => {
+  it('shades a yes/no question rather than slicing it', async () => {
+    // A pie of two slices says less than a shaded rate, and it used to be
+    // drawn only for the three questions the findings ranked highest, so
+    // "Is there a long queue outside?" - which no keyword matches - was
+    // the one question of its kind the deck never put on the map.
     stubCanvas();
     const texts = await slideTexts(true);
-    expect(texts.filter((x) => x.includes('Was a candidate present'))).toHaveLength(1);
+    const pages = texts.filter((x) => x.includes('Was a candidate present'));
+    expect(pages).toHaveLength(3);
+    expect(pages[1]).toContain('Reports answering Yes');
+    expect(pages[1]).toContain('<p:pic>');
   });
 
   it('is left out when maps are turned off', async () => {
     stubCanvas();
     const texts = await slideTexts(false);
-    expect(texts.filter((x) => x.includes('Type of event'))).toHaveLength(1);
+    // The chart and its shares, and nothing with a picture on it.
+    expect(texts.filter((x) => x.includes('Type of event'))).toHaveLength(2);
+    expect(texts.some((x) => x.includes('<p:pic>'))).toBe(false);
   });
 });

@@ -301,7 +301,7 @@ const META_HEADERS = /^(source|username|date|submitted|timestamp|id)$/i;
  * once: the form lays out a separate column per area, and each report fills
  * exactly one of them.
  */
-function splitBase(header: string): { base: string; suffix: string } | null {
+export function splitBase(header: string): { base: string; suffix: string } | null {
   const m = /^(.*\S)\s+[-\u2013\u2014]\s+(\S[^-\u2013\u2014]*)$/.exec(header);
   if (!m) return null;
   return { base: m[1]!.trim(), suffix: m[2]!.trim() };

@@ -3,6 +3,7 @@ import type { Dataset } from '@/lib/analyse';
 import { findings, turnoutByHour } from '@/lib/analyse';
 import {
   PRESETS,
+  countExtraPages,
   countOwnSlides,
   estimateSlides,
   exportableQuestions,
@@ -102,7 +103,19 @@ export default function ExportDialog({
     () => countOwnSlides(dataset, selectedQuestions(dataset, sel)),
     [dataset, sel],
   );
-  const slides = estimateSlides(sel, chosen.size, heavy, turnoutByHour(dataset) !== null);
+  // The section pages, the shares pages and the maps that follow the
+  // questions. See `countExtraPages`.
+  const extras = useMemo(
+    () => countExtraPages(dataset, selectedQuestions(dataset, sel), sel),
+    [dataset, sel],
+  );
+  const slides = estimateSlides(
+    sel,
+    chosen.size,
+    heavy,
+    turnoutByHour(dataset) !== null,
+    extras,
+  );
   const nothingChosen =
     !sel.coverage && !sel.maps && !sel.findingsTable && !sel.ratings && chosen.size === 0;
 

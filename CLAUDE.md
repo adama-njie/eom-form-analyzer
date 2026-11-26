@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 231 tests
+npm test           # vitest, 243 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 188 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 200 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -201,13 +201,58 @@ geography.
   `ratingOf`, so the dashboard shows the same ones. "Constituencies" is
   shown only where the form asks for one; it used to read "0 / 53" on a
   form that never asks, which says the deployment reached none of them.
-- **The deck reads in the form's own order.** An overview first - coverage,
-  turnout, where the reports came from - and then section A through to the
-  end, with each question's pie map or finding map directly after the
-  question it maps and the overall assessments last, because they are
-  section J. There is no ranked-findings slide: it put C.7 and F.6 on page
-  four, before section A had been reached, and the ranking is on the
-  dashboard and in the Word report, which are read rather than presented.
+- **The deck reads in the form's own order.** An overview first -
+  coverage and turnout - and then section A through to the end, with the
+  overall assessments last, because they are section J. There is no
+  ranked-findings slide: it put C.7 and F.6 on page four, before section A
+  had been reached, and the ranking is on the dashboard and in the Word
+  report, which are read rather than presented.
+- **A question runs to three pages: counts, geography, shares.** Its own
+  slide counts the answers, the map says where, and the shares page is
+  the one that bears comparison between places. Each is drawn only where
+  it has something to add, so most questions are two pages and some are
+  one. The order is fixed in `addQuestionSlides` and the pages that
+  follow a question are counted for the dialogue by `countExtraPages`,
+  from the same rules - `mapKindFor` and `sharesAcross` - that draw them.
+- **Which map a question gets is `mapKindFor`'s decision, and only its.**
+  The question naming the area is followed by the map of where the
+  reports came from, which is why that map is no longer in the overview;
+  a yes/no question is shaded on the answer that matters, which
+  `isInverted` knows; anything else with two to five answers gets a pie on
+  each area. Every binary question is mapped, not only the three the
+  findings ranked highest: "Is there a long queue outside?" matches no
+  problem keyword, so the one question a reader most wants on a map was
+  the one question never put there.
+- **A question's shares are the nation, the kind of station, and each
+  area, as 100% stacked columns.** `sharesAcross`, drawn by
+  `addSharesSlide`, which is the reference deck's second page for a
+  question. Counts cannot be compared between an area holding eighty
+  reports and one holding nine, and the columns are of reports rather
+  than of answers, so NA is a segment and every column is full height - a
+  composition, not the rate the findings table and the maps print. Every
+  column carries its own base in its name.
+- **A section of questions asked the same way opens on one page.** Ten
+  questions answered Yes or No are ten pages of two bars, and a reader
+  who has to turn ten of them to find the one that stands out will not
+  find it; read as one chart - a row per question, each row a full-width
+  100% stacked bar - the section states itself. `sectionOverviews` groups
+  by the scale rather than by the answers that were given, because a
+  question answered No on every report has an answer set of one and would
+  otherwise be split onto a page of its own, which is precisely the
+  question worth seeing beside the others. Twelve rows to a page, then
+  the section continues on another.
+- **The teams are a chart per team type.** The form asks for the team
+  number once per team type, so the columns are the types and the answers
+  in them are the teams: sixty bars on one axis is a wall, and the
+  comparison worth drawing is each team beside the others doing the same
+  job. `teamColumns` reads those columns from the headers rather than
+  from one question, because a report that fills two of them - a team of
+  two observers writing both their numbers - makes `splitBase` leave them
+  apart, correctly, and they are still one page to a reader. Thirteen
+  teams to a column, because a category name needs about 1.6 times its
+  type size of chart height before PowerPoint starts printing every other
+  one, and a team missing from the axis reads as a team that filed
+  nothing.
 - **A decimal is a full stop.** Everything this tool writes itself is
   formatted `en-GB`, and a chart's data labels - which PowerPoint renders
   on opening, in the regional settings of the machine it is opened on -
@@ -254,10 +299,11 @@ geography.
   adds the period where one is filtered, then the date. The title starts
   as the form's own name from the sheet (`defaultTitle`), because it is
   printed on a cover as well as on a file.
-- **Maps carry a key and no prose.** Title, picture, key. A categorical or
-  ordinal question with two to five answers and at least three areas also gets
-  a pie map after its own slide, with the pies sized by report count and
-  nudged apart where they would overlap.
+- **Maps carry a key and no prose.** Title, picture, key - and, on a
+  shaded map, the one line saying which answer is shaded and what the
+  share is of, which is the unit and not a sentence about the map. A pie
+  map's pies are sized by report count and nudged apart where they would
+  overlap.
 - **An export says which period it covers.** The header offers all period /
   campaign period / before it, and only when the file straddles the start.
   Reports are placed by the date of the event where the form asks for one

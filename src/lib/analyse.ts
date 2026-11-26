@@ -7,6 +7,7 @@
 
 import {
   ALL_CONSTITUENCIES,
+  AREA_WORDS,
   CENTRAL_RIVER_UNIT,
   LGAS,
   TOTAL_REGISTERED_2026,
@@ -24,6 +25,7 @@ import {
   clean,
   isBlank,
   parseCode,
+  splitBase,
   type Question,
   type Table,
 } from './schema';
@@ -1531,6 +1533,331 @@ export function stationsObserved(dataset: Dataset, rowFilter?: boolean[]): numbe
     if (v) seen.add(v.toLowerCase());
   });
   return seen.size > 0 ? seen.size : null;
+}
+
+/* ------------------------------------------------------------------ */
+/* The same question, across the country                               */
+/* ------------------------------------------------------------------ */
+
+/** One column of a 100% stacked chart: a group, and how it answered. */
+export interface ShareGroup {
+  label: string;
+  /** Reports behind the column, NA included: a column is of reports. */
+  n: number;
+  /** One entry per answer, in the chart's order, zeros included. */
+  counts: Count[];
+}
+
+/** One chart of such columns. */
+export interface SharePanel {
+  title: string;
+  groups: ShareGroup[];
+}
+
+/**
+ * One question's answers as shares: nationally, and across the country.
+ *
+ * The question's own slide counts the answers; this says what proportion
+ * of each place answered which way, which is the only form in which two
+ * places of very different size can be compared at a glance. Banjul
+ * answering No eleven times and Basse answering No four is a bar twice as
+ * long for Banjul and tells a reader nothing about either place.
+ *
+ * The columns are of reports rather than of answers, so NA is a segment
+ * like any other and every column is full height. That is not the rate
+ * the findings table and the maps print, which is of the reports that
+ * could answer; a composition and a rate are different figures and this
+ * one says so by charting NA rather than dropping it.
+ */
+export interface Shares {
+  /** The answers, in the order every panel stacks them. */
+  answers: string[];
+  panels: SharePanel[];
+}
+
+/**
+ * The answers to one question, split by the answers to another.
+ *
+ * Only used for the station type, which describes the place rather than
+ * the day, so no banding or gazetteer resolution is wanted: the values go
+ * in as the form stores them. The area and the party, which every question
+ * is broken down by, are `analyse`'s own work.
+ */
+export function countsBy(
+  dataset: Dataset,
+  question: Question,
+  by: Question,
+  order: string[],
+  rowFilter?: boolean[],
+): ShareGroup[] {
+  const per = new Map<string, Map<string, number>>();
+  dataset.table.rows.forEach((row, i) => {
+    if (rowFilter && !rowFilter[i]) return;
+    const key = answersFor(by, row)[0];
+    if (!key || NON_ANSWERS.has(key)) return;
+    const answers = answersFor(question, row);
+    if (answers.length === 0) return;
+    const m = per.get(key) ?? new Map<string, number>();
+    for (const a of answers) m.set(a, (m.get(a) ?? 0) + 1);
+    per.set(key, m);
+  });
+
+  // Commonest kind of station first, which is the order its own chart on
+  // the coverage page puts it in.
+  return [...per.entries()]
+    .map(([label, m]) => ({ label, counts: toCounts(m, order) }))
+    .sort((a, b) => sumCounts(b.counts) - sumCounts(a.counts))
+    .map((g) => ({ label: g.label, n: sumCounts(g.counts), counts: g.counts }));
+}
+
+function sumCounts(counts: Count[]): number {
+  return counts.reduce((s, c) => s + c.n, 0);
+}
+
+/** The minimum places worth a chart of their own: two is a comparison. */
+const MIN_SHARE_GROUPS = 3;
+
+export function sharesAcross(
+  dataset: Dataset,
+  question: Question,
+  rowFilter?: boolean[],
+  breakdown?: Breakdown,
+): Shares | null {
+  if (!['binary', 'categorical', 'ordinal'].includes(question.kind)) return null;
+  const b = breakdown ?? analyse(dataset, question, rowFilter);
+  const counts = displayCounts(question, b);
+  // Six colours stacked in a column is a pattern rather than a chart, and
+  // one answer is not a composition.
+  if (counts.length < 2 || counts.length > 5) return null;
+  const places = dataset.groups.filter((g) => b.byArea[g]);
+  if (places.length < MIN_SHARE_GROUPS) return null;
+
+  const answers = counts.map((c) => c.label);
+  /** Every answer in every column, so a place that never said No still has a No. */
+  const fill = (source: Count[]): Count[] =>
+    answers.map(
+      (label) => source.find((c) => c.label === label) ?? { label, n: 0, pct: 0 },
+    );
+
+  const panels: SharePanel[] = [
+    {
+      title: 'National',
+      groups: [{ label: 'National', n: sumCounts(counts), counts: fill(counts) }],
+    },
+  ];
+
+  /*
+   * By the kind of place, where the form asks what kind of place it is.
+   *
+   * A rural station and an urban one are not the same observation, and the
+   * reference deck splits every question of this shape that way. It is
+   * left out of the question's own breakdown, which has the area and the
+   * party to fit already.
+   */
+  const type = stationTypeQuestion(dataset);
+  if (type && type.columns[0] !== question.columns[0]) {
+    const split = countsBy(dataset, question, type, answers, rowFilter);
+    if (split.length >= 2) {
+      panels.push({
+        title: 'By station type',
+        groups: split.map((g) => ({ ...g, counts: fill(g.counts) })),
+      });
+    }
+  }
+
+  panels.push({
+    title: dataset.geo ? `By ${AREA_WORDS[dataset.division].one}` : 'By area',
+    groups: places.map((place) => ({
+      label: place,
+      n: sumCounts(b.byArea[place]!),
+      counts: fill(b.byArea[place]!),
+    })),
+  });
+
+  return { answers, panels };
+}
+
+/* ------------------------------------------------------------------ */
+/* A section, on one page                                              */
+/* ------------------------------------------------------------------ */
+
+/** One question's answers, as a row of a section's chart. */
+export interface SectionRow {
+  question: Question;
+  /** One entry per answer, in the section's order, zeros included. */
+  counts: Count[];
+  /** Reports behind the row, NA included. */
+  n: number;
+}
+
+/**
+ * A whole section of questions asked the same way, on one page.
+ *
+ * Ten questions answered Yes or No are ten pages of two bars each, and a
+ * reader who has to turn ten pages to learn that one of them stands out
+ * will not find it. Read as one chart - a row per question, each row a
+ * full-width 100% stacked bar - the section states itself: F.6 at 35% is
+ * visible beside nine questions above 89% without reading a number.
+ *
+ * The questions' own pages still follow, with their counts and their
+ * breakdowns; this is the section's first page, not a replacement for them.
+ */
+export interface SectionOverview {
+  /** Section letter, as the form's codes give it. */
+  section: string;
+  answers: string[];
+  rows: SectionRow[];
+}
+
+/**
+ * What makes two questions comparable on one chart.
+ *
+ * Their scale, not the answers that happened to be given. A question
+ * answered No on every report has only one answer in its breakdown, and
+ * keyed on that it would be split off onto a chart of its own - which is
+ * precisely the question a reader most wants to see in the row above the
+ * others.
+ */
+function scaleKey(q: Question): string | null {
+  if (q.scale && q.scale.length > 1) return q.scale.join('\u0001');
+  if (q.kind === 'binary') return 'binary';
+  return null;
+}
+
+/** The most rows one chart is given before the section runs to a second page. */
+const SECTION_ROWS = 12;
+
+export function sectionOverviews(
+  dataset: Dataset,
+  questions: Question[],
+  rowFilter?: boolean[],
+): SectionOverview[] {
+  const groups = new Map<string, { q: Question; b: Breakdown }[]>();
+  for (const q of questions) {
+    const key = scaleKey(q);
+    if (!key || !q.section) continue;
+    const b = analyse(dataset, q, rowFilter);
+    if (b.total.length === 0) continue;
+    const id = `${q.section}\u0001${key}`;
+    groups.set(id, [...(groups.get(id) ?? []), { q, b }]);
+  }
+
+  const out: SectionOverview[] = [];
+  for (const [id, members] of groups) {
+    // Two rows is a pair of charts that each had room to say more.
+    if (members.length < 3) continue;
+    const section = id.split('\u0001')[0]!;
+    const scale = members[0]!.q.scale;
+    const answers = [
+      ...(scale && scale.length > 1 ? scale : ['Yes', 'No']),
+      // NA is a segment here as everywhere, and last.
+      ...[...NON_ANSWERS].filter((na) =>
+        members.some((m) => m.b.total.some((c) => c.label === na && c.n > 0)),
+      ),
+    ];
+
+    for (let i = 0; i < members.length; i += SECTION_ROWS) {
+      out.push({
+        section,
+        answers,
+        rows: members.slice(i, i + SECTION_ROWS).map(({ q, b }) => ({
+          question: q,
+          n: b.total.reduce((s, c) => s + c.n, 0),
+          counts: answers.map(
+            (label) => b.total.find((c) => c.label === label) ?? { label, n: 0, pct: 0 },
+          ),
+        })),
+      });
+    }
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------------ */
+/* Who filed the reports                                               */
+/* ------------------------------------------------------------------ */
+
+/** One team type, and the reports each of its teams filed. */
+export interface TeamPanel {
+  /** The column's own heading: the team type it was printed for. */
+  label: string;
+  counts: Count[];
+}
+
+/** Whether a question is one of the columns naming the team. */
+function namesATeam(q: Question): boolean {
+  return /\bteam\b/i.test(q.label) && /\b(number|no|id|code)\b/i.test(q.label);
+}
+
+/**
+ * The question naming the team that filed the report.
+ *
+ * The form asks it once per team type - "A.1 Team number - LTO" through
+ * "- CT" - so the columns are the team types and the answers inside them
+ * are the teams themselves. Where the form prints it in several columns
+ * this is the first of them, and the page it draws covers them all.
+ */
+export function teamQuestion(dataset: Dataset): Question | null {
+  return dataset.questions.find(namesATeam) ?? null;
+}
+
+/** Whether this question is one of the columns that page is drawn from. */
+export function isTeamQuestion(dataset: Dataset, q: Question): boolean {
+  const first = teamQuestion(dataset);
+  return first !== null && namesATeam(q) && q.code === first.code;
+}
+
+/**
+ * Every column the form printed the team number in, with its team type.
+ *
+ * Read from the headers rather than from one question, because the tool
+ * does not always read these columns as one question: a report that fills
+ * two of them - as a form does where a team of two observers writes both
+ * their numbers - is the signature of columns that only share a stem, and
+ * `splitBase` leaves those apart on purpose. They are still the same
+ * question to a reader, and still belong on one page.
+ */
+export function teamColumns(dataset: Dataset): { col: number; label: string }[] {
+  const first = teamQuestion(dataset);
+  if (!first) return [];
+  const out: { col: number; label: string }[] = [];
+  for (const q of dataset.questions) {
+    if (q.code !== first.code || !namesATeam(q)) continue;
+    const labels = q.columnLabels ?? [];
+    q.columns.forEach((col, i) => {
+      const suffix = splitBase(dataset.table.headers[col] ?? '')?.suffix;
+      out.push({ col, label: labels[i] ?? suffix ?? q.label });
+    });
+  }
+  return out.sort((a, b) => a.col - b.col);
+}
+
+/**
+ * Every team, with the reports it filed, grouped by team type.
+ *
+ * Read as one chart the teams are sixty bars with no order to them; read
+ * as a chart per team type, each team beside the others doing the same
+ * job, the chart answers the question it is there for - which teams are
+ * reporting, and which have not reported at all.
+ */
+export function teamReports(dataset: Dataset, rowFilter?: boolean[]): TeamPanel[] {
+  return teamColumns(dataset)
+    .map(({ col, label }) => {
+      const tally = new Map<string, number>();
+      dataset.table.rows.forEach((row, r) => {
+        if (rowFilter && !rowFilter[r]) return;
+        const v = clean(row[col] ?? '');
+        if (isBlank(v) || NON_ANSWERS.has(v)) return;
+        tally.set(v, (tally.get(v) ?? 0) + 1);
+      });
+      const counts = [...tally.entries()]
+        // Team 2 after team 1 and before team 10: a team's name is an
+        // identifier, and sorting it as text puts "A.10" above "A.2".
+        .sort((a, b) => a[0].localeCompare(b[0], 'en', { numeric: true }))
+        .map(([label, n]) => ({ label, n, pct: 0 }));
+      return { label, counts };
+    })
+    .filter((p) => p.counts.length > 0);
 }
 
 /* ------------------------------------------------------------------ */
