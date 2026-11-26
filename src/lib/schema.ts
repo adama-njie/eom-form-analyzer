@@ -535,7 +535,7 @@ export function inferSchema(table: Table): Question[] {
     i += 1;
   }
 
-  return questions;
+  return nestFollowUps(questions);
 }
 
 /**
@@ -553,5 +553,37 @@ export function nestSubItems(questions: Question[]): Question[] {
       out.push(q);
     }
   }
+  return out;
+}
+
+/**
+ * A follow-up sits with the question it follows up.
+ *
+ * "F.7.1 If Yes, please specify" is a block of columns, and this export
+ * writes it after F.8: the deck drew F.7, F.8 and then went back for
+ * F.7.1, so a reader met the answers without the question they answer.
+ * The form's own numbering says where it belongs, so a question whose
+ * code is another question's code with a part added is moved to
+ * directly after it, and everything else keeps the order the file has.
+ */
+export function nestFollowUps(questions: Question[]): Question[] {
+  const byCode = new Map<string, Question>();
+  for (const q of questions) if (q.code && !byCode.has(q.code)) byCode.set(q.code, q);
+
+  const children = new Map<Question, Question[]>();
+  const roots: Question[] = [];
+  for (const q of questions) {
+    const cut = q.code.lastIndexOf('.');
+    const parent = cut > 1 ? byCode.get(q.code.slice(0, cut)) : undefined;
+    if (parent && parent !== q) children.set(parent, [...(children.get(parent) ?? []), q]);
+    else roots.push(q);
+  }
+
+  const out: Question[] = [];
+  const emit = (q: Question): void => {
+    out.push(q);
+    for (const child of children.get(q) ?? []) emit(child);
+  };
+  roots.forEach(emit);
   return out;
 }

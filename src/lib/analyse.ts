@@ -109,14 +109,14 @@ export interface Percentage {
 /**
  * A mean percentage, written for a reader.
  *
- * Whole numbers, because the estimates behind them are whole numbers -
- * except where the figure is small, which rounding destroys: B.10
- * averages 0.54%, and "0%" says nobody when several reports said
- * somebody.
+ * Whole numbers, because the estimates behind them are whole numbers,
+ * and no decimals anywhere a percentage is written. A figure too small
+ * to round to one is written "<1" rather than "0": B.10 averages
+ * 0.54%, and "0%" says nobody when several reports said somebody.
  */
 export function meanLabel(value: number): string {
-  const tenth = Math.round(value * 10) / 10;
-  return value < 10 && !Number.isInteger(tenth) ? tenth.toFixed(1) : String(Math.round(value));
+  if (value > 0 && Math.round(value) === 0) return '<1';
+  return String(Math.round(value));
 }
 
 /**
@@ -1775,6 +1775,18 @@ export function sectionOverviews(
   for (const q of questions) {
     const key = scaleKey(q);
     if (!key || !q.section) continue;
+    /*
+     * The section's own questions, not its follow-ups.
+     *
+     * A page headed "Section E" that opens on E.1.2 and then jumps to
+     * E.4 is not the section: it is three of its nine questions, and a
+     * reader looking for E.1 on it does not find it. A follow-up is
+     * asked only of the reports whose parent answer led to it, so its
+     * bar rests on a different base from the bars around it as well.
+     * Those questions keep their own pages, after the question they
+     * follow.
+     */
+    if (q.code.split('.').length !== 2) continue;
     const b = analyse(dataset, q, rowFilter);
     if (b.total.length === 0) continue;
     const id = `${q.section}\u0001${key}`;

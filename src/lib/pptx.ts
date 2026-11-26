@@ -368,7 +368,7 @@ function addCoverageSlide(
   filter: boolean[] | undefined,
 ): void {
   const s = pptx.addSlide({ masterName: 'BASE' });
-  const top = heading(s, 'Coverage', 'What was observed, and where.');
+  const top = heading(s, 'Coverage');
 
   /*
    * The figures a briefing opens with, as the reference's own front page
@@ -998,11 +998,7 @@ function addQuestionSlides(
  */
 function addSectionSlide(pptx: PptxGenJS, o: SectionOverview): void {
   const s = pptx.addSlide({ masterName: 'BASE' });
-  const top = heading(
-    s,
-    `Section ${o.section}`,
-    'Each bar is all of the reports that answered that question.',
-  );
+  const top = heading(s, `Section ${o.section}`);
   const rows = topDown(o.rows);
   // The polarity of ten questions at once is not one question's polarity,
   // so the colours are the fixed ones: Yes light, No dark, NA grey, and a
@@ -1062,11 +1058,7 @@ function addSharesSlide(pptx: PptxGenJS, planned: Planned): void {
   if (!shares) return;
 
   const s = pptx.addSlide({ masterName: 'BASE' });
-  const top = heading(
-    s,
-    `${q.code} ${q.label}`.trim(),
-    'Each column is the reports that answered it, and the figure above the column is how many.',
-  );
+  const top = heading(s, `${q.code} ${q.label}`.trim());
   const colours = fillsFor(
     shares.answers.map((label) => ({ label })),
     { judged: JUDGED.test(q.label), scale: q.scale, perMark: true },
@@ -1216,7 +1208,16 @@ export function labelBand(panel: SharePanel, w: number): { height: number; rotat
    * given more - "Mansa Konko" was drawn as "Mansa K...".
    */
   const textW = (longest * pt * 0.58) / 72;
-  if (textW <= w / panel.groups.length) return { height: line, rotate: 0 };
+  /*
+   * A name sits level only with room to spare on either side of it, and
+   * is given two lines of band rather than one: PowerPoint puts a gap
+   * between the plot area and the labels, and with the plot area stated
+   * by hand there is nothing to push the names down into - "National"
+   * and "Mansa Konko" were drawn with their descenders cut off at the
+   * foot of the chart, and the names either side of "Mansa Konko" were
+   * touching it.
+   */
+  if (textW * 1.2 <= w / panel.groups.length) return { height: line * 2, rotate: 0 };
   return { height: textW * Math.SQRT1_2 + line, rotate: -45 };
 }
 
@@ -1616,7 +1617,7 @@ function drawPercentage(
         valAxisMinVal: 0,
         showValue: true,
         dataLabelPosition: 'outEnd',
-        dataLabelFormatCode: fine ? `${DECIMAL}0.0"%"` : '0"%"',
+        dataLabelFormatCode: '0"%"',
         dataLabelColor: MUTED,
         dataLabelFontSize: TYPE.dataLabel,
         catAxisLabelFontSize: TYPE.category,
@@ -1695,7 +1696,7 @@ function drawAnswerChart(
    */
   if (q.kind === 'multi' && b.reports > 0) {
     const named = counts.map((c) => `${c.label} (${c.n})`);
-    const share = counts.map((c) => Math.round((c.n / b.reports) * 1000) / 10);
+    const share = counts.map((c) => Math.round((c.n / b.reports) * 100));
     slide.addChart(
       pptx.ChartType.bar,
       [{ name: 'Share of reports', labels: topDown(named), values: topDown(share) }],
@@ -1705,9 +1706,7 @@ function drawAnswerChart(
         barDir: 'bar', chartColors: topDown(colours), barGapWidthPct: 55,
         showValue: true, dataLabelPosition: 'outEnd',
         dataLabelColor: MUTED, dataLabelFontSize: TYPE.dataLabel,
-        // The locale prefix, as everywhere a chart label carries a
-        // decimal: PowerPoint writes these as the file is opened.
-        dataLabelFormatCode: `${DECIMAL}0.0"%"`,
+        dataLabelFormatCode: '0"%"',
         catAxisLabelFontSize: TYPE.category,
         showTitle: true,
         title: `Share of all ${b.reports} reports. The number ticking each is in brackets.`,

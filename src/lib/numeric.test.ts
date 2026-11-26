@@ -96,12 +96,14 @@ describe('writing an average out', () => {
     expect(meanLabel(50)).toBe('50');
   });
 
-  it('keeps a decimal place where rounding would wipe the figure out', () => {
+  it('writes a figure too small to round as under one, never as nought', () => {
     // B.10, estimated % of disabled participants, runs at well under 1%.
-    // "0%" says nobody was there when several reports said somebody was.
-    expect(meanLabel(0.54)).toBe('0.5');
-    expect(meanLabel(2.25)).toBe('2.3');
-    expect(meanLabel(3)).toBe('3');
+    // "0%" says nobody was there when several reports said somebody was,
+    // and a percentage carries no decimal anywhere this tool writes one.
+    expect(meanLabel(0.54)).toBe('1');
+    expect(meanLabel(0.2)).toBe('<1');
+    expect(meanLabel(0)).toBe('0');
+    expect(meanLabel(2.25)).toBe('2');
   });
 });
 

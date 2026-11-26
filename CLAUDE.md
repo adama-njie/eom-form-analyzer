@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 262 tests
+npm test           # vitest, 264 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 219 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 221 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -275,7 +275,13 @@ geography.
   column carries its own base above it, as a figure of the slide's own,
   because "Mansa Konko (1)" is half again as long as "Mansa Konko" and
   the names are what decide how much of the page is left for the
-  columns. Every panel's columns are drawn against the same height,
+  columns, and there is no line under the heading explaining the page:
+  a slide that describes its own chart spends on prose the room the
+  names below the chart need, and the names were being cut off at the
+  foot of it. The sub-line is kept only where it states a unit - which
+  answer a map shades, what a turnout figure is a share of, what a mean
+  is out of - because a figure whose unit is not written says more than
+  the data supports. Every panel's columns are drawn against the same height,
   which is the whole point of the page: a chart takes its legend and its
   category names out of its own plot area, so the legend is the slide's
   own - `addLegendRow` - and the plot area is stated rather than fitted,
@@ -286,6 +292,20 @@ geography.
   sets the rotation and reserves the room the names need under the plot,
   generously, because a stated plot area will not grow and a name with
   too little room is cut off - "Mansa Konko" was drawn as "Mansa K...".
+- **A section's page is the section's own questions, not its
+  follow-ups.** `sectionOverviews` takes only the top-level codes -
+  E.4, not E.4.1. A page headed "Section E" that opened on E.1.2 and
+  jumped to E.4 was three of the section's nine questions, and a reader
+  looking for E.1 on it did not find it; a follow-up is also asked only
+  of the reports whose parent answer led to it, so its bar rests on a
+  different base from the bars around it. Follow-ups keep their own
+  pages.
+- **A follow-up follows the question it follows up.** `nestFollowUps`
+  in `schema.ts` puts a question whose code is another's with a part
+  added directly after it, whatever the column order is: this export
+  writes the F.7.1 block after F.8, so the deck drew F.7, F.8 and then
+  went back for F.7.1, and a reader met the answers without the
+  question they answer. Everything else keeps the order the file has.
 - **A section of questions asked the same way opens on one page.** Ten
   questions answered Yes or No are ten pages of two bars, and a reader
   who has to turn ten of them to find the one that stands out will not
@@ -366,7 +386,11 @@ geography.
   LGA is what they get - `isPercentageQuestion` and `percentageOf` in
   `analyse.ts`, drawn by `drawPercentage`, `PercentPanel` and `meanBarsPng`.
   Every bar says how many reports it rests on, the bars run against a fixed
-  0-100 track, and the mean is one report one vote: the form records an
+  0-100 track, and the mean is one report one vote - and every percentage
+  anywhere in the deck is a whole number, including the share of reports
+  a tick box is drawn as. A figure too small to round to 1% is written
+  "<1%" rather than "0%", which would say nobody where several reports
+  said somebody: the form records an
   estimated share, not a headcount, so there is nothing to weight by that
   would not be invented. The figure stands alone - "mean of 36 estimates"
   beside it read as a hedge, not as a base - and `meanLabel` is the one

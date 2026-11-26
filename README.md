@@ -408,6 +408,30 @@ scale is kept, including points nobody used, because the better half of a four-p
 scale is a different half from the better half of the three points that happened to be
 answered.
 
+**A slide does not explain its own chart.** The line under the heading - "Each bar is all
+of the reports that answered that question" - was prose where the page needed room, and
+the room it took came off the bottom, where the names under the columns are: on a
+fourteen-point axis with the plot area stated by hand, "National" and "Mansa Konko" were
+drawn with their descenders cut off. The sub-line survives only where it states a unit:
+which answer a map shades and what the share is of, what a turnout figure is a share of,
+what a mean score is out of. A figure whose unit is not written says more than the data
+supports; a sentence describing the chart beside it says less than the chart does.
+
+**A section's page is the section's own questions.** The page that puts a whole section on
+one chart takes the top-level codes only - E.4, not E.4.1. On the polling-day form,
+section E has nine questions of which three are answered Yes or No: E.1.2, E.4 and E.5. As
+a page headed "Section E" that is three of nine, opening on a sub-question of E.1 with
+E.1 itself nowhere on it, and a reader turning to it for the section does not find the
+section. A follow-up is also asked only of the reports whose parent answer led to it, so
+its bar rests on a different base from the bars around it on a chart that invites them to
+be read against one another. Follow-ups keep their own pages, where the base is printed.
+
+**A follow-up follows the question it follows up.** The export writes the columns of
+"F.7.1 If Yes, please specify" after F.8, so the deck drew F.7, then F.8, and then went
+back for F.7.1 - a reader met a page of specified answers three pages after the question
+that asked for them. The form's own numbering says where a follow-up belongs, so one is
+moved to directly after its parent and everything else keeps the order the file has.
+
 **N/A is an answer, and "n/a" was being read as a blank.** The polling-day form offers
 N/A on some of its questions - "G.11 Are duty certificate voters added to the voter list?"
 is Yes, No or N/A - and six of nine observers answered it. The tool had "n/a" in its list

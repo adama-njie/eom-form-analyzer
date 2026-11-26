@@ -326,6 +326,30 @@ function gForm() {
   return buildDataset(table, inferSchema(table));
 }
 
+describe('a follow-up and the question it follows', () => {
+  /** This export writes the F.7.1 block after F.8, as the file has it. */
+  const form = () => {
+    const table = toTable([
+      [
+        'B.1 Polling station administrative area',
+        'F.7 Is any of the essential material missing?',
+        'F.8 Is the voter list missing any pages?',
+        'F.7.1 If Yes, please specify:',
+        'F.7.1 If Yes, please specify: (Ballot tokens)',
+      ],
+      ['Banjul', 'Yes', 'No', 'Indelible ink', ''],
+      ['Kanifing', 'No', 'No', '', 'Ballot tokens'],
+      ['Basse', 'Yes', 'Yes', '', ''],
+    ]);
+    return buildDataset(table, inferSchema(table));
+  };
+
+  it('reads in the order the form numbers them, not the order of the columns', () => {
+    // F.7, F.8, then back to F.7.1 met the answers without the question.
+    expect(form().questions.map((q) => q.code)).toEqual(['B.1', 'F.7', 'F.7.1', 'F.8']);
+  });
+});
+
 describe('a scale and the answers nobody gave', () => {
   it('keeps the whole scale, so one odd answer does not split a section', () => {
     /*
@@ -342,6 +366,23 @@ describe('a scale and the answers nobody gave', () => {
     expect([...scales]).toEqual(['Never|Sometimes|Mostly|Always']);
     const g = sectionOverviews(ds, ds.questions).find((o) => o.section === 'G')!;
     expect(g.rows.map((r) => r.question.code)).toEqual(['G.1', 'G.2', 'G.3', 'G.8']);
+  });
+
+  it('keeps a section page to the section’s own questions', () => {
+    /*
+     * A page headed "Section E" that opens on E.1.2 and jumps to E.4 is
+     * three of the section's nine questions, and a reader looking for
+     * E.1 on it does not find it. A follow-up keeps its own page.
+     */
+    const table = toTable([
+      ['B.1 Polling station administrative area', 'E.1.2 Were any staff replaced?',
+       'E.4 Any unauthorised persons present?', 'E.5 Anyone interfering?'],
+      ['Banjul', 'Yes', 'No', 'No'],
+      ['Kanifing', 'No', 'Yes', 'No'],
+      ['Basse', 'No', 'No', 'Yes'],
+    ]);
+    const ds = buildDataset(table, inferSchema(table));
+    expect(sectionOverviews(ds, ds.questions)).toEqual([]);
   });
 
   it('counts an answer of N/A, which is not the same as no answer', () => {
