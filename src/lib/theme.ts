@@ -92,15 +92,45 @@ export const SCALE = ['6B007B', 'E66C37', 'D9B300', '118DFF', '12239E'];
  * ordered ramp, and it is one hue because the tool does not know which
  * end of a count is the good one: a station with every member of staff
  * present is a full team, and a station with four unauthorised persons
- * in it is not the same news.
+ * in it is not the same news. Which end is which is `moreIsWorse`'s
+ * decision, read off the mission's own problem vocabulary, and the
+ * scale handed in is held worst first.
  *
- * It stops at the deck's own light blue rather than going paler. A
- * chart's data labels are one colour for the whole chart - PowerPoint
- * allows no other - so every step has to carry white text, and a 9% in
- * white on a pale blue column was the one thing on the page nobody
- * could read.
+ * Every step carries white text, including the warm ones, which is why
+ * they run dark to mid rather than through the pale orange a diverging
+ * ramp usually has in the middle: a chart's data labels are one colour
+ * for the whole chart - PowerPoint allows no other - and 9% in white on
+ * a pale column is the one thing on the page nobody can read. The
+ * warm end is redder than `NOT_APPLICABLE`, so a legend naming both a
+ * band and NA does not name them in the same orange.
  */
-export const COUNT = ['118DFF', '0F73E0', '0D59C0', '1040A8', '12239E'];
+export const COUNT = ['8C2D0C', 'B8431A', 'E05A24', '118DFF', '12239E'];
+
+/**
+ * Where one answer sits on its scale, as a colour.
+ *
+ * The deck and the dashboard both ask this, so it is answered once. A
+ * scale of words is a judgement and steps through `SCALE` by position.
+ * A scale of numbers is a count and is placed by its value instead -
+ * four of five staff present is four fifths of the way along, not two
+ * thirds of the way through a list of three answers - along `COUNT`,
+ * whose warm end is whichever end of the count is the bad one.
+ */
+export function rampColour(label: string, scale: string[]): string | null {
+  if (scale.length < 2) return null;
+  const i = scale.indexOf(label);
+  if (i < 0) return null;
+  const numbers = scale.map((s) => parseFloat(s));
+  if (numbers.every((n) => Number.isFinite(n))) {
+    const lo = Math.min(...numbers);
+    const hi = Math.max(...numbers);
+    const along = hi === lo ? 0 : (numbers[i]! - lo) / (hi - lo);
+    // Worst first, so a scale running downwards is one where more is worse.
+    const worst = numbers[0]! <= numbers[numbers.length - 1]! ? along : 1 - along;
+    return COUNT[Math.round(worst * (COUNT.length - 1))]!;
+  }
+  return SCALE[Math.round(i * ((SCALE.length - 1) / (scale.length - 1)))]!;
+}
 
 /** An answer that indicates a problem, so it stands out from the rest. */
 export const FLAG = 'E66C37';

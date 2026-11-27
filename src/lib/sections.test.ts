@@ -5,6 +5,7 @@ import {
   buildDataset,
   chartScale,
   displayCounts,
+  moreIsWorse,
   namesStations,
   sectionOverviews,
   sharesAcross,
@@ -129,6 +130,65 @@ describe('the stations behind a follow-up', () => {
 
   it('heads its last column with the question, not with the whole question', () => {
     expect(answerHead(q('D.1.1'))).toBe('Delay');
+  });
+});
+
+/**
+ * A form whose count runs the other way, and a team type nobody filed
+ * from.
+ */
+const PROBLEM = [
+  'A.2 Local Government Area (LGA)',
+  'A.1 Team number - LTO',
+  'A.1 Team number - LSTO',
+  'E.4 How many unauthorised persons are present inside the PS',
+];
+
+function problemForm(): ReturnType<typeof buildDataset> {
+  const table = toTable([
+    PROBLEM,
+    ['Banjul', 'LTO 01', '', '0'],
+    ['Banjul', 'LTO 01', '', '2'],
+    ['Kanifing', 'LTO 02', '', '1'],
+    ['Brikama', 'LTO 02', '', '0'],
+  ]);
+  return buildDataset(table, inferSchema(table));
+}
+
+describe('a count of something that should not be there', () => {
+  const ds = problemForm();
+  const unauthorised = ds.questions.find((x) => x.code === 'E.4')!;
+
+  it('is read as a count where more is worse', () => {
+    expect(moreIsWorse(unauthorised)).toBe(true);
+    expect(moreIsWorse(q('E.3'))).toBe(false);
+  });
+
+  it('opens on none of them, not on the most of them', () => {
+    const b = analyse(ds, unauthorised);
+    expect(displayCounts(unauthorised, b).map((c) => c.label)).toEqual(['0', '1', '2']);
+  });
+
+  it('wears the warm end of the ramp at the end that is bad news', () => {
+    const scale = chartScale(unauthorised, analyse(ds, unauthorised).total)!;
+    expect(colourFor('2', 0, scale)).toBe(COUNT[0]);
+    expect(colourFor('0', 2, scale)).toBe(COUNT[4]);
+    // And the other way round where more is what the mission wants.
+    const staff = chartScale(q('E.3'), analyse(form(), q('E.3')).total)!;
+    expect(colourFor('0', 0, staff)).toBe(COUNT[0]);
+    expect(colourFor('4 or more', 4, staff)).toBe(COUNT[4]);
+  });
+
+  it('places a count by its value, not by its place in the list', () => {
+    // 4 of 5 staff present is four fifths of the way along the ramp,
+    // not two thirds of the way through a list of three answers.
+    expect(colourFor('4', 1, ['1', '4', '5'])).toBe(COUNT[3]);
+  });
+
+  it('keeps a panel for a team type that filed nothing', () => {
+    const panels = teamReports(ds);
+    expect(panels.map((p) => p.label)).toEqual(['LTO', 'LSTO']);
+    expect(panels[1]!.counts).toEqual([]);
   });
 });
 

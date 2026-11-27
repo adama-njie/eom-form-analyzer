@@ -47,7 +47,7 @@ import {
   RULE,
   BARE,
   CAT,
-  COUNT,
+  rampColour,
   FONT,
   HEADER_BLUE,
   INK,
@@ -55,7 +55,6 @@ import {
   NOT_APPLICABLE,
   ON_FILL,
   PANEL,
-  SCALE,
   TYPE,
 } from './theme';
 import { drawFlag, euFlag, gambiaFlag } from './flags';
@@ -118,22 +117,11 @@ export function colourFor(label: string, index: number, scale?: string[]): strin
   if (label === 'Yes') return ACCENT_DEEP;
   if (label === 'No') return ACCENT;
   if (NON_ANSWERS.has(label)) return NOT_APPLICABLE;
-  if (scale && scale.length > 1) {
-    const i = scale.indexOf(label);
-    if (i >= 0) {
-      /*
-       * A count takes the blue ramp, a judgement the rating scale.
-       *
-       * A scale of bare numbers is a count - `chartScale` builds it
-       * from the bands, and a question the form scores wears the words
-       * from its own legend, never the digits. Colour on a count says
-       * how many, not how good, so it is one hue: "E.1 How many polling
-       * staff members are present" had 1 in the deep blue and 2 in the
-       * orange that flags a problem.
-       */
-      const ramp = scale.every((s) => /^-?\d/.test(s)) ? COUNT : SCALE;
-      return ramp[Math.round(i * ((ramp.length - 1) / (scale.length - 1)))]!;
-    }
+  // A count takes the count ramp and a judgement the rating scale, and
+  // both are placed by `rampColour`, which the dashboard asks too.
+  if (scale) {
+    const ramp = rampColour(label, scale);
+    if (ramp) return ramp;
   }
   return CAT[index % CAT.length]!;
 }
@@ -1313,7 +1301,10 @@ function addSharesSlide(pptx: PptxGenJS, planned: Planned): void {
   if (!shares) return;
 
   const s = pptx.addSlide({ masterName: 'BASE' });
-  const top = heading(s, `${q.code} ${q.label}`.trim());
+  // No line explaining the page - it is the same page for every
+  // question - except where a column is not made of reports, which is
+  // the unit and not a sentence about the chart. See `Shares.unit`.
+  const top = heading(s, `${q.code} ${q.label}`.trim(), shares.unit);
   const colours = fillsFor(
     shares.answers.map((label) => ({ label })),
     { judged: JUDGED.test(q.label), scale: chartScale(q, planned.b.total), perMark: true },
@@ -1561,6 +1552,10 @@ function addTeamSlides(pptx: PptxGenJS, q: Question, panels: TeamPanel[]): void 
     // Evenly: twenty-seven teams in columns of thirteen leaves a column
     // holding one bar across the full width of it, and three columns of
     // nine are the same teams drawn as a chart.
+    if (panel.counts.length === 0) {
+      chunks.push(panel);
+      continue;
+    }
     const columns = Math.max(1, Math.ceil(panel.counts.length / TEAMS_PER_COLUMN));
     const size = Math.ceil(panel.counts.length / columns);
     for (let i = 0; i < panel.counts.length; i += size) {
@@ -1568,8 +1563,13 @@ function addTeamSlides(pptx: PptxGenJS, q: Question, panels: TeamPanel[]): void 
     }
   }
 
-  for (let i = 0; i < chunks.length; i += COLUMNS_PER_SLIDE) {
-    const page = chunks.slice(i, i + COLUMNS_PER_SLIDE);
+  // Evenly across the slides it needs, as a section fills its pages:
+  // five team types at four to a slide left CT alone on the second.
+  const slides = Math.max(1, Math.ceil(chunks.length / COLUMNS_PER_SLIDE));
+  const perSlide = Math.ceil(chunks.length / slides);
+
+  for (let i = 0; i < chunks.length; i += perSlide) {
+    const page = chunks.slice(i, i + perSlide);
     const s = pptx.addSlide({ masterName: 'BASE' });
     // The page is every team type, so its title is the question without
     // the one type the first column happened to be headed with.
@@ -1582,7 +1582,7 @@ function addTeamSlides(pptx: PptxGenJS, q: Question, panels: TeamPanel[]): void 
     // reads as a different unit. Every bar on the slide is the same depth
     // instead, set by the longest column, and a short column is a short
     // chart.
-    const most = Math.max(...page.map((p) => p.counts.length));
+    const most = Math.max(1, ...page.map((p) => p.counts.length));
     const barH = (PAD.bottom - top - titleH) / most;
 
     page.forEach((panel, j) => {
@@ -1592,6 +1592,16 @@ function addTeamSlides(pptx: PptxGenJS, q: Question, panels: TeamPanel[]): void 
         fontSize: TYPE.chartTitleSmall, color: INK, fontFace: FONT,
         align: 'center', valign: 'middle',
       });
+      // A type nobody filed from has no team numbers to draw, so it
+      // says what it is rather than standing as an empty heading.
+      if (panel.counts.length === 0) {
+        s.addText('No reports', {
+          ...place({ x, y: top + titleH, w, h: 0.5 }, `teams ${panel.label} none`),
+          fontSize: TYPE.caption, color: MUTED, fontFace: FONT,
+          align: 'center', valign: 'middle',
+        });
+        return;
+      }
       s.addChart(
         pptx.ChartType.bar,
         [{

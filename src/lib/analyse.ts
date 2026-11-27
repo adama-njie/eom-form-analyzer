@@ -794,18 +794,31 @@ export function parentCount(dataset: Dataset, question: Question): Question | nu
  * among one member of staff is not a share of anything. The base under
  * the figure falls by one, which is the honest record of it.
  */
-export function shareOfParent(
+/** A part, its whole and the reports behind them, for one group. */
+interface PartTally {
+  part: number;
+  whole: number;
+  n: number;
+}
+
+/**
+ * The part and the whole, nationally and by every group a page splits.
+ *
+ * One pass over the reports, because the figure and the page that
+ * stacks it must not be able to disagree.
+ */
+function partTallies(
   dataset: Dataset,
   question: Question,
   rowFilter?: boolean[],
-): Percentage | null {
+): Map<string, PartTally> | null {
   const parent = parentCount(dataset, question);
   const col = question.columns[0];
   const parentCol = parent?.columns[0];
   if (!parent || col === undefined || parentCol === undefined) return null;
 
   const type = stationTypeQuestion(dataset);
-  const tally = new Map<string, { part: number; whole: number; n: number }>();
+  const tally = new Map<string, PartTally>();
   const add = (key: string, part: number, whole: number): void => {
     const t = tally.get(key) ?? { part: 0, whole: 0, n: 0 };
     tally.set(key, { part: t.part + part, whole: t.whole + whole, n: t.n + 1 });
@@ -827,7 +840,87 @@ export function shareOfParent(
     const kind = type ? answersFor(type, row)[0] : undefined;
     if (kind) add(`type:${kind}`, part, whole);
   });
+  return tally;
+}
 
+/**
+ * What the form calls the part it counts, for a legend.
+ *
+ * "How many of the polling staff are female" is "Female", which is the
+ * predicate with the asking taken off it. A predicate too long for a
+ * legend keeps its first word - "sealed in front of you" is "Sealed" -
+ * and the rest of the whole is "Other", never "male": the form asked
+ * one question and the answer to the other one is not in the file.
+ */
+export function partLabel(question: Question): string {
+  const said = /\s(?:are|is|were|was)\s+(.+)$/i.exec(question.label.replace(/[.:?]\s*$/, ''));
+  const word = (said?.[1] ?? '').trim();
+  const short = word.length > 0 && word.length <= 20 ? word : (word.split(/\s+/)[0] ?? '');
+  const name = short.length > 0 ? short : 'Counted';
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+/**
+ * The same share as 100% stacked columns, which is every other
+ * question's page.
+ *
+ * The columns are of polling staff rather than of reports, which is
+ * what `Shares.unit` says: a column is a station's staff pooled with
+ * every other station's in that area, and the figure over it counts
+ * people. Three of five women and two of four are different columns
+ * here, where on a count of answers they were the same bar.
+ */
+export function sharesOfParent(
+  dataset: Dataset,
+  question: Question,
+  rowFilter?: boolean[],
+): Shares | null {
+  const tally = partTallies(dataset, question, rowFilter);
+  const parent = parentCount(dataset, question);
+  const all = tally?.get('');
+  if (!tally || !parent || !all || all.whole === 0) return null;
+
+  const part = partLabel(question);
+  const answers = [part, 'Other'];
+  const group = (label: string, t: PartTally): SharePanel['groups'][number] => ({
+    label,
+    n: t.whole,
+    counts: [
+      { label: part, n: t.part, pct: (t.part / t.whole) * 100 },
+      { label: 'Other', n: t.whole - t.part, pct: ((t.whole - t.part) / t.whole) * 100 },
+    ],
+  });
+  const groupsFor = (prefix: string, order: string[]): SharePanel['groups'] =>
+    order
+      .filter((label) => (tally.get(prefix + label)?.whole ?? 0) > 0)
+      .map((label) => group(label, tally.get(prefix + label)!));
+
+  const panels: SharePanel[] = [{ title: 'National', groups: [group('National', all)] }];
+  const kinds = [...tally.keys()].filter((k) => k.startsWith('type:')).map((k) => k.slice(5));
+  const byType = groupsFor('type:', kinds);
+  if (byType.length >= 2) panels.push({ title: 'By station type', groups: byType });
+  const places = groupsFor('area:', dataset.groups);
+  if (places.length < MIN_SHARE_GROUPS) return null;
+  panels.push({
+    title: dataset.geo ? `By ${AREA_WORDS[dataset.division].one}` : 'By area',
+    groups: places,
+  });
+
+  return {
+    answers,
+    panels,
+    unit: `Columns are ${subjectOf(parent.label)}, not reports.`,
+  };
+}
+
+export function shareOfParent(
+  dataset: Dataset,
+  question: Question,
+  rowFilter?: boolean[],
+): Percentage | null {
+  const tally = partTallies(dataset, question, rowFilter);
+  const parent = parentCount(dataset, question);
+  if (!tally || !parent) return null;
   const all = tally.get('');
   if (!all || all.whole === 0) return null;
 
@@ -1137,27 +1230,54 @@ export function displayCounts(q: Question, b: Breakdown): Count[] {
    * The bands themselves stay in order wherever they are counted; this
    * is the chart's order, as it is for a scale.
    */
-  const counted = q.kind === 'numeric' ? countScale(b.total) : undefined;
+  const counted = q.kind === 'numeric' ? countScale(q, b.total) : undefined;
   const scale = q.scale && q.scale.length > 1 ? q.scale : counted;
   if (!scale) return b.total;
-  const rated = b.total.filter((c) => scale.includes(c.label));
+  // Through the scale rather than through the counts, because the
+  // counts are in the order the bands were made and the scale is the
+  // one that runs worst to best - which for a count of unauthorised
+  // persons is 2, 1, 0, and reversing the bands gave the opposite.
+  const rated = scale
+    .map((label) => b.total.find((c) => c.label === label))
+    .filter((c): c is Count => c !== undefined);
   const rest = b.total.filter((c) => !scale.includes(c.label));
   return [...rated.reverse(), ...rest];
 }
 
 /**
- * The bands of a count, fewest first, where a numeric question has them.
+ * Whether more of the thing a question counts is worse news.
+ *
+ * Read off the mission's own problem vocabulary, which is the same list
+ * the findings are ranked by. "How many polling staff members are
+ * present" wants five and "how many unauthorised persons are present"
+ * wants none, and the chart cannot shade either until it knows which.
+ * Where the wording names no problem, more is the better end - the
+ * forms count what should be there far more often than what should not.
+ */
+export function moreIsWorse(question: Question): boolean {
+  return PROBLEM_WORDS.test(question.label);
+}
+
+/**
+ * The bands of a count, worst first, where a numeric question has them.
+ *
+ * Worst first, as a scale is held worst first, so everything that
+ * reverses a scale for the chart or shades it along a ramp works the
+ * same way on both without knowing which it has.
  *
  * A number banded into ranges is not one of these: "4,000 to 4,999" is
  * not a quantity a chart can shade along a ramp, and a station's own
- * number is an identifier. A count of a few things is, and this is the
- * order it is shaded and ordered by.
+ * number is an identifier.
  */
-export function countScale(counts: { label: string }[]): string[] | undefined {
+export function countScale(
+  question: Question,
+  counts: { label: string }[],
+): string[] | undefined {
   const real = counts.map((c) => c.label).filter((l) => !NON_ANSWERS.has(l));
   if (real.length < 2) return undefined;
   if (!real.every((l) => /^-?\d/.test(l) && !l.includes(' to '))) return undefined;
-  return [...real].sort((a, b) => parseFloat(a) - parseFloat(b));
+  const ascending = [...real].sort((a, b) => parseFloat(a) - parseFloat(b));
+  return moreIsWorse(question) ? ascending.reverse() : ascending;
 }
 
 /**
@@ -1170,7 +1290,7 @@ export function countScale(counts: { label: string }[]): string[] | undefined {
  */
 export function chartScale(q: Question, counts: { label: string }[]): string[] | undefined {
   if (q.scale && q.scale.length > 1) return q.scale;
-  return q.kind === 'numeric' ? countScale(counts) : undefined;
+  return q.kind === 'numeric' ? countScale(q, counts) : undefined;
 }
 
 /* ------------------------------------------------------------------ */
@@ -2136,6 +2256,16 @@ export interface Shares {
   /** The answers, in the order every panel stacks them. */
   answers: string[];
   panels: SharePanel[];
+  /**
+   * What a column is made of, where it is not reports.
+   *
+   * The page is otherwise the same for every question and needs no
+   * explaining. "E.1.1 How many of the polling staff are female" is the
+   * exception: its columns are the staff themselves, so the figure over
+   * each one counts people and not reports, and a page that does not
+   * say so says more than the data supports.
+   */
+  unit?: string;
 }
 
 /**
@@ -2208,10 +2338,15 @@ export function sharesAcross(
      * percentage is averaged rather than banded, and has its own page.
      */
     if (isPercentageQuestion(question)) return null;
-    // A count that is part of another count is drawn as that share, on a
-    // page of its own: "two of the staff are women" is not a thing an
-    // area holds more or less of. See `shareOfParent`.
-    if (parentCount(dataset, question)) return null;
+    /*
+     * A count that is part of another count is stacked as that share.
+     *
+     * Not as a count of its answers: "two of the staff are women" says
+     * two of five at one station and two of four at the next, and an
+     * area does not hold more or less of the digit 2. The columns are
+     * the staff themselves. See `sharesOfParent`.
+     */
+    if (parentCount(dataset, question)) return sharesOfParent(dataset, question, rowFilter);
     const bands = bandingFor(dataset, question, rowFilter)?.labels ?? [];
     if (bands.length === 0 || bands.some((l) => l.includes(' to '))) return null;
   }
@@ -2495,6 +2630,15 @@ function withSilentTeams(counts: Count[]): Count[] {
   return out;
 }
 
+/*
+ * A team type nobody filed from keeps its panel.
+ *
+ * The form offers LTO, STO, LSTO, MEP and CT, and dropping the empty
+ * ones left a page of two headings - a deployment of two kinds of team,
+ * rather than three kinds that have sent nothing in, which during a
+ * deployment is the thing this page is read for. The panel says so in
+ * words, because there are no team numbers to draw as bars of nought.
+ */
 export function teamReports(dataset: Dataset, rowFilter?: boolean[]): TeamPanel[] {
   return teamColumns(dataset)
     .map(({ col, label }) => {
@@ -2511,8 +2655,7 @@ export function teamReports(dataset: Dataset, rowFilter?: boolean[]): TeamPanel[
         .sort((a, b) => a[0].localeCompare(b[0], 'en', { numeric: true }))
         .map(([label, n]) => ({ label, n, pct: 0 }));
       return { label, counts: withSilentTeams(counts) };
-    })
-    .filter((p) => p.counts.length > 0);
+    });
 }
 
 /* ------------------------------------------------------------------ */

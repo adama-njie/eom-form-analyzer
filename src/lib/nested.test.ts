@@ -114,12 +114,31 @@ describe('the share a part is of its whole', () => {
     expect(Math.round(p.byType![1]!.mean)).toBe(43);
   });
 
-  it('replaces the composition, which cannot hold it', () => {
+  it('is stacked as the share, not counted as the answers', () => {
     // Two of ten staff and two of two stand in the same bar on a count
     // of answers, and a station staffed by two can never reach a bar
-    // above two at all.
-    expect(sharesAcross(form(), q('E.1.1'))).toBeNull();
-    expect(sharesAcross(form(), q('E.1'))).not.toBeNull();
+    // above two at all. The columns are the staff instead.
+    const shares = sharesAcross(form(), q('E.1.1'))!;
+    expect(shares.answers).toEqual(['Female', 'Other']);
+    expect(shares.unit).toBe('Columns are polling staff members, not reports.');
+    const national = shares.panels[0]!.groups[0]!;
+    expect(national.n).toBe(36);
+    expect(national.counts.map((c) => c.n)).toEqual([14, 22]);
+    expect(Math.round(national.counts[0]!.pct)).toBe(39);
+  });
+
+  it('splits those columns by station type and by area, as every page does', () => {
+    const shares = sharesAcross(form(), q('E.1.1'))!;
+    expect(shares.panels.map((p) => p.title)).toEqual([
+      'National',
+      'By station type',
+      'By Local Government Area',
+    ]);
+    // Urban is 22 staff across three reports, 8 of them women.
+    const urban = shares.panels[1]!.groups[0]!;
+    expect(urban.label).toBe('Urban');
+    expect(urban.n).toBe(22);
+    expect(urban.counts[0]!.n).toBe(8);
   });
 
   it('reaches the breakdown every view is drawn from', () => {

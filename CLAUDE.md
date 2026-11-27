@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 295 tests
+npm test           # vitest, 301 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 252 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 258 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -176,22 +176,33 @@ geography.
   on the answers the column holds rather than on the scale, so a
   four-point legend still names a column of digits read against the
   five-point one.
-- **A count is charted the most first, on one blue ramp.** Five staff
+- **A count is charted the best end first, along `COUNT`.** Five staff
   members present is a full complement and the thing a briefing looks
   for, so the chart opens on it, exactly as a rating chart opens on
-  Very good; `displayCounts` reverses a count's bands the way it
-  reverses a scale, and `chartScale` is what every colouring site reads
-  so the screen and the deck agree. The colour is `COUNT`, one blue
-  from light to deep, and not the categorical palette, which put 1 in
-  the deep blue and 2 in the orange a flagged answer wears - colour
-  saying something about a quantity that the quantity did not say. One
-  hue rather than the rating ramp, because the tool does not know which
-  end of a count is the good one: a full team is good news and four
-  unauthorised persons in the room are not. It stops at the deck's own
-  light blue rather than going paler, because a chart's data labels are
+  Very good. `countScale` holds the bands worst first, as a scale is
+  held worst first, and `displayCounts` reverses it for the chart;
+  `chartScale` is what every colouring site reads, so the screen and
+  the deck agree. The categorical palette put 1 in the deep blue and 2
+  in the orange a flagged answer wears - colour saying something about
+  a quantity that the quantity did not say.
+  **Which end is the bad one is `moreIsWorse`'s decision**, read off
+  the same problem vocabulary the findings are ranked by: "how many
+  polling staff members are present" wants five, "how many unauthorised
+  persons are present" wants none, and the ramp turns round between
+  them. Where the wording names no problem, more is the better end.
+  **A count is placed by its value, not by its position in the list** -
+  `rampColour`, which the deck and the dashboard both ask, so there is
+  one of it. Four of five staff present is four fifths of the way along
+  the ramp; as the second of three answers it was two thirds of the way
+  along and drawn in the colour of a problem. A scale of words has no
+  such distances and still steps through `SCALE` by position.
+  Every step of `COUNT` carries white text, including the warm ones,
+  which is why they run dark to mid rather than through the pale orange
+  a diverging ramp usually has in the middle: a chart's data labels are
   one colour for the whole chart - PowerPoint allows no other - and 9%
-  in white on a pale blue column is the one thing on the page nobody
-  can read.
+  in white on a pale column is the one thing on the page nobody can
+  read. The warm end is redder than `NOT_APPLICABLE`, so a legend
+  naming both a band and NA does not name them in the same orange.
 - **Six values is five and a tail.** The shares page holds five
   answers, and "E.3 How many citizen observers are present" was
   answered 0, 1, 2, 3, 4 and 9 on eleven reports, so one station with
@@ -311,6 +322,17 @@ geography.
   A share summed this way is also split by station type, which a mean
   of estimates is not: the pages around it in section E are split that
   way already.
+  **The deck draws it as the 100% stacked page every other question
+  gets** - `sharesOfParent`, in place of the big figure - because that
+  is the page a reader of this deck already knows how to read. The
+  columns are the staff themselves rather than the reports, which is
+  the one thing about the page that is not the same as every other, so
+  `Shares.unit` says so under the heading and the figure over each
+  column counts people. `partLabel` names the two segments from the
+  question's own wording - "Female" and "Other", never "male": the form
+  asked one question and the answer to the other one is not in the
+  file. The dashboard and the Word report still show the figure, the
+  basis and the two splits as bars.
 - **A rating question is found by its scale, not by its section letter.**
   It was `/^J\./`, and the opening form rates one thing in section G, so a
   morning's observation reported nothing at all.
@@ -448,6 +470,13 @@ geography.
   that range would invent two hundred teams. Nothing is added past the
   highest number seen: how many teams there are is the mission's own
   figure and this page has never known it.
+  **And a team type nobody filed from keeps its panel**, saying "No
+  reports" where its bars would be. The form offers LTO, STO, LSTO, MEP
+  and CT; dropping the empty ones left a page of two headings, which
+  reads as a deployment of two kinds of team rather than three kinds
+  that have sent nothing in. The panels fill their slides evenly, as a
+  section fills its pages: five types at four to a slide left CT alone
+  on the second.
 - **The teams are a chart per team type.** The form asks for the team
   number once per team type, so the columns are the types and the answers
   in them are the teams: sixty bars on one axis is a wall, and the
