@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 285 tests
+npm test           # vitest, 295 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 242 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 252 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -176,6 +176,31 @@ geography.
   on the answers the column holds rather than on the scale, so a
   four-point legend still names a column of digits read against the
   five-point one.
+- **A count is charted the most first, on one blue ramp.** Five staff
+  members present is a full complement and the thing a briefing looks
+  for, so the chart opens on it, exactly as a rating chart opens on
+  Very good; `displayCounts` reverses a count's bands the way it
+  reverses a scale, and `chartScale` is what every colouring site reads
+  so the screen and the deck agree. The colour is `COUNT`, one blue
+  from light to deep, and not the categorical palette, which put 1 in
+  the deep blue and 2 in the orange a flagged answer wears - colour
+  saying something about a quantity that the quantity did not say. One
+  hue rather than the rating ramp, because the tool does not know which
+  end of a count is the good one: a full team is good news and four
+  unauthorised persons in the room are not. It stops at the deck's own
+  light blue rather than going paler, because a chart's data labels are
+  one colour for the whole chart - PowerPoint allows no other - and 9%
+  in white on a pale blue column is the one thing on the page nobody
+  can read.
+- **Six values is five and a tail.** The shares page holds five
+  answers, and "E.3 How many citizen observers are present" was
+  answered 0, 1, 2, 3, 4 and 9 on eleven reports, so one station with
+  nine cost the question that page altogether. `bandsFor` gathers the
+  tail into "4 or more" instead. Only for a count of things in a
+  polling station - whole numbers, none above twenty - because six
+  distinct voter-list totals are six sizes of station and "3,300 or
+  more" said about one report is not a band. The station with nine is
+  still in the exported table.
 - **A scale is held worst first and charted best first.** `displayCounts`
   reverses it for the chart, and `sectionOverviews` does the same for the
   section's page, so a column stacks Very good at the foot and Very bad
@@ -185,14 +210,28 @@ geography.
   takes its order from `displayCounts` too, so the dashboard and the deck
   read the same way round.
 - **The map of a rating is followed by the stations behind it.**
-  `poorReports` and `addPoorTableSlide`: the area, the constituency and
-  the station name, worst first, ten rows to a page, with a column the
-  form does not ask for left out rather than filled with blanks. The
+  `poorReports` and `addStationTableSlide`: the area, the constituency
+  and the station name, worst first, ten rows to a page, with a column
+  the form does not ask for left out rather than filled with blanks. The
   constituency is read through its question rather than through
   `dataset.constituencyColumn`, because the polling-day form asks it in
   a column per area and the settled column is blank for every report
   filed from anywhere else. The table needs no canvas, so it is drawn
   whether or not the maps are.
+- **So is a follow-up to a Yes/No question.** `namesStations` and
+  `answeredReports`, drawn by the same table. "D.1.1 If No to D.1 the
+  delay was" is asked only of the reports that said the station did not
+  open on time, so its answers are a list of the stations that opened
+  late and by how much; the deck counted them and never said which they
+  were. The longest answer first, by the number its band starts with,
+  because the page is read from the top. It has to be a question with a
+  fixed set of answers and a form that names its stations: a follow-up
+  asking for a number is a different page, and one offering a tick box
+  per option is a block rather than a column, which is why this draws
+  one table across both Gambian forms and not seven. The last column is
+  headed from the question's own wording - "the delay was:" is
+  "Delay" - and anything that will not shorten to a heading is headed
+  "Answer" rather than repeating the question.
 - **A rating question is mapped on the worse end of its scale.**
   `mapKindFor` returns `poor` for it rather than `pie`: four answers pied
   across seven areas holding one or two reports each is a page of
@@ -210,7 +249,8 @@ geography.
   total just over its own column - `axisTop` states the top of the axis
   so the figure can be placed there, and written along one line at the
   head of the chart it sat an inch above the short columns. The clock
-  is named on the category axis rather than in a line under the title. The first rating question only: five of these
+  carries no axis title: a clock reads as one, and a line of small
+  print under a chart is the first thing a projector loses. The first rating question only: five of these
   would be five pages saying the same thing five ways.
 - **A scored question wears the words from its own legend.** The forms put
   the key in a column of its own - "4=Very good 3=Good 2=Bad 1=Very bad" -
@@ -380,6 +420,12 @@ geography.
   writes the F.7.1 block after F.8, so the deck drew F.7, F.8 and then
   went back for F.7.1, and a reader met the answers without the
   question they answer. Everything else keeps the order the file has.
+- **A section fills its pages evenly.** Thirteen questions at twelve to
+  a page is a page of twelve and a page of one, and D.14 alone under a
+  heading reading "Section D" looks like a mistake rather than a
+  continuation. `sectionOverviews` divides by the pages it needs, so
+  the same two pages hold seven and six. `SECTION_ROWS` is still the
+  most one page may hold.
 - **A section of questions asked the same way opens on one page.** Ten
   questions answered Yes or No are ten pages of two bars, and a reader
   who has to turn ten of them to find the one that stands out will not
@@ -390,6 +436,18 @@ geography.
   otherwise be split onto a page of its own, which is precisely the
   question worth seeing beside the others. Twelve rows to a page, then
   the section continues on another.
+- **A team that filed nothing is still on the page.** `withSilentTeams`
+  fills the gaps between the lowest and the highest team number that
+  filed, because a team missing from the axis reads as a team that does
+  not exist when what it means is that nothing has come in from it -
+  which is what this page is read for during a deployment. LTO 03 and
+  LTO 06 were simply absent between 02 and 08. Only where the
+  numbering says so: one prefix, numbers of one width, and fewer gaps
+  than teams that filed, because "STO 0401" and "STO 0601" are a region
+  and a team rather than teams one and two hundred and one, and filling
+  that range would invent two hundred teams. Nothing is added past the
+  highest number seen: how many teams there are is the mission's own
+  figure and this page has never known it.
 - **The teams are a chart per team type.** The form asks for the team
   number once per team type, so the columns are the types and the answers
   in them are the teams: sixty bars on one axis is a wall, and the

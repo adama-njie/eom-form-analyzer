@@ -1127,11 +1127,50 @@ export function displayCounts(q: Question, b: Breakdown): Count[] {
    * which does not move. Anything outside the scale - NA - keeps its
    * place at the end.
    */
-  if (!q.scale || q.scale.length < 2) return b.total;
-  const scale = q.scale;
+  /*
+   * A count is charted the most first, for the same reason.
+   *
+   * "E.1 How many polling staff members are present" answered 5 is a
+   * full complement, which is the thing a briefing wants to see before
+   * it sees the station that was staffed by one - and the deck reads
+   * the other way round from the rating charts beside it otherwise.
+   * The bands themselves stay in order wherever they are counted; this
+   * is the chart's order, as it is for a scale.
+   */
+  const counted = q.kind === 'numeric' ? countScale(b.total) : undefined;
+  const scale = q.scale && q.scale.length > 1 ? q.scale : counted;
+  if (!scale) return b.total;
   const rated = b.total.filter((c) => scale.includes(c.label));
   const rest = b.total.filter((c) => !scale.includes(c.label));
   return [...rated.reverse(), ...rest];
+}
+
+/**
+ * The bands of a count, fewest first, where a numeric question has them.
+ *
+ * A number banded into ranges is not one of these: "4,000 to 4,999" is
+ * not a quantity a chart can shade along a ramp, and a station's own
+ * number is an identifier. A count of a few things is, and this is the
+ * order it is shaded and ordered by.
+ */
+export function countScale(counts: { label: string }[]): string[] | undefined {
+  const real = counts.map((c) => c.label).filter((l) => !NON_ANSWERS.has(l));
+  if (real.length < 2) return undefined;
+  if (!real.every((l) => /^-?\d/.test(l) && !l.includes(' to '))) return undefined;
+  return [...real].sort((a, b) => parseFloat(a) - parseFloat(b));
+}
+
+/**
+ * The scale a question's answers are coloured along.
+ *
+ * Its own, where the form scores it, and the bands of a count where it
+ * does not: both are ordered, and the one thing a chart must not do is
+ * hand an ordered set of answers the categorical palette, which says
+ * nothing and says it in the colour a flagged answer wears.
+ */
+export function chartScale(q: Question, counts: { label: string }[]): string[] | undefined {
+  if (q.scale && q.scale.length > 1) return q.scale;
+  return q.kind === 'numeric' ? countScale(counts) : undefined;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1166,6 +1205,39 @@ export function bandsFor(values: number[], target = 6, unit = ''): Bands {
   // The unit goes on the end of the whole label, so a range reads
   // "20 to 39%" rather than "20% to 39%".
   const label = (v: number) => `${fmt(v)}${unit}`;
+
+  if (distinct.length <= 5) {
+    return { labels: distinct.map(label), of: label };
+  }
+
+  /*
+   * Six values is five and a tail.
+   *
+   * A count of a few things is a composition, and the page that puts it
+   * against the kind of station and the areas is drawn on five answers
+   * at most, because six colours stacked in a column is a pattern
+   * rather than a chart. "E.3 How many citizen observers are present"
+   * was answered 0, 1, 2, 3, 4 and 9 on eleven reports, and the one
+   * station with nine cost the question that page altogether. The tail
+   * is gathered instead: "4 or more" is as true as the list was, and
+   * the station with nine is still in the exported table.
+   *
+   * Only for a count of things in a polling station - whole numbers,
+   * none of them above twenty. Six distinct voter-list totals are six
+   * sizes of station rather than a quantity to gather a tail from, and
+   * "3,300 or more" said about one report is not a band.
+   */
+  const countable =
+    distinct.length <= 8 && distinct.every((v) => Number.isInteger(v) && v >= 0 && v <= 20);
+  if (countable) {
+    const head = distinct.slice(0, 4);
+    const cut = distinct[4]!;
+    const tail = `${label(cut)} or more`;
+    return {
+      labels: [...head.map(label), tail],
+      of: (v: number) => (v < cut ? label(v) : tail),
+    };
+  }
 
   if (distinct.length <= 8) {
     return { labels: distinct.map(label), of: label };
@@ -1643,6 +1715,53 @@ export function poorReports(
 ): PoorReport[] {
   const poor = new Set(poorLabels(question));
   if (poor.size === 0) return [];
+  const out = namedReports(dataset, question, (a) => poor.has(a), rowFilter);
+  // Worst first, and then down the country as the areas are ordered.
+  const rank = (r: PoorReport): number => question.scale?.indexOf(r.rating) ?? 0;
+  return out.sort(
+    (a, b) =>
+      rank(a) - rank(b) ||
+      dataset.groups.indexOf(a.area) - dataset.groups.indexOf(b.area) ||
+      a.constituency.localeCompare(b.constituency),
+  );
+}
+
+/**
+ * The stations behind a follow-up question.
+ *
+ * "D.1.1 If No to D.1 the delay was" is asked only of the reports that
+ * said the station did not open on time, so the answers to it are a
+ * list of the stations that opened late and by how much. Counted on a
+ * chart it says four stations were between one and fifteen minutes
+ * late; the mission's next question is which four, and this is the
+ * table that answers it.
+ *
+ * The longest answer first, by the number its band starts with -
+ * "Between 16-30 minutes" after "More than 60 minutes" and before
+ * "Between 1-15 minutes" - because a page of these is read from the
+ * top and the worst case is what it is read for.
+ */
+export function answeredReports(
+  dataset: Dataset,
+  question: Question,
+  rowFilter?: boolean[],
+): PoorReport[] {
+  const out = namedReports(dataset, question, (a) => !NON_ANSWERS.has(a), rowFilter);
+  return out.sort(
+    (a, b) =>
+      b.rating.localeCompare(a.rating, 'en', { numeric: true }) ||
+      dataset.groups.indexOf(a.area) - dataset.groups.indexOf(b.area) ||
+      a.constituency.localeCompare(b.constituency),
+  );
+}
+
+/** One row per report whose answer is wanted: where it was, and what it said. */
+function namedReports(
+  dataset: Dataset,
+  question: Question,
+  wanted: (answer: string) => boolean,
+  rowFilter?: boolean[],
+): PoorReport[] {
   const station = stationQuestion(dataset);
   /*
    * The constituency question, not the constituency column.
@@ -1662,7 +1781,7 @@ export function poorReports(
   dataset.table.rows.forEach((row, i) => {
     if (rowFilter && !rowFilter[i]) return;
     const rating = answersFor(question, row)[0];
-    if (!rating || !poor.has(rating)) return;
+    if (!rating || !wanted(rating)) return;
     const named = constituency ? (answersFor(constituency, row)[0] ?? '') : '';
     out.push({
       area: dataset.rowGroup[i] ?? '',
@@ -1671,15 +1790,27 @@ export function poorReports(
       rating,
     });
   });
+  return out;
+}
 
-  // Worst first, and then down the country as the areas are ordered.
-  const rank = (r: PoorReport) => question.scale?.indexOf(r.rating) ?? 0;
-  return out.sort(
-    (a, b) =>
-      rank(a) - rank(b) ||
-      dataset.groups.indexOf(a.area) - dataset.groups.indexOf(b.area) ||
-      a.constituency.localeCompare(b.constituency),
-  );
+/**
+ * Whether a question's answers are worth naming the stations behind.
+ *
+ * A follow-up to a Yes/No question is asked only of the reports whose
+ * answer to it was the one that needs following up, so the reports
+ * that answered are a short list of stations where something
+ * happened - and the deck already counts them without ever saying
+ * which. It has to be a question with a fixed set of answers: a
+ * follow-up that asks for a number is a different page, and one that
+ * offers a tick box per option is a block, not a column.
+ */
+export function namesStations(dataset: Dataset, question: Question): boolean {
+  if (question.kind !== 'categorical' && question.kind !== 'ordinal') return false;
+  if (stationQuestion(dataset) === null) return false;
+  const cut = question.code.lastIndexOf('.');
+  if (cut <= 1) return false;
+  const parent = dataset.questions.find((q) => q.code === question.code.slice(0, cut));
+  return parent !== undefined && parent !== question && parent.kind === 'binary';
 }
 
 /** The question asking what time the observer left, if the form asks. */
@@ -2229,11 +2360,23 @@ export function sectionOverviews(
       ),
     ];
 
-    for (let i = 0; i < members.length; i += SECTION_ROWS) {
+    /*
+     * The pages a section needs, filled evenly.
+     *
+     * Thirteen questions at twelve to a page is a page of twelve and a
+     * page of one, and D.14 alone under a heading reading "Section D"
+     * looks like a mistake rather than a continuation. The same two
+     * pages hold seven and six, which read as one section split in
+     * half - which is what they are.
+     */
+    const pages = Math.ceil(members.length / SECTION_ROWS);
+    const perPage = Math.ceil(members.length / pages);
+
+    for (let i = 0; i < members.length; i += perPage) {
       out.push({
         section,
         answers,
-        rows: members.slice(i, i + SECTION_ROWS).map(({ q, b }) => ({
+        rows: members.slice(i, i + perPage).map(({ q, b }) => ({
           question: q,
           n: b.total.reduce((s, c) => s + c.n, 0),
           counts: answers.map(
@@ -2313,6 +2456,45 @@ export function teamColumns(dataset: Dataset): { col: number; label: string }[] 
  * job, the chart answers the question it is there for - which teams are
  * reporting, and which have not reported at all.
  */
+/**
+ * The teams between the lowest and the highest that filed, including
+ * the ones that filed nothing.
+ *
+ * A team missing from the axis reads as a team that does not exist,
+ * when what it means is that nothing has come in from it - which is
+ * the one thing this page is read for during a deployment. LTO 03 and
+ * LTO 06 were simply absent between 02 and 08.
+ *
+ * Only where the numbering says so. The teams have to be one prefix
+ * and a number of one width, and the gaps have to be fewer than the
+ * teams that filed: "STO 0401" and "STO 0601" are a region and a team
+ * rather than teams one and two hundred and one, and filling that
+ * range would invent two hundred teams. Nothing is added past the
+ * highest number seen, because how many teams there are is the
+ * mission's own figure and this page has never known it.
+ */
+function withSilentTeams(counts: Count[]): Count[] {
+  if (counts.length < 2) return counts;
+  const parsed = counts.map((c) => /^(.*?)(\d+)$/.exec(c.label));
+  if (parsed.some((m) => m === null)) return counts;
+  const prefix = parsed[0]![1]!;
+  const width = parsed[0]![2]!.length;
+  if (parsed.some((m) => m![1] !== prefix || m![2]!.length !== width)) return counts;
+  const numbers = parsed.map((m) => Number(m![2]));
+  const lo = Math.min(...numbers);
+  const hi = Math.max(...numbers);
+  const missing = hi - lo + 1 - counts.length;
+  if (missing <= 0 || missing >= counts.length) return counts;
+  const have = new Map(numbers.map((n, i) => [n, counts[i]!]));
+  const out: Count[] = [];
+  for (let n = lo; n <= hi; n += 1) {
+    out.push(
+      have.get(n) ?? { label: `${prefix}${String(n).padStart(width, '0')}`, n: 0, pct: 0 },
+    );
+  }
+  return out;
+}
+
 export function teamReports(dataset: Dataset, rowFilter?: boolean[]): TeamPanel[] {
   return teamColumns(dataset)
     .map(({ col, label }) => {
@@ -2328,7 +2510,7 @@ export function teamReports(dataset: Dataset, rowFilter?: boolean[]): TeamPanel[
         // identifier, and sorting it as text puts "A.10" above "A.2".
         .sort((a, b) => a[0].localeCompare(b[0], 'en', { numeric: true }))
         .map(([label, n]) => ({ label, n, pct: 0 }));
-      return { label, counts };
+      return { label, counts: withSilentTeams(counts) };
     })
     .filter((p) => p.counts.length > 0);
 }

@@ -2,7 +2,7 @@ import type { Count, GroupMean, Percentage } from '@/lib/analyse';
 import { basisLine, meanLabel } from '@/lib/analyse';
 import { AREA_WORDS, type Division } from '@/lib/gambia';
 import { NON_ANSWERS } from '@/lib/schema';
-import { ACCENT, ACCENT_DEEP, CAT, NOT_APPLICABLE, SCALE } from '@/lib/theme';
+import { ACCENT, ACCENT_DEEP, CAT, COUNT, NOT_APPLICABLE, SCALE } from '@/lib/theme';
 
 /**
  * Hand-rolled SVG charts.
@@ -22,6 +22,8 @@ import { ACCENT, ACCENT_DEEP, CAT, NOT_APPLICABLE, SCALE } from '@/lib/theme';
 export const SCALE_COLOURS = SCALE.map((c) => `#${c}`);
 /** Categorical palette. */
 export const CAT_COLOURS = CAT.map((c) => `#${c}`);
+/** One blue, fewest to most, for a count. See `COUNT`. */
+export const COUNT_COLOURS = COUNT.map((c) => `#${c}`);
 const YES = `#${ACCENT}`;
 const NO = `#${ACCENT_DEEP}`;
 const NEUTRAL = `#${NOT_APPLICABLE}`;
@@ -43,8 +45,11 @@ export function colourFor(label: string, index: number, scale?: string[]): strin
   if (scale && scale.length > 1) {
     const i = scale.indexOf(label);
     if (i >= 0) {
-      const step = (SCALE_COLOURS.length - 1) / (scale.length - 1);
-      return SCALE_COLOURS[Math.round(i * step)]!;
+      // A scale of bare numbers is a count of something, and colour on
+      // a count says how many rather than how good. See `COUNT`.
+      const ramp = scale.every((v) => /^-?\d/.test(v)) ? COUNT_COLOURS : SCALE_COLOURS;
+      const step = (ramp.length - 1) / (scale.length - 1);
+      return ramp[Math.round(i * step)]!;
     }
   }
   return CAT_COLOURS[index % CAT_COLOURS.length]!;

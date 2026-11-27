@@ -1,7 +1,9 @@
 import PptxGenJS from 'pptxgenjs';
 import {
   analyse,
+  answeredReports,
   basisLine,
+  chartScale,
   coverage,
   displayCounts,
   poorLabels,
@@ -19,6 +21,7 @@ import {
   sectionOverviews,
   sharesAcross,
   isTeamQuestion,
+  namesStations,
   stationTypeQuestion,
   stationsObserved,
   teamQuestion,
@@ -44,6 +47,7 @@ import {
   RULE,
   BARE,
   CAT,
+  COUNT,
   FONT,
   HEADER_BLUE,
   INK,
@@ -116,7 +120,20 @@ export function colourFor(label: string, index: number, scale?: string[]): strin
   if (NON_ANSWERS.has(label)) return NOT_APPLICABLE;
   if (scale && scale.length > 1) {
     const i = scale.indexOf(label);
-    if (i >= 0) return SCALE[Math.round(i * ((SCALE.length - 1) / (scale.length - 1)))]!;
+    if (i >= 0) {
+      /*
+       * A count takes the blue ramp, a judgement the rating scale.
+       *
+       * A scale of bare numbers is a count - `chartScale` builds it
+       * from the bands, and a question the form scores wears the words
+       * from its own legend, never the digits. Colour on a count says
+       * how many, not how good, so it is one hue: "E.1 How many polling
+       * staff members are present" had 1 in the deep blue and 2 in the
+       * orange that flags a problem.
+       */
+      const ramp = scale.every((s) => /^-?\d/.test(s)) ? COUNT : SCALE;
+      return ramp[Math.round(i * ((ramp.length - 1) / (scale.length - 1)))]!;
+    }
   }
   return CAT[index % CAT.length]!;
 }
@@ -1005,7 +1022,32 @@ function addQuestionSlides(
       if (!sharesFirst) addSharesSlide(pptx, p);
       // The table of the stations behind the map, which needs no canvas
       // and so is drawn whether or not the maps are.
-      if (isRatingQuestion(p.q)) addPoorTableSlide(pptx, dataset, p.q, filter);
+      if (isRatingQuestion(p.q)) {
+        const poor = poorReports(dataset, p.q, filter);
+        addStationTableSlide(
+          pptx,
+          dataset,
+          p.q,
+          poor,
+          'Rating',
+          `Rated ${poorLabels(p.q).join(' or ').toLowerCase()} on ${poor.length} of ${
+            dataset.table.rows.length
+          } reports.`,
+        );
+      }
+      // And the stations behind a follow-up, which is a list of where
+      // something went wrong however few of them answered it.
+      if (namesStations(dataset, p.q)) {
+        const named = answeredReports(dataset, p.q, filter);
+        addStationTableSlide(
+          pptx,
+          dataset,
+          p.q,
+          named,
+          answerHead(p.q),
+          `Answered on ${named.length} of ${dataset.table.rows.length} reports.`,
+        );
+      }
       addRatingHourSlide(pptx, dataset, p.q, filter);
     }
   }
@@ -1027,13 +1069,35 @@ function title(word: string): string {
  * rather than filled with blanks, and ten rows to a page: a table a
  * reader cannot read from the back of the room is not a briefing slide.
  */
-function addPoorTableSlide(
+/**
+ * The last column's heading, read off the question's own wording.
+ *
+ * "If No to D.1  the delay was:" is a sentence about one column of a
+ * table, and the table wants the noun out of it. Anything this cannot
+ * shorten to a heading keeps the generic word rather than printing the
+ * question twice.
+ */
+export function answerHead(q: Question): string {
+  const word = q.label
+    // "If No to D.1" and no further, or the clause eats the sentence it
+    // was meant to introduce and every table is headed "Answer".
+    .replace(/^if\s+(yes|no)\b(\s+to\s+\S+)?\s*[,:]?\s*/i, '')
+    .replace(/\s+(was|were|is|are)\b.*$/i, '')
+    .replace(/^the\s+/i, '')
+    .replace(/[.:?]\s*$/, '')
+    .trim();
+  if (word.length === 0 || word.length > 18) return 'Answer';
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
+function addStationTableSlide(
   pptx: PptxGenJS,
   dataset: Dataset,
   q: Question,
-  filter: boolean[] | undefined,
+  reports: PoorReport[],
+  lastHead: string,
+  sub: string,
 ): void {
-  const reports = poorReports(dataset, q, filter);
   if (reports.length === 0) return;
 
   const columns: { head: string; of: (r: PoorReport) => string; w: number }[] = [];
@@ -1050,7 +1114,10 @@ function addPoorTableSlide(
   if (reports.some((r) => r.station)) {
     columns.push({ head: 'Polling station', of: (r) => r.station, w: 3.6 });
   }
-  columns.push({ head: 'Rating', of: (r) => r.rating, w: 2.2 });
+  // A rating is a word or two; "Between 16-30 minutes" is not, and the
+  // column it is in should not wrap every row of the table.
+  const widest = Math.max(...reports.map((r) => r.rating.length));
+  columns.push({ head: lastHead, of: (r) => r.rating, w: widest > 12 ? 3.4 : 2.2 });
 
   const total = columns.reduce((t, c) => t + c.w, 0);
   const widths = columns.map((c) => (c.w / total) * CONTENT.w);
@@ -1058,13 +1125,7 @@ function addPoorTableSlide(
   for (let i = 0; i < reports.length; i += POOR_ROWS) {
     const page = reports.slice(i, i + POOR_ROWS);
     const s = pptx.addSlide({ masterName: 'BASE' });
-    const top = heading(
-      s,
-      `${q.code} ${q.label}`.trim(),
-      `Rated ${poorLabels(q).join(' or ').toLowerCase()} on ${reports.length} of ${
-        dataset.table.rows.length
-      } reports.`,
-    );
+    const top = heading(s, `${q.code} ${q.label}`.trim(), sub);
     s.addTable(
       [
         columns.map((c) => ({
@@ -1148,10 +1209,9 @@ function addRatingHourSlide(
       // An hour nobody rated that way is not labelled nought.
       dataLabelFormatCode: '0;;;',
       catAxisLabelFontSize: TYPE.category,
-      catAxisTitle: 'Hour the observer left',
-      showCatAxisTitle: true,
-      catAxisTitleFontSize: TYPE.category,
-      catAxisTitleColor: MUTED,
+      // No axis title. The hours are a clock, which reads as one
+      // without being told, and a line of small print under a chart is
+      // the first thing a projector loses.
       valAxisMinVal: 0,
       valAxisMaxVal: tall,
       showLegend: false,
@@ -1256,7 +1316,7 @@ function addSharesSlide(pptx: PptxGenJS, planned: Planned): void {
   const top = heading(s, `${q.code} ${q.label}`.trim());
   const colours = fillsFor(
     shares.answers.map((label) => ({ label })),
-    { judged: JUDGED.test(q.label), scale: q.scale, perMark: true },
+    { judged: JUDGED.test(q.label), scale: chartScale(q, planned.b.total), perMark: true },
   );
 
   /*
@@ -1575,7 +1635,7 @@ function addPieMapSlide(pptx: PptxGenJS, dataset: Dataset, planned: Planned): vo
   const order = b.total.filter((c) => !NON_ANSWERS.has(c.label)).map((c) => c.label);
   const colours = fillsFor(b.total, {
     judged: JUDGED.test(q.label),
-    scale: q.scale,
+    scale: chartScale(q, b.total),
     perMark: true,
   })
     .slice(0, order.length)
@@ -1858,7 +1918,7 @@ function drawAnswerChart(
   const labels = counts.map((c) => c.label);
   const values = counts.map((c) => Number(c.n));
   const ring = (q.kind === 'binary' || q.kind === 'categorical') && labels.length <= 4;
-  const colours = fillsFor(counts, { judged, scale: q.scale, perMark: ring });
+  const colours = fillsFor(counts, { judged, scale: chartScale(q, counts), perMark: ring });
   const placed = place(box, `answers ${q.code}`);
 
   /*
@@ -2026,7 +2086,7 @@ function drawByGroup(
 ): void {
   const source = by === 'party' ? b.byParty : b.byArea;
   const answers = b.total.map((c) => c.label);
-  const colours = fillsFor(b.total, { judged, scale: q.scale, perMark: true });
+  const colours = fillsFor(b.total, { judged, scale: chartScale(q, b.total), perMark: true });
 
   // Largest area at the top, so the chart opens with the places that carry
   // the most observation rather than with whatever order the file had.

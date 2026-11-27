@@ -82,6 +82,26 @@ export const NOT_APPLICABLE = 'E66C37';
  */
 export const SCALE = ['6B007B', 'E66C37', 'D9B300', '118DFF', '12239E'];
 
+/**
+ * A count, fewest to most: one blue, pale to deep.
+ *
+ * "E.1 How many polling staff members are present" was drawn in the
+ * categorical palette, which put 1 in the deep blue and 2 in the orange
+ * a flagged answer wears - colour saying something about a quantity
+ * that the quantity did not say. A count is ordered data and takes an
+ * ordered ramp, and it is one hue because the tool does not know which
+ * end of a count is the good one: a station with every member of staff
+ * present is a full team, and a station with four unauthorised persons
+ * in it is not the same news.
+ *
+ * It stops at the deck's own light blue rather than going paler. A
+ * chart's data labels are one colour for the whole chart - PowerPoint
+ * allows no other - so every step has to carry white text, and a 9% in
+ * white on a pale blue column was the one thing on the page nobody
+ * could read.
+ */
+export const COUNT = ['118DFF', '0F73E0', '0D59C0', '1040A8', '12239E'];
+
 /** An answer that indicates a problem, so it stands out from the rest. */
 export const FLAG = 'E66C37';
 /** An answer that indicates no problem. */

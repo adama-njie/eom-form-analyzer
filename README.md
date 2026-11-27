@@ -400,6 +400,24 @@ observers gave as they left - section I on the Gambian form - and the mission re
 conditions at the station before the arithmetic of the day; a deck whose questions include
 no section C has nowhere to put it but the front, where it was.
 
+**A count is a quantity, not a judgement.** "E.1 How many polling staff members are
+present" was drawn in the categorical palette - 1 in the deep blue, 2 in the orange that
+flags a problem - which is colour saying something about a quantity that the quantity did
+not say, and it ran 0, 1, 2, 3, 4, 5 when five is a full complement and the thing a
+briefing looks for. A count is ordered data: it is charted the most first, as a rating is
+charted the best first, and shaded along one blue ramp from light to deep. One hue,
+because the tool does not know which end of a count is the good one - a full team is good
+news and four unauthorised persons in the room are not - and no paler than the deck's own
+light blue, because PowerPoint gives a chart one data-label colour for all of it and white
+on a pale column cannot be read.
+
+The same page holds five answers at most, six colours stacked in a column being a pattern
+rather than a chart. "E.3 How many citizen observers are present" was answered 0, 1, 2, 3,
+4 and 9 on eleven reports, so one station with nine cost the question its page. The tail is
+gathered into "4 or more" instead, for a count of things in a polling station - whole
+numbers, none above twenty. Six distinct voter-list totals are six sizes of station, and
+"3,300 or more" said about one report is not a band.
+
 **A count the form asks for as part of another count is that share.** "E.1.1 How many of
 the polling staff are female" is not a tally of its own: every woman it counts is one of
 the staff that E.1 counted. Charted in its own right it says how many observers wrote the

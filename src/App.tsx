@@ -12,6 +12,7 @@ import {
 import { GambiaMap } from '@/components/GambiaMap';
 import {
   analyse,
+  chartScale,
   displayCounts,
   buildDataset,
   coverage,
@@ -888,7 +889,8 @@ function QuestionCard({
 
       {q.kind === 'numeric' && !b.percent && b.numeric && (
         <>
-          <BarList counts={b.numeric.bins} />
+          {/* Most first and on one blue ramp, as the deck draws it. */}
+          <BarList counts={shown} scale={chartScale(q, b.total)} />
           <p className="muted small">
             {b.numeric.n} reports, totalling {b.numeric.sum.toLocaleString('en-GB')}.
           </p>
@@ -896,12 +898,12 @@ function QuestionCard({
       )}
 
       {(q.kind === 'binary' || q.kind === 'categorical') && shown.length <= 6 && (
-        <Donut counts={shown} scale={q.scale} />
+        <Donut counts={shown} scale={chartScale(q, b.total)} />
       )}
 
       {(q.kind === 'multi' || q.kind === 'time' || (q.kind === 'text' && !words) ||
         ((q.kind === 'categorical' || q.kind === 'ordinal') && shown.length > 6)) && (
-        <BarList counts={shown} judged={judged} scale={q.scale} />
+        <BarList counts={shown} judged={judged} scale={chartScale(q, b.total)} />
       )}
 
       {q.kind === 'ordinal' && shown.length <= 6 && (
@@ -917,7 +919,7 @@ function QuestionCard({
         <details className="byarea" open>
           <summary>By party</summary>
           <StackedByArea
-            scale={q.scale}
+            scale={chartScale(q, b.total)}
             order={order}
             rows={[
               ...partiesWithData.map((label) => ({
@@ -934,7 +936,7 @@ function QuestionCard({
         <details className="byarea">
           <summary>By area</summary>
           <StackedByArea
-            scale={q.scale}
+            scale={chartScale(q, b.total)}
             order={order}
             rows={[
               ...areasWithData.map((label) => ({

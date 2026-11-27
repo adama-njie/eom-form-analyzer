@@ -16,6 +16,8 @@ import {
   displayCounts,
   isRatingQuestion,
   poorLabels,
+  answeredReports,
+  namesStations,
   poorReports,
   ratingByHour,
   ratingQuestions,
@@ -301,6 +303,10 @@ export function countExtraPages(
     // or not the maps are.
     if (isRatingQuestion(q)) {
       n += Math.ceil(poorReports(dataset, q, filter).length / POOR_ROWS);
+    }
+    // And the stations behind a follow-up to a Yes/No question.
+    if (namesStations(dataset, q)) {
+      n += Math.ceil(answeredReports(dataset, q, filter).length / POOR_ROWS);
     }
     if (
       headline &&
