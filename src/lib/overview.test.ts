@@ -130,13 +130,27 @@ describe('the teams that filed the reports', () => {
     expect(panels.map((p) => p.label)).toEqual(['LTO', 'STO']);
   });
 
-  it('shows every team of a type, with the reports it filed', () => {
+  it('shows every team the mission deployed, with the reports each filed', () => {
     const panels = teamReports(form());
     expect(panels[0]!.counts.map((c) => [c.label, c.n])).toEqual([
       ['LTO 01', 2],
       ['LTO 02', 1],
+      ['LTO 03', 0],
+      ['LTO 04', 0],
+      ['LTO 05', 0],
+      ['LTO 06', 0],
+      ['LTO 07', 0],
+      ['LTO 08', 0],
     ]);
-    expect(panels[1]!.counts.map((c) => [c.label, c.n])).toEqual([
+  });
+
+  it('keeps a team that filed and is not on the roster', () => {
+    // "STO 01" is not how this mission numbers its short-term teams,
+    // and a report from it is still a report: a roster that swallowed
+    // one would be worse than a roster that is out of date.
+    const sto = teamReports(form())[1]!;
+    expect(sto.counts[0]!.label).toBe('STO 0101');
+    expect(sto.counts.slice(-2).map((c) => [c.label, c.n])).toEqual([
       ['STO 01', 1],
       ['STO 02', 2],
     ]);

@@ -1567,6 +1567,11 @@ function addTeamSlides(pptx: PptxGenJS, q: Question, panels: TeamPanel[]): void 
   // five team types at four to a slide left CT alone on the second.
   const slides = Math.max(1, Math.ceil(chunks.length / COLUMNS_PER_SLIDE));
   const perSlide = Math.ceil(chunks.length / slides);
+  // Across the whole question, not just this slide: ten short-term
+  // teams on one page and three members of parliament on the next drew
+  // the three as blocks four times the depth, which reads as a
+  // different unit rather than as a shorter list.
+  const deepest = Math.max(1, ...chunks.map((p) => p.counts.length));
 
   for (let i = 0; i < chunks.length; i += perSlide) {
     const page = chunks.slice(i, i + perSlide);
@@ -1582,7 +1587,7 @@ function addTeamSlides(pptx: PptxGenJS, q: Question, panels: TeamPanel[]): void 
     // reads as a different unit. Every bar on the slide is the same depth
     // instead, set by the longest column, and a short column is a short
     // chart.
-    const most = Math.max(1, ...page.map((p) => p.counts.length));
+    const most = deepest;
     const barH = (PAD.bottom - top - titleH) / most;
 
     page.forEach((panel, j) => {

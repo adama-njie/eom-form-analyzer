@@ -53,8 +53,19 @@ function form(): ReturnType<typeof buildDataset> {
 
 const q = (code: string) => form().questions.find((x) => x.code === code)!;
 
+/** A form from a mission this tool holds no roster for. */
+function otherMission(): ReturnType<typeof buildDataset> {
+  const table = toTable([
+    ['A.2 Local Government Area (LGA)', 'A.1 Team number - FIELD', 'A.1 Team number - AREA'],
+    ['Banjul', 'FIELD 01', 'AREA 0401'],
+    ['Banjul', 'FIELD 02', ''],
+    ['Kanifing', 'FIELD 04', 'AREA 0601'],
+  ]);
+  return buildDataset(table, inferSchema(table));
+}
+
 describe('the page of teams', () => {
-  it('shows a team that filed nothing, so the gap in the deployment is visible', () => {
+  it('shows every team the mission deployed, filed from or not', () => {
     const lto = teamReports(form()).find((p) => p.label === 'LTO')!;
     expect(lto.counts.map((c) => `${c.label}:${c.n}`)).toEqual([
       'LTO 01:2',
@@ -62,14 +73,36 @@ describe('the page of teams', () => {
       'LTO 03:0',
       'LTO 04:1',
       'LTO 05:2',
+      'LTO 06:0',
+      'LTO 07:0',
+      'LTO 08:0',
+    ]);
+  });
+
+  it('knows how its short-term teams are numbered, which no file could say', () => {
+    // Two reports, from STO 0401 and STO 0601. The ten teams between
+    // them cannot be inferred: "0401" is a region and a team.
+    const sto = teamReports(form()).find((p) => p.label === 'STO')!;
+    expect(sto.counts.map((c) => c.n)).toEqual([0, 0, 0, 1, 0, 0, 1, 0, 0, 0]);
+    expect(sto.counts.map((c) => c.label)[4]).toBe('STO 0402');
+  });
+
+  it('falls back to the numbering for a type the roster does not list', () => {
+    const panels = teamReports(otherMission());
+    expect(panels[0]!.counts.map((c) => `${c.label}:${c.n}`)).toEqual([
+      'FIELD 01:1',
+      'FIELD 02:1',
+      'FIELD 03:0',
+      'FIELD 04:1',
     ]);
   });
 
   it('invents no teams where the numbering is not a sequence', () => {
-    // "STO 0401" and "STO 0601" are a region and a team, not teams one
-    // and two hundred and one.
-    const sto = teamReports(form()).find((p) => p.label === 'STO')!;
-    expect(sto.counts.map((c) => c.label)).toEqual(['STO 0401', 'STO 0601']);
+    // "AREA 0401" and "AREA 0601" could be a region and a team, so the
+    // two hundred between them are not drawn as teams that filed
+    // nothing.
+    const areas = teamReports(otherMission())[1]!;
+    expect(areas.counts.map((c) => c.label)).toEqual(['AREA 0401', 'AREA 0601']);
   });
 });
 
@@ -140,7 +173,7 @@ describe('the stations behind a follow-up', () => {
 const PROBLEM = [
   'A.2 Local Government Area (LGA)',
   'A.1 Team number - LTO',
-  'A.1 Team number - LSTO',
+  'A.1 Team number - FIELD',
   'E.4 How many unauthorised persons are present inside the PS',
 ];
 
@@ -185,9 +218,11 @@ describe('a count of something that should not be there', () => {
     expect(colourFor('4', 1, ['1', '4', '5'])).toBe(COUNT[3]);
   });
 
-  it('keeps a panel for a team type that filed nothing', () => {
+  it('keeps a panel for a team type that filed nothing and is not listed', () => {
+    // The roster fills in the types it knows; one it does not know and
+    // nobody filed from has nothing to draw, and says so.
     const panels = teamReports(ds);
-    expect(panels.map((p) => p.label)).toEqual(['LTO', 'LSTO']);
+    expect(panels.map((p) => p.label)).toEqual(['LTO', 'FIELD']);
     expect(panels[1]!.counts).toEqual([]);
   });
 });

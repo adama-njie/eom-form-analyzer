@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 301 tests
+npm test           # vitest, 304 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 258 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 261 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -66,7 +66,7 @@ src/
     text.ts            prose vs lists, word and phrase counting
     chartImage.ts      canvas rendering (report charts, word clouds)
     mapImage.ts        map rasterisation for the deck
-    gambia.ts          LGAs, constituencies, the register, name matching
+    gambia.ts          LGAs, constituencies, the register, the deployment, name matching
     period.ts          the campaign period, and the dashboard's view of it
     layout.ts          slide geometry; `place()` throws on anything that would not fit
     theme.ts           every colour and type size in the product
@@ -458,25 +458,34 @@ geography.
   otherwise be split onto a page of its own, which is precisely the
   question worth seeing beside the others. Twelve rows to a page, then
   the section continues on another.
-- **A team that filed nothing is still on the page.** `withSilentTeams`
-  fills the gaps between the lowest and the highest team number that
-  filed, because a team missing from the axis reads as a team that does
-  not exist when what it means is that nothing has come in from it -
-  which is what this page is read for during a deployment. LTO 03 and
-  LTO 06 were simply absent between 02 and 08. Only where the
-  numbering says so: one prefix, numbers of one width, and fewer gaps
-  than teams that filed, because "STO 0401" and "STO 0601" are a region
-  and a team rather than teams one and two hundred and one, and filling
-  that range would invent two hundred teams. Nothing is added past the
-  highest number seen: how many teams there are is the mission's own
-  figure and this page has never known it.
-  **And a team type nobody filed from keeps its panel**, saying "No
-  reports" where its bars would be. The form offers LTO, STO, LSTO, MEP
-  and CT; dropping the empty ones left a page of two headings, which
-  reads as a deployment of two kinds of team rather than three kinds
-  that have sent nothing in. The panels fill their slides evenly, as a
-  section fills its pages: five types at four to a slide left CT alone
-  on the second.
+- **The deployment is the mission's, and `DEPLOYMENT` is where it is
+  written.** Which teams have not reported is what this page is read
+  for during a deployment, and the reports cannot answer it: a team
+  that has sent nothing in is absent from the file by definition. The
+  numbering gets part of it - LTO 01 to 08 with 03 and 06 missing - and
+  cannot get the short-term teams at all, because "STO 0401" is a
+  region and a team rather than team four hundred and one. So the
+  roster is listed in `gambia.ts` beside the register, for the same
+  reason: it is the mission's own figure, known before a report was
+  filed. `withEveryTeam` draws every team on it with nought against the
+  ones that have not reported, and a team that files and is not on the
+  roster goes after them rather than being dropped - a roster that
+  swallowed a report would be worse than one that is out of date; that
+  is the sign this list needs correcting. Names are matched on
+  `teamKey`, so "lto01" is "LTO 01".
+  **A form this holds no roster for falls back to the numbering.**
+  `withSilentTeams` fills the gaps between the lowest and the highest
+  number that filed, where the names are one prefix and numbers of one
+  width and the gaps are fewer than the teams that filed; nothing is
+  added past the highest number seen.
+  **And a team type with neither a roster nor a report keeps its
+  panel**, saying "No reports" where its bars would be, rather than
+  leaving the page to read as a deployment of fewer kinds of team.
+  The panels fill their slides evenly, as a section fills its pages,
+  and every bar on the question is the same depth whichever slide it
+  is on: ten short-term teams on one page and three members of
+  parliament on the next drew the three as blocks four times as deep,
+  which reads as a different unit rather than as a shorter list.
 - **The teams are a chart per team type.** The form asks for the team
   number once per team type, so the columns are the types and the answers
   in them are the teams: sixty bars on one axis is a wall, and the

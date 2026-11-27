@@ -499,3 +499,53 @@ export const LGA_SHAPES: { key: string; shape: BoundaryShape }[] = LGAS.map((a) 
   return { key: a.name, shape };
 });
 
+
+/* ------------------------------------------------------------------ */
+/* The deployment                                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Every team the mission deployed, by the type the form asks for.
+ *
+ * This is the mission's own figure, as the register is the IEC's, and
+ * it is the only place it is written. The teams page is read during a
+ * deployment to see who has not filed yet, and that question cannot be
+ * answered from the reports alone: a team that has sent nothing in is
+ * absent from the file by definition. Inferring the range from the
+ * numbers that did file got LTO right - 01 to 08 with two gaps - and
+ * could not get STO right at all, because "STO 0401" is a region and a
+ * team rather than team four hundred and one.
+ *
+ * The listed teams are shown whether or not they filed. A team that
+ * filed and is not listed here is still shown, after them, because a
+ * roster that silently swallowed a report would be worse than one that
+ * is out of date; if that happens, this list is what needs correcting.
+ */
+export const DEPLOYMENT: Record<string, readonly string[]> = {
+  LTO: ['LTO 01', 'LTO 02', 'LTO 03', 'LTO 04', 'LTO 05', 'LTO 06', 'LTO 07', 'LTO 08'],
+  STO: [
+    'STO 0101',
+    'STO 0201',
+    'STO 0301',
+    'STO 0401',
+    'STO 0402',
+    'STO 0501',
+    'STO 0601',
+    'STO 0701',
+    'STO 0702',
+    'STO 0801',
+  ],
+  LSTO: ['LSTO 01', 'LSTO 02', 'LSTO 03', 'LSTO 04', 'LSTO 05', 'LSTO 06'],
+  MEP: ['MEP 1', 'MEP 2', 'MEP 3'],
+  CT: ['CT 1', 'CT 2', 'CT 3', 'CO'],
+};
+
+/** How a team name is compared, so "lto01" and "LTO 01" are one team. */
+export function teamKey(name: string): string {
+  return name.replace(/\s+/g, '').toUpperCase();
+}
+
+/** The teams deployed as this type, or null where the mission lists none. */
+export function deployedTeams(type: string): readonly string[] | null {
+  return DEPLOYMENT[teamKey(type)] ?? null;
+}

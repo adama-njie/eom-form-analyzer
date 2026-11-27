@@ -12,9 +12,11 @@ import {
   LGAS,
   TOTAL_REGISTERED_2026,
   areaUnits,
+  deployedTeams,
   lgaName,
   resolveConstituency,
   resolveLga,
+  teamKey,
   unitCodeFor,
   type AreaUnit,
   type Division,
@@ -2654,8 +2656,28 @@ export function teamReports(dataset: Dataset, rowFilter?: boolean[]): TeamPanel[
         // identifier, and sorting it as text puts "A.10" above "A.2".
         .sort((a, b) => a[0].localeCompare(b[0], 'en', { numeric: true }))
         .map(([label, n]) => ({ label, n, pct: 0 }));
-      return { label, counts: withSilentTeams(counts) };
+      return { label, counts: withEveryTeam(label, counts) };
     });
+}
+
+/**
+ * Every team of this type, whether or not it filed.
+ *
+ * From the mission's roster where it has one, which is the only thing
+ * that knows how many teams there are; from the numbering otherwise, so
+ * a form from another mission still shows the gaps it can see.
+ */
+function withEveryTeam(type: string, counts: Count[]): Count[] {
+  const roster = deployedTeams(type);
+  if (!roster) return withSilentTeams(counts);
+  const filed = new Map(counts.map((c) => [teamKey(c.label), c]));
+  const listed = roster.map(
+    (name) => filed.get(teamKey(name)) ?? { label: name, n: 0, pct: 0 },
+  );
+  // A team that filed and is not on the roster goes after it rather
+  // than being dropped: the report exists and the roster may be stale.
+  const known = new Set(roster.map(teamKey));
+  return [...listed, ...counts.filter((c) => !known.has(teamKey(c.label)))];
 }
 
 /* ------------------------------------------------------------------ */

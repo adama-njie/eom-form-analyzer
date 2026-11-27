@@ -677,6 +677,19 @@ in one question: a form where two observers each write their own number fills tw
 on one report, which is the signature of columns that only share a stem, and the tool
 leaves those apart on purpose - but they are still one page to the person reading it.
 
+**Which teams have not reported at all is the question this page exists for, and the
+reports cannot answer it.** A team that has sent nothing in is absent from the file by
+definition, so the page silently showed a deployment consisting of whoever had filed. The
+numbering could be read for part of it - LTO 01 to LTO 08 with 03 and 06 missing - but not
+for the short-term teams, where "STO 0401" is a region and a team rather than team four
+hundred and one, and filling that range would have invented two hundred teams. So the
+mission's roster is written down, in the same file as the register and for the same
+reason: it is the mission's own figure, known before a report was filed. Every team on it
+is drawn, with nought against the ones that have not reported, and a team that files and
+is not on the roster is drawn after them rather than dropped - a roster that swallowed a
+report would be worse than one that is out of date. A form from a mission with no roster
+here still gets what the numbering can tell it.
+
 **A mean score is written to one decimal place.** Two decimals said more than the scale
 knows: a mean of 3.44 out of 4 is drawn from reports that each answered 3 or 4, and the
 second decimal moves with a single report. One place, in the one function that writes it,
