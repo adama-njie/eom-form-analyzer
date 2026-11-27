@@ -16,6 +16,7 @@ import {
   displayCounts,
   isRatingQuestion,
   poorLabels,
+  poorReports,
   ratingByHour,
   ratingQuestions,
   findings,
@@ -186,8 +187,17 @@ export function needsOwnSlide(q: Question, b: Breakdown): boolean {
  * Read by the deck, which draws the page, and by the dialogue, which
  * counts it before the analyst presses the button.
  */
-export function needsCountsPage(hasShares: boolean, parties: string[]): boolean {
-  return !hasShares || parties.length > 0;
+/** Rows to a page of the table of badly rated stations. See `addPoorTableSlide`. */
+export const POOR_ROWS = 10;
+
+export function needsCountsPage(
+  hasShares: boolean,
+  parties: string[],
+  banded = false,
+): boolean {
+  // A number keeps its counting page whatever else it gets: the shares
+  // page is a composition and the count is the figure itself.
+  return !hasShares || parties.length > 0 || banded;
 }
 
 /**
@@ -208,6 +218,7 @@ export function countQuestionPages(
       counts: needsCountsPage(
         sharesAcross(dataset, q, filter, b) !== null,
         slideBreakdown(q, b).parties,
+        q.kind === 'numeric',
       ),
     };
   });
@@ -293,6 +304,11 @@ export function countExtraPages(
     // The area's own map is the overview map, moved rather than added.
     const kind = selection.maps ? mapKindFor(dataset, q, b) : null;
     if (kind && kind !== 'area') n += 1;
+    // The table of the stations the map shades, which is drawn whether
+    // or not the maps are.
+    if (isRatingQuestion(q)) {
+      n += Math.ceil(poorReports(dataset, q, filter).length / POOR_ROWS);
+    }
     if (
       headline &&
       q.columns[0] === headline.columns[0] &&
@@ -397,8 +413,15 @@ export function defaultSelection(dataset: Dataset, formName: string): ExportSele
 export function defaultTitle(fileName: string, sheetName: string): string {
   const sheet = sheetName.trim();
   const generic = /^(sheet|table|tabelle|hoja|feuille|foglio)\s*\d*$/i;
-  if (sheet && !generic.test(sheet)) return sheet;
-  return fileName.replace(/\.[^.]+$/, '') || fileName;
+  const name = sheet && !generic.test(sheet) ? sheet : fileName.replace(/\.[^.]+$/, '') || fileName;
+  /*
+   * "Analysis of Form B Voting", not "Form B Voting".
+   *
+   * The title is printed on a cover and on a file, and the form's own
+   * name alone reads as the form rather than as what was done with it -
+   * a reader opening the deck would reasonably expect the questionnaire.
+   */
+  return /^analys/i.test(name) ? name : `Analysis of ${name}`;
 }
 
 /**

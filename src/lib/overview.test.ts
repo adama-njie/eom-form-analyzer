@@ -7,6 +7,7 @@ import {
   buildDataset,
   displayCounts,
   poorLabels,
+  poorReports,
   rateByPlace,
   ratingByHour,
   sectionOverviews,
@@ -419,16 +420,18 @@ function ratedForm() {
   const table = toTable([
     [
       'B.1 Polling station administrative area',
+      'B.2 Polling station constituency',
+      'B.3 Polling station name',
       'I.1 Time of departure',
       '4=Very good 3=Good 2=Bad 1=Very bad',
       'J.1 The overall conduct of the voting in this PS was',
     ],
-    ['Banjul', '08:10', '', '4'],
-    ['Banjul', '08:40', '', '3'],
-    ['Kanifing', '11:05', '', '2'],
-    ['Kanifing', '11:50', '', '3'],
-    ['Basse', '16:20', '', '1'],
-    ['Basse', '16:30', '', '4'],
+    ['Banjul', 'Banjul North', 'Crab Island', '08:10', '', '4'],
+    ['Banjul', 'Banjul South', 'Half Die', '08:40', '', '3'],
+    ['Kanifing', 'Serrekunda', 'Latrikunda Lower Basic', '11:05', '', '2'],
+    ['Kanifing', 'Bakau', 'Bakau Newtown', '11:50', '', '3'],
+    ['Basse', 'Basse', 'Manneh Kunda', '16:20', '', '1'],
+    ['Basse', 'Basse', 'Basse Upper Basic', '16:30', '', '4'],
   ]);
   return buildDataset(table, inferSchema(table));
 }
@@ -462,6 +465,22 @@ describe('a rating, read the way a briefing reads it', () => {
     const rates = rateByPlace(ds, q, poorLabels(q));
     expect(rates.find((r) => r.place === 'Kanifing')?.pct).toBe(50);
     expect(rates.find((r) => r.place === 'Banjul')?.pct).toBe(0);
+  });
+
+  it('names the stations behind the map, worst first', () => {
+    /*
+     * A map shades an area and says how much of it was rated badly;
+     * the next thing a mission asks is which stations those were.
+     */
+    const ds = ratedForm();
+    const rows = poorReports(ds, ds.questions.find((x) => x.code === 'J.1')!);
+    expect(rows.map((r) => [r.rating, r.area, r.station])).toEqual([
+      ['Very bad', 'Basse', 'Manneh Kunda'],
+      ['Bad', 'Kanifing', 'Latrikunda Lower Basic'],
+    ]);
+    // The constituency is read from the question, which a polling-day
+    // form asks in a column per area.
+    expect(rows[0]!.constituency).toBe('Basse');
   });
 
   it('reads the rating against the hour the observer left', () => {

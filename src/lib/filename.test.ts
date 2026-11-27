@@ -51,12 +51,18 @@ describe('what an export is called before anyone renames it', () => {
     // The cover used to read "campaign-report-20261124-143212.xlsx -
     // Campaign Report", which is a file name on a briefing slide.
     expect(defaultTitle('campaign-report-20261124-143212.xlsx', 'Campaign Report')).toBe(
-      'Campaign Report',
+      'Analysis of Campaign Report',
     );
   });
 
+  it('says it is an analysis of the form, not the form', () => {
+    // A cover reading "Form B Voting" promises the questionnaire.
+    expect(defaultTitle('x.xlsx', 'Form B Voting')).toBe('Analysis of Form B Voting');
+    expect(defaultTitle('x.xlsx', 'Analysis of Form B')).toBe('Analysis of Form B');
+  });
+
   it('falls back to the file when the sheet was never named', () => {
-    expect(defaultTitle('Form B sample.xlsx', 'Sheet1')).toBe('Form B sample');
-    expect(defaultTitle('Form B sample.xlsx', '')).toBe('Form B sample');
+    expect(defaultTitle('Form B sample.xlsx', 'Sheet1')).toBe('Analysis of Form B sample');
+    expect(defaultTitle('Form B sample.xlsx', '')).toBe('Analysis of Form B sample');
   });
 });

@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 268 tests
+npm test           # vitest, 273 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 225 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 230 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -184,6 +184,15 @@ geography.
   scale and `colourFor`'s place along it are all read off it. The screen
   takes its order from `displayCounts` too, so the dashboard and the deck
   read the same way round.
+- **The map of a rating is followed by the stations behind it.**
+  `poorReports` and `addPoorTableSlide`: the area, the constituency and
+  the station name, worst first, ten rows to a page, with a column the
+  form does not ask for left out rather than filled with blanks. The
+  constituency is read through its question rather than through
+  `dataset.constituencyColumn`, because the polling-day form asks it in
+  a column per area and the settled column is blank for every report
+  filed from anywhere else. The table needs no canvas, so it is drawn
+  whether or not the maps are.
 - **A rating question is mapped on the worse end of its scale.**
   `mapKindFor` returns `poor` for it rather than `pie`: four answers pied
   across seven areas holding one or two reports each is a page of
@@ -198,7 +207,10 @@ geography.
   departure reading - the same clock the turnout curve uses, because that
   is when the observer had seen the whole of their visit - and
   `addRatingHourSlide` draws it as stacked counts with the hour's own
-  total above the column. The first rating question only: five of these
+  total just over its own column - `axisTop` states the top of the axis
+  so the figure can be placed there, and written along one line at the
+  head of the chart it sat an inch above the short columns. The clock
+  is named on the category axis rather than in a line under the title. The first rating question only: five of these
   would be five pages saying the same thing five ways.
 - **A scored question wears the words from its own legend.** The forms put
   the key in a column of its own - "4=Very good 3=Good 2=Bad 1=Very bad" -
@@ -276,8 +288,16 @@ geography.
   `needsCountsPage` is that decision, read by the deck and by the export
   dialogue, which counts the pages before the analyst presses the button.
   A question the shares page cannot hold keeps its counting page - more
-  than five answers, a number in bands, a cloud of words - and so does a
-  question broken down by party, which the shares page does not draw. The
+  than five answers, a number in ranges, a cloud of words - and so does
+  a question broken down by party, which the shares page does not draw.
+  A count of a few things - "E.1 How many polling staff members are
+  present", answered 1 to 5 and banded one value to a band - is a
+  composition like any other and gets the shares page too, and keeps
+  its counting page, because the shares are the composition and the
+  count is the figure itself. A number banded into ranges does not: an
+  area does not hold more or less of "4,000 to 4,999", and a station's
+  own number is an identifier. Nor does a question asked as a
+  percentage, which is averaged and has its own page. The
   order is fixed in `addQuestionSlides`: the question's own page, then the
   map, and the shares after it where the question had a page of counts.
 - **Which map a question gets is `mapKindFor`'s decision, and only its.**
@@ -403,12 +423,17 @@ geography.
   43%, which answers a question nobody asked. `analyse` sets a multi
   block's `pct` against `reports`, and the deck charts that share with
   the base written over the chart - the reference deck's own treatment
-  of "unauthorised persons". The share and the count are written
-  together after the bar, "78% (7)", because a PowerPoint data label
-  holds one number and the count used to sit in the option's name at
-  the far end of the row: the plot area is stated and the axis fixed at
-  0 to 100, so where each bar ends is known and the pair can be written
-  there - and two of these blocks can be read against each other.
+  of "unauthorised persons". The count, the base and the share are
+  written together after the bar - "2 of 9 (22%)" - because a
+  PowerPoint data label holds one number and the count used to sit in
+  the option's name at the far end of the row: the plot area is stated
+  and the axis top is `axisTop` of the longest bar, so where each bar
+  ends is known and the figures can be written there. The base is in
+  every label rather than in a line under the title, which was prose
+  where the chart needed the room; the axis stops above the longest bar
+  rather than at 100%, because a block whose commonest answer was
+  ticked on two reports in thirteen was five stubs in an acre of
+  white.
   The share is of every report in the export rather than of the ones
   that reached the question, so a follow-up asked only of the reports
   that answered Yes is not a share of a different denominator on every
@@ -431,6 +456,11 @@ geography.
   beside it read as a hedge, not as a base - and `meanLabel` is the one
   place it is written: whole numbers, except under 10, where B.10's half a
   percent would otherwise be drawn as 0%.
+- **A deck is named "Analysis of" the form.** `defaultTitle` prefixes
+  the sheet's own name, because the cover and the file are read by
+  someone who would otherwise expect the questionnaire. The cover no
+  longer carries the line about which division of the country the deck
+  counts; `AREA_WORDS` names it on every page that groups by area.
 - **An export is named after the title it was given**, not
   `observer-analysis-<date>`: `exportFileName` slugs the dialogue's title,
   adds the period where one is filtered, then the date. The title starts

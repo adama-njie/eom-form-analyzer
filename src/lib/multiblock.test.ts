@@ -92,7 +92,7 @@ describe('a block of tick boxes', () => {
     expect(Math.round(mandinka.pct)).toBe(75);
   });
 
-  it('says on the slide what the share is of', () => {
+  it('writes the base into every label, so no line explains the chart', () => {
     // A percentage on a slide says what it is a share of, always.
     const ds = dataset();
     const deck = buildDeck(ds, undefined, {
@@ -109,13 +109,16 @@ describe('a block of tick boxes', () => {
       const zip = await JSZip.loadAsync(buf as Buffer);
       const charts = Object.keys(zip.files).filter((f) => /ppt\/charts\/chart\d+\.xml$/.test(f));
       const texts = await Promise.all(charts.map((f) => zip.files[f]!.async('string')));
-      const page = texts.find((x) => x.includes('Mandinka'))!;
-      expect(page).toContain('Share of all 4 reports');
-      // The share and the count are written together, after the bar, so
-      // a reader does not carry the count across the chart to reach it.
+      expect(texts.some((x) => x.includes('Mandinka'))).toBe(true);
+      /*
+       * The count, the base and the share are written together after
+       * the bar. A percentage says what it is a share of, and a line
+       * under the title saying it once was prose where the chart
+       * needed the room.
+       */
       const slides = Object.keys(zip.files).filter((f) => /ppt\/slides\/slide\d+\.xml$/.test(f));
       const written = await Promise.all(slides.map((f) => zip.files[f]!.async('string')));
-      expect(written.some((x) => x.includes('<a:t>75% (3)</a:t>'))).toBe(true);
+      expect(written.some((x) => x.includes('<a:t>3 of 4 (75%)</a:t>'))).toBe(true);
     });
   });
 });

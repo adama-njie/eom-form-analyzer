@@ -4,8 +4,11 @@ import {
   coverage,
   displayCounts,
   poorLabels,
+  poorReports,
+  type PoorReport,
   ratingByHour,
   isInverted,
+  isRatingQuestion,
   meanLabel,
   rateByPlace,
   ratingOf,
@@ -37,6 +40,7 @@ import {
   ACCENT,
   ACCENT_DEEP,
   FLAG,
+  RULE,
   BARE,
   CAT,
   FONT,
@@ -57,6 +61,7 @@ import {
   isConstituencyQuestion,
   mapKindFor,
   needsCountsPage,
+  POOR_ROWS,
   needsOwnSlide,
   selectedQuestions,
   slideBreakdown,
@@ -234,7 +239,7 @@ export function buildDeck(
     ? turnoutPage
     : undefined;
 
-  addTitleSlide(pptx, sel, dataset.division);
+  addTitleSlide(pptx, sel);
   if (sel.coverage) addCoverageSlide(pptx, dataset, cov, filter);
   if (turnoutPage && !afterSection) turnoutPage();
   if (canDrawMaps && !areaAsked) addMapSlide(pptx, dataset, filter);
@@ -248,7 +253,7 @@ export function buildDeck(
 
 /* ------------------------------------------------------------------ */
 
-function addTitleSlide(pptx: PptxGenJS, sel: ExportSelection, division: Division): void {
+function addTitleSlide(pptx: PptxGenJS, sel: ExportSelection): void {
   const s = pptx.addSlide();
   s.background = { color: 'FFFFFF' };
 
@@ -313,25 +318,6 @@ function addTitleSlide(pptx: PptxGenJS, sel: ExportSelection, division: Division
       fontSize: TYPE.coverSubtitle, color: INK,
       fontFace: FONT, align: 'center', valign: 'middle',
     });
-  }
-
-  /*
-   * Which division of the country the deck counts.
-   *
-   * A deck of seven regions and a deck of eight Local Government Areas
-   * both show a place called Janjanbureh, and in one of them it is twice
-   * the size of the other. Side by side in a briefing that is a question
-   * nobody should have to ask, so the cover answers it.
-   */
-  if (division === 'region') {
-    s.addText(
-      'Areas are the seven regions; Central River is reported as Janjanbureh.',
-      {
-        ...place({ x: 0.9, y: 5.25, w: SLIDE.w - 1.8, h: 0.4 }, 'division note'),
-        fontSize: TYPE.coverStamp, color: MUTED,
-        fontFace: FONT, align: 'center', valign: 'middle',
-      },
-    );
   }
 
   s.addText('Updated', {
@@ -703,6 +689,20 @@ function addMapSlide(
 }
 
 /**
+ * A round number at or above the largest value, for an axis the tool
+ * places its own labels against.
+ *
+ * PowerPoint picks the top of an axis itself, and a label written by
+ * hand has to know where the mark ends, so the top is stated. Round,
+ * because a reader reads the axis too, and never below a tenth of the
+ * scale, so a chart of small shares is still a chart.
+ */
+export function axisTop(max: number, cap = Infinity): number {
+  const step = max <= 10 ? 2 : max <= 50 ? 10 : 20;
+  return Math.min(cap, Math.max(step, Math.ceil(max / step) * step));
+}
+
+/**
  * The colour a shaded map is drawn in.
  *
  * One colour per kind of map, not per question: blue for a rate, the
@@ -880,7 +880,7 @@ interface Planned {
 
 /** See `needsCountsPage`, which the export dialogue counts from. */
 function countsNeeded(p: Planned): boolean {
-  return needsCountsPage(p.shares !== null, p.parties);
+  return needsCountsPage(p.shares !== null, p.parties, p.q.kind === 'numeric');
 }
 
 function plan(dataset: Dataset, q: Question, filter: boolean[] | undefined): Planned | null {
@@ -1002,11 +1002,93 @@ function addQuestionSlides(
         else if (kind === 'pie') addPieMapSlide(pptx, dataset, p);
       }
       if (!sharesFirst) addSharesSlide(pptx, p);
+      // The table of the stations behind the map, which needs no canvas
+      // and so is drawn whether or not the maps are.
+      if (isRatingQuestion(p.q)) addPoorTableSlide(pptx, dataset, p.q, filter);
       addRatingHourSlide(pptx, dataset, p.q, filter);
     }
   }
   // Where section C is the last one in the deck, the curve closes it.
   if (pending && opened.has(TURNOUT_AFTER)) pending();
+}
+
+/** A word as a column heading: "Region", not "region". */
+function title(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
+/**
+ * The stations behind the map of the worse end of a scale.
+ *
+ * The map says how much of an area was rated badly; a mission then asks
+ * which stations those were, and the reference deck answers it with a
+ * table beside the map. A column the form does not ask for is left out
+ * rather than filled with blanks, and ten rows to a page: a table a
+ * reader cannot read from the back of the room is not a briefing slide.
+ */
+function addPoorTableSlide(
+  pptx: PptxGenJS,
+  dataset: Dataset,
+  q: Question,
+  filter: boolean[] | undefined,
+): void {
+  const reports = poorReports(dataset, q, filter);
+  if (reports.length === 0) return;
+
+  const columns: { head: string; of: (r: PoorReport) => string; w: number }[] = [];
+  if (reports.some((r) => r.area)) {
+    columns.push({
+      head: title(AREA_WORDS[dataset.division].one),
+      of: (r) => r.area,
+      w: 3,
+    });
+  }
+  if (reports.some((r) => r.constituency)) {
+    columns.push({ head: 'Constituency', of: (r) => r.constituency, w: 3.6 });
+  }
+  if (reports.some((r) => r.station)) {
+    columns.push({ head: 'Polling station', of: (r) => r.station, w: 3.6 });
+  }
+  columns.push({ head: 'Rating', of: (r) => r.rating, w: 2.2 });
+
+  const total = columns.reduce((t, c) => t + c.w, 0);
+  const widths = columns.map((c) => (c.w / total) * CONTENT.w);
+
+  for (let i = 0; i < reports.length; i += POOR_ROWS) {
+    const page = reports.slice(i, i + POOR_ROWS);
+    const s = pptx.addSlide({ masterName: 'BASE' });
+    const top = heading(
+      s,
+      `${q.code} ${q.label}`.trim(),
+      `Rated ${poorLabels(q).join(' or ').toLowerCase()} on ${reports.length} of ${
+        dataset.table.rows.length
+      } reports.`,
+    );
+    s.addTable(
+      [
+        columns.map((c) => ({
+          text: c.head,
+          options: { bold: true, color: INK, fill: { color: PANEL } },
+        })),
+        ...page.map((r) => columns.map((c) => ({ text: c.of(r), options: { color: INK } }))),
+      ],
+      {
+        ...place(
+          { x: PAD.x, y: top, w: CONTENT.w, h: PAD.bottom - top },
+          `poor table ${q.code} ${i}`,
+        ),
+        colW: widths,
+        // A row is as tall as a line of it needs; left to fill the box,
+        // two rows of a ten-row table were an inch and a half each.
+        rowH: 0.42,
+        fontSize: TYPE.table,
+        fontFace: FONT,
+        border: { type: 'solid', color: RULE, pt: 1 },
+        valign: 'middle',
+        autoPage: false,
+      },
+    );
+  }
 }
 
 /**
@@ -1031,18 +1113,17 @@ function addRatingHourSlide(
   if (!read || read.hours.length < 2) return;
 
   const s = pptx.addSlide({ masterName: 'BASE' });
-  const top = heading(
-    s,
-    `${q.code} ${q.label}`.trim(),
-    'By the hour the observer left, in reports.',
-  );
+  const top = heading(s, `${q.code} ${q.label}`.trim());
   const colours = read.answers.map((label, i) => colourFor(label, i, q.scale));
 
   const legendH = 0.46;
   const totalH = (TYPE.category * 1.7) / 72;
-  const band = ((TYPE.category * 1.4) / 72) * 2;
+  const band = ((TYPE.category * 1.4) / 72) * 2.4;
   const frameH = PAD.bottom - legendH - top;
   const plotH = frameH - totalH - band;
+  // The top of the axis is stated, so each hour's total can be written
+  // just over its own column rather than along a line of its own.
+  const tall = axisTop(Math.max(...read.hours.map((h) => h.n)));
 
   s.addChart(
     pptx.ChartType.bar,
@@ -1066,15 +1147,31 @@ function addRatingHourSlide(
       // An hour nobody rated that way is not labelled nought.
       dataLabelFormatCode: '0;;;',
       catAxisLabelFontSize: TYPE.category,
+      catAxisTitle: 'Hour the observer left',
+      showCatAxisTitle: true,
+      catAxisTitleFontSize: TYPE.category,
+      catAxisTitleColor: MUTED,
+      valAxisMinVal: 0,
+      valAxisMaxVal: tall,
       showLegend: false,
     },
   );
 
-  // The hour's own total, over the column, as on the shares page.
+  /*
+   * The hour's own total, just over its own column.
+   *
+   * Written along one line at the head of the chart it sat an inch
+   * above the short columns and touching the tall ones, and a reader
+   * had to work out which figure belonged to which hour.
+   */
+  const slot = CONTENT.w / read.hours.length;
   read.hours.forEach((h, i) => {
-    const slot = CONTENT.w / read.hours.length;
+    const colTop = top + totalH + plotH * (1 - h.n / tall);
     s.addText(String(h.n), {
-      ...place({ x: PAD.x + i * slot, y: top, w: slot, h: totalH }, `hour total ${i}`),
+      ...place(
+        { x: PAD.x + i * slot, y: colTop - totalH, w: slot, h: totalH },
+        `hour total ${i}`,
+      ),
       fontSize: TYPE.category, color: MUTED, fontFace: FONT,
       align: 'center', valign: 'bottom',
     });
@@ -1820,14 +1917,23 @@ function drawAnswerChart(
       box.w * 0.45,
       (Math.max(...rows.map((r) => r.label.length)) * pt * 0.58) / 72 + 0.12,
     );
-    const valueW = (9 * TYPE.dataLabel * 0.62) / 72 + 0.12;
-    // Room for the line over the chart, which is one line: at 0.62 a
-    // title that ran to two sat on top of the first option's name.
-    const titleH = 0.82;
+    /*
+     * The axis stops a little above the longest bar, not at 100%.
+     *
+     * Drawn against the whole hundred, a block whose commonest answer
+     * was ticked on two reports in thirteen was five stubs in an acre
+     * of white. The base is written into every label instead, so the
+     * page still says what the share is of and a reader comparing two
+     * of these pages has the number rather than the length to go on.
+     */
+    const top100 = axisTop(Math.max(...rows.map((r) => r.pct)), 100);
+    const text = (r: { n: number; pct: number }) => `${r.n} of ${b.reports} (${r.pct}%)`;
+    const valueW =
+      (Math.max(...rows.map((r) => text(r).length)) * TYPE.dataLabel * 0.62) / 72 + 0.14;
     const plotX = box.x + nameW;
     const plotW = box.w - nameW - valueW;
-    const plotY = box.y + titleH;
-    const plotH = box.h - titleH;
+    const plotY = box.y;
+    const plotH = box.h;
 
     slide.addChart(
       pptx.ChartType.bar,
@@ -1839,25 +1945,21 @@ function drawAnswerChart(
       {
         ...placed,
         ...BARE,
-        layout: { x: nameW / box.w, y: titleH / box.h, w: plotW / box.w, h: plotH / box.h },
+        layout: { x: nameW / box.w, y: 0, w: plotW / box.w, h: 1 },
         barDir: 'bar', chartColors: topDown(colours), barGapWidthPct: 55,
         showValue: false,
         catAxisLabelFontSize: pt,
-        showTitle: true,
-        title: `Share of all ${b.reports} reports.`,
-        titleFontSize: TYPE.sub,
-        titleColor: MUTED,
         showLegend: false,
         valAxisMinVal: 0,
-        valAxisMaxVal: 100,
+        valAxisMaxVal: top100,
       },
     );
 
     const slot = plotH / rows.length;
     const lineH = (TYPE.dataLabel * 1.7) / 72;
     rows.forEach((r, i) => {
-      const end = plotX + (plotW * r.pct) / 100;
-      slide.addText(`${r.pct}% (${r.n})`, {
+      const end = plotX + (plotW * r.pct) / top100;
+      slide.addText(text(r), {
         ...place(
           { x: end + 0.06, y: plotY + i * slot + slot / 2 - lineH / 2, w: valueW, h: lineH },
           `tick share ${q.code} ${i}`,

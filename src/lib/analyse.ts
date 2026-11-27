@@ -1410,6 +1410,70 @@ export function turnoutByHour(dataset: Dataset, rowFilter?: boolean[]): Turnout 
   return { points, readings: n, register };
 }
 
+/** One report that rated something at the worse end of its scale. */
+export interface PoorReport {
+  area: string;
+  constituency: string;
+  station: string;
+  rating: string;
+}
+
+/**
+ * The reports behind a map of the worse end of a scale.
+ *
+ * A map shades an area and says how much of it was rated badly; the
+ * next thing a mission asks is which stations those were, and the
+ * reference deck answers it with a table beside the map. Named as
+ * closely as the form allows - the area, the constituency, the station
+ * - and a column the form does not ask for is left out rather than
+ * filled with blanks.
+ */
+export function poorReports(
+  dataset: Dataset,
+  question: Question,
+  rowFilter?: boolean[],
+): PoorReport[] {
+  const poor = new Set(poorLabels(question));
+  if (poor.size === 0) return [];
+  const station = stationQuestion(dataset);
+  /*
+   * The constituency question, not the constituency column.
+   *
+   * The polling-day form asks it in a column per area and a report
+   * fills the one its station is in, so reading the column the dataset
+   * settled on gave a blank for every report filed from anywhere else.
+   */
+  const constituency =
+    dataset.constituencyColumn !== null
+      ? (dataset.questions.find((x) =>
+          x.columns.includes(dataset.constituencyColumn!),
+        ) ?? null)
+      : null;
+
+  const out: PoorReport[] = [];
+  dataset.table.rows.forEach((row, i) => {
+    if (rowFilter && !rowFilter[i]) return;
+    const rating = answersFor(question, row)[0];
+    if (!rating || !poor.has(rating)) return;
+    const named = constituency ? (answersFor(constituency, row)[0] ?? '') : '';
+    out.push({
+      area: dataset.rowGroup[i] ?? '',
+      constituency: named ? (resolveConstituency(named)?.name ?? named) : '',
+      station: (station && answersFor(station, row)[0]) || '',
+      rating,
+    });
+  });
+
+  // Worst first, and then down the country as the areas are ordered.
+  const rank = (r: PoorReport) => question.scale?.indexOf(r.rating) ?? 0;
+  return out.sort(
+    (a, b) =>
+      rank(a) - rank(b) ||
+      dataset.groups.indexOf(a.area) - dataset.groups.indexOf(b.area) ||
+      a.constituency.localeCompare(b.constituency),
+  );
+}
+
 /** The question asking what time the observer left, if the form asks. */
 export function departureTime(dataset: Dataset): Question | null {
   return (
@@ -1646,6 +1710,27 @@ export function stationTypeQuestion(dataset: Dataset): Question | null {
   );
 }
 
+/** The words a form uses for the place a report was filed from. */
+const STATION_WORDS = /\b(polling station|station|centre|center|ps)\b/i;
+
+/**
+ * The question naming or numbering the polling station.
+ *
+ * The name first here, because this one is read by a person off a
+ * table; `stationsObserved` prefers the number, because that one is
+ * counted and two villages can name a school the same thing.
+ */
+export function stationQuestion(dataset: Dataset): Question | null {
+  const named = (what: RegExp) =>
+    dataset.questions.find(
+      (q) =>
+        q.kind !== 'meta' &&
+        STATION_WORDS.test(q.label) &&
+        what.test(q.label),
+    );
+  return named(/\bname\b/i) ?? named(/\b(number|code)\b/i) ?? null;
+}
+
 /**
  * How many polling stations the reports came from.
  *
@@ -1762,7 +1847,31 @@ export function sharesAcross(
   rowFilter?: boolean[],
   breakdown?: Breakdown,
 ): Shares | null {
-  if (!['binary', 'categorical', 'ordinal'].includes(question.kind)) return null;
+  /*
+   * A number is in this too, where its bands are few enough.
+   *
+   * "E.1 How many polling staff members are present" is answered 1 to 5
+   * and banded one value to a band, which is a composition like any
+   * other: the section around it had the national, by-type and by-area
+   * page and it did not, for no reason a reader could see. A number of
+   * many bands still falls out below, on the count of answers.
+   */
+  if (!['binary', 'categorical', 'ordinal', 'numeric'].includes(question.kind)) return null;
+  if (question.kind === 'numeric') {
+    /*
+     * A count of a few things, not a number in ranges.
+     *
+     * "How many polling staff members are present" is answered 1 to 5
+     * and banded one value to a band, which is a composition. "Total
+     * number of voters on the voter list" is banded "4,000 to 4,999",
+     * and a station's own number is an identifier: neither is a thing
+     * an area can hold more or less of. A question asked as a
+     * percentage is averaged rather than banded, and has its own page.
+     */
+    if (isPercentageQuestion(question)) return null;
+    const bands = bandingFor(dataset, question, rowFilter)?.labels ?? [];
+    if (bands.length === 0 || bands.some((l) => l.includes(' to '))) return null;
+  }
   const b = breakdown ?? analyse(dataset, question, rowFilter);
   const counts = displayCounts(question, b);
   // Six colours stacked in a column is a pattern rather than a chart, and

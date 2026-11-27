@@ -408,6 +408,25 @@ scale is kept, including points nobody used, because the better half of a four-p
 scale is a different half from the better half of the three points that happened to be
 answered.
 
+**The map of a rating is followed by the stations behind it.** A shaded map says how much
+of an area was rated badly; the next thing a mission asks is which stations those were, and
+the reference deck answers it with a table. The area, the constituency and the station name,
+worst rating first, ten rows to a page - a table a reader cannot read from the back of the
+room is not a briefing slide. A column the form does not ask for is left out rather than
+filled with blanks, and the constituency is read through its question rather than through
+the one column the tool settled on, because a polling-day form asks it in a column per area
+and that column is blank for every report filed from anywhere else. The table needs no
+browser canvas, so it is there whether or not the maps are.
+
+**A count of a few things is a composition too.** The national, by-station-type and by-area
+page used to be for answers in words only, so "E.1 How many polling staff members are
+present" - answered 1 to 5, and banded one value to a band - did not get one while the
+questions either side of it did. It does now, and keeps its own counting page: the shares
+are the composition and the count is the figure itself. A number banded into ranges still
+does not, because an area does not hold more or less of "4,000 to 4,999" and a station's
+own number is an identifier, and nor does a question asked as a percentage, which is
+averaged and has a page of its own.
+
 **A scale is held worst first and charted best first.** It is stored in the order it scores
 in - Very bad, Bad, Good, Very good - because that is what makes a mean rating mean
 anything, and the chart reads the other way round: a briefing looks for how much of the day

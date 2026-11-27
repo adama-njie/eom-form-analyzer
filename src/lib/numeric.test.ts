@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { analyse, bandsFor, buildDataset, meanLabel, percentageOf } from './analyse';
+import {
+  analyse,
+  bandsFor,
+  buildDataset,
+  meanLabel,
+  percentageOf,
+  sharesAcross,
+} from './analyse';
+import { needsCountsPage } from './selection';
 import { inferSchema, toTable } from './schema';
 
 /**
@@ -172,5 +180,48 @@ describe('a column of bare digits', () => {
     // The legend runs 1 to 4 and the staff counts reach 5, so nothing in
     // the file names the answer "5".
     expect(staff(true).questions.find((x) => x.code === 'E.1')?.kind).toBe('numeric');
+  });
+});
+
+describe('a number across the country', () => {
+  const form = (header: string, values: string[]) => {
+    const table = toTable([
+      ['A.2 Local Government Area (LGA)', header],
+      ...values.map((v, i) => [['Banjul', 'Kanifing', 'Brikama', 'Basse'][i % 4]!, v]),
+    ]);
+    return buildDataset(table, inferSchema(table));
+  };
+
+  it('gives a count of a few things the page the section around it has', () => {
+    /*
+     * "E.1 How many polling staff members are present" is answered 1 to
+     * 5 and banded one value to a band, which is a composition like any
+     * other: the questions either side of it had the national,
+     * by-station-type and by-area page and it did not.
+     */
+    const ds = form('E.1 How many polling staff members are present', [
+      '5', '4', '5', '3', '4', '5', '4', '5',
+    ]);
+    const q = ds.questions.find((x) => x.code === 'E.1')!;
+    expect(sharesAcross(ds, q)).not.toBeNull();
+    // And it keeps its own count page: the shares are a composition,
+    // the count is the figure itself.
+    expect(needsCountsPage(true, [], q.kind === 'numeric')).toBe(true);
+  });
+
+  it('leaves a number in ranges to its own chart', () => {
+    // "4,000 to 4,999" is not a thing an area holds more or less of,
+    // and a station's own number is an identifier.
+    const ds = form('D.1 Total number of voters on the voter list', [
+      '4120', '980', '2310', '4890', '1500', '3300', '770', '4400',
+    ]);
+    expect(sharesAcross(ds, ds.questions.find((x) => x.code === 'D.1')!)).toBeNull();
+  });
+
+  it('leaves a question asked as a percentage to its average', () => {
+    const ds = form('B.8 Estimated % of female participants', [
+      '10', '20', '30', '40', '10', '20', '30', '40',
+    ]);
+    expect(sharesAcross(ds, ds.questions.find((x) => x.code === 'B.8')!)).toBeNull();
   });
 });
