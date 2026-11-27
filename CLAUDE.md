@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 267 tests
+npm test           # vitest, 268 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 224 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 225 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -370,6 +370,12 @@ geography.
   deck, in the Word report and on screen, with the ramp carrying the rate.
   A flagged question used to be shaded in orange, so two maps of the same
   shape were different colours for a reason no reader could see.
+  **Except the map of a rating**, which is `FLAG`: it is the only map a
+  rating question gets, it is always of the worse end of the scale, and
+  the line under the title says which answers it shades - so the colour
+  is a property of the kind of map and not of the question, which is
+  what made the old orange unreadable. `mapShade` is the one place
+  either is chosen.
 - **NA is charted**, last, and excluded from every rate. A question answered
   No on 18 reports and NA on 15 must not be drawn as "100% No". **And
   "N/A" is one of them, not a blank.** It was in `BLANKS`, so the six

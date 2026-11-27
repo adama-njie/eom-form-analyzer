@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { isInverted } from './analyse';
-import { JUDGED, colourFor, fillsFor } from './pptx';
-import { ACCENT, ACCENT_DEEP, CAT, NOT_APPLICABLE } from './theme';
+import { JUDGED, colourFor, fillsFor, mapShade } from './pptx';
+import { ACCENT, ACCENT_DEEP, CAT, FLAG, NOT_APPLICABLE } from './theme';
 
 describe('answer colours', () => {
   /*
@@ -75,5 +75,19 @@ describe('chart fills', () => {
       perMark: false,
     });
     expect(new Set(fills).size).toBe(2);
+  });
+});
+
+describe('a shaded map', () => {
+  it('is blue for a rate and orange for the worse end of a rating', () => {
+    /*
+     * One colour per kind of map, not per question. A flagged question
+     * used to be shaded orange and an unflagged one blue, so two maps
+     * of the same shape differed for a reason no reader could see; the
+     * map of a rating is always of the answers nobody wants to see, and
+     * says so in the line under its title.
+     */
+    expect(mapShade(false)).toBe(ACCENT_DEEP);
+    expect(mapShade(true)).toBe(FLAG);
   });
 });

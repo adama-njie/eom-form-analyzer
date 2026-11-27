@@ -36,6 +36,7 @@ import { CONTENT, PAD, SLIDE, columns, fitText, linesNeeded, place, wrapText } f
 import {
   ACCENT,
   ACCENT_DEEP,
+  FLAG,
   BARE,
   CAT,
   FONT,
@@ -702,6 +703,17 @@ function addMapSlide(
 }
 
 /**
+ * The colour a shaded map is drawn in.
+ *
+ * One colour per kind of map, not per question: blue for a rate, the
+ * deck's orange for the worse end of a rating scale, which is the only
+ * map that is always of the answers nobody wants to see.
+ */
+export function mapShade(rated: boolean): string {
+  return rated ? FLAG : ACCENT_DEEP;
+}
+
+/**
  * A yes/no question, shaded across the country.
  *
  * Every binary question gets one, not only the ranked findings: a rate per
@@ -726,6 +738,7 @@ function addRateMapSlide(
   // question on the whole of the worse end of its scale.
   const shaded = answers ?? [isInverted(q.label) ? 'No' : 'Yes'];
   const label = shaded.join(' or ');
+  const rated = answers !== undefined;
   if (!shaded.some((a) => (b.total.find((c) => c.label === a)?.n ?? 0) > 0)) return;
 
   const s = pptx.addSlide({ masterName: 'BASE' });
@@ -739,18 +752,20 @@ function addRateMapSlide(
     `Reports answering ${label}, as a share of those that answered.`,
   );
   /*
-   * Shaded in the deck's blue, whatever the question asks.
+   * The deck's blue for a yes/no question, its orange for a rating.
    *
-   * A flagged question used to be shaded in the orange the deck spends on
-   * a problem, so two maps of the same shape - one of a question with a
-   * keyword in it, one without - were different colours for a reason no
-   * reader could see. The ramp already says which areas are high; the
-   * colour only has to be the same one every time.
+   * A flagged question used to be shaded in orange, so two maps of the
+   * same shape - one of a question with a problem keyword in it, one
+   * without - were different colours for a reason no reader could see.
+   * A map of the worse end of a scale is not that case: it is the only
+   * map a rating gets, it is always of the bad answers, and the rule is
+   * on the page in the line under the title. Deep where the share is
+   * high, as every map here is.
    */
   const img = mapPng(
     rateByPlace(dataset, q, shaded, filter),
     '%',
-    ACCENT_DEEP,
+    mapShade(rated),
     1400,
     dataset.division,
   );
