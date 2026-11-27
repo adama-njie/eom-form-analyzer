@@ -1,6 +1,7 @@
 import PptxGenJS from 'pptxgenjs';
 import {
   analyse,
+  basisLine,
   coverage,
   displayCounts,
   poorLabels,
@@ -1762,8 +1763,9 @@ function drawPercentage(
    * tell a share of the station's list from a share of the reports.
    */
   let figureH = headH;
-  if (p.basis) {
-    slide.addText(p.basis, {
+  const basis = basisLine(p);
+  if (basis) {
+    slide.addText(basis, {
       ...place({ x: box.x, y: box.y + headH, w: box.w, h: 0.34 }, 'percentage basis'),
       fontSize: TYPE.caption, color: MUTED, fontFace: FONT,
       align: 'center', valign: 'middle',
@@ -1773,6 +1775,12 @@ function drawPercentage(
 
   const charts: { title: string; rows: GroupMean[] }[] = [];
   if (p.byParty.length > 1) charts.push({ title: 'By party', rows: p.byParty });
+  // The kind of place, where the figure is worked out from counts: the
+  // rest of the section is split urban and rural on its own pages, and a
+  // share of the staff is as readable that way as a share of the reports.
+  if (p.byType && p.byType.length > 1) {
+    charts.push({ title: 'By station type', rows: p.byType });
+  }
   if (p.byArea.length > 1) {
     charts.push({ title: `By ${AREA_WORDS[division].one}`, rows: p.byArea });
   }
@@ -1789,6 +1797,18 @@ function drawPercentage(
     // under 1%, and whole numbers would draw every bar as 0% or 1%.
     const fine = c.rows.some((r) => r.mean < 10 && Math.round(r.mean * 10) % 10 !== 0);
     const value = (v: number) => (fine ? Math.round(v * 10) / 10 : Math.round(v));
+    /*
+     * A bar is a bar at any number of them.
+     *
+     * The gap is a share of the bar's own thickness, so a fixed one
+     * draws two categories as two blocks a third of the page deep -
+     * urban and rural beside a chart of seven regions did not read as
+     * the same kind of chart. The gap grows instead, until the bar is
+     * about as thick as it would be on a chart of seven.
+     */
+    const slot = (h - 0.42) / c.rows.length;
+    const thickness = Math.min(0.42, slot * 0.65);
+    const gapPct = Math.min(500, Math.round((slot / thickness - 1) * 100));
     slide.addText(c.title, {
       ...place({ x, y: top, w, h: 0.4 }, 'percentage chart title'),
       fontSize: TYPE.chartTitleSmall,
@@ -1811,7 +1831,7 @@ function drawPercentage(
         ...BARE,
         barDir: 'bar',
         chartColors: [ACCENT_DEEP],
-        barGapWidthPct: 55,
+        barGapWidthPct: gapPct,
         valAxisMaxVal: 100,
         valAxisMinVal: 0,
         showValue: true,

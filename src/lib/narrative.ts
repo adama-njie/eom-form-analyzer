@@ -12,7 +12,7 @@
  */
 
 import type { Breakdown, Dataset, Finding } from './analyse';
-import { analyse, coverage, findings, meanLabel, realTotal, scoreLabel } from './analyse';
+import { analyse, basisLine, coverage, findings, meanLabel, realTotal, scoreLabel } from './analyse';
 import type { Question } from './schema';
 
 function pct(v: number): string {
@@ -34,10 +34,20 @@ export function describe(q: Question, b: Breakdown, geo: boolean): string {
     // A percentage is already a rate, so the thing to report is its
     // average and where it is highest - not which band most events fell in.
     const p = b.percent;
+    const reports = `${p.n} ${p.n === 1 ? 'report' : 'reports'}`;
+    /*
+     * An estimate and a worked-out share are not the same claim.
+     *
+     * "Observers estimated 32% on average" was written under the turnout
+     * figure too, which no observer estimated: it is the votes counted
+     * divided by the list they were counted against. Where the figure
+     * has a basis it was worked out, and the sentence says what from.
+     */
+    const line = basisLine(p);
     const sentences = [
-      `Observers estimated ${meanLabel(p.mean)}% on average, across ${p.n} ${
-        p.n === 1 ? 'report' : 'reports'
-      }.`,
+      line
+        ? `${meanLabel(p.mean)}%, ${line.charAt(0).toLowerCase()}${line.slice(1)}, across ${reports}.`
+        : `Observers estimated ${meanLabel(p.mean)}% on average, across ${reports}.`,
     ];
     const top = (rows: typeof p.byParty) =>
       rows.reduce((a, c) => (c.mean > a.mean ? c : a), rows[0]!);

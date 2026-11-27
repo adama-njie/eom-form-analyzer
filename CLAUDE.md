@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 273 tests
+npm test           # vitest, 285 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 230 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 242 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -243,6 +243,34 @@ geography.
   for as a percentage. "As a share of voters on the voter list" under a
   question headed "Total number of voters who had already voted" is not a
   hedge but the unit, and `Percentage.basis` carries it.
+- **A count the form asks for as part of another count is that share.**
+  "E.1.1 How many of the polling staff are female" counted in its own
+  right says how many observers wrote the digit 4, which is partly a
+  picture of how big the stations were: two of five and two of four
+  stand in the same bar, and a station staffed by one can never reach
+  the fourth bar at all. `parentCount` finds the whole and
+  `shareOfParent` draws the share, which replaces the composition page
+  rather than joining it. Three things have to agree before one number
+  is read as part of another, because reading it wrongly invents a
+  denominator: the code says it is a follow-up, both are counts, and
+  the wording either points back at the parent ("how many of these")
+  or names what it is a part of ("of the polling staff") in a word the
+  parent used too. "How many of the party agents were accredited" under
+  "How many citizen observers are present" is not a part of it.
+  **Summed, not averaged**, which is where it parts company with
+  `percentageOf` and `shareOfRegister`: those average a per-report
+  share because the reports hold estimates, and because summing over
+  the observed stations would read as a figure for the country. Here
+  both numbers are headcounts an observer took standing in the room,
+  so "25 of the 47 polling staff observed were women" is complete and
+  true of exactly the set it names. `Percentage.counted` carries the
+  two numbers and `basisLine` writes them beside the unit, because 53%
+  reads the same whether it is 25 of 47 or 2 of 4. A report counting
+  more parts than it has wholes is dropped and the base falls by one,
+  which is the honest record of it - the polling-day export has one.
+  A share summed this way is also split by station type, which a mean
+  of estimates is not: the pages around it in section E are split that
+  way already.
 - **A rating question is found by its scale, not by its section letter.**
   It was `/^J\./`, and the opening form rates one thing in section G, so a
   morning's observation reported nothing at all.

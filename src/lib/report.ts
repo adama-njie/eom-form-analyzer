@@ -411,6 +411,7 @@ export async function buildReport(
         const p = b.percent;
         for (const [title, rows] of [
           ['by party', p.byParty],
+          ['by station type', p.byType ?? []],
           [`by ${dataset.geo ? AREA_WORDS[dataset.division].one : 'district'}`, p.byArea],
         ] as const) {
           if (rows.length < 2) continue;

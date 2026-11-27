@@ -99,11 +99,29 @@ export interface Percentage {
   byParty: GroupMean[];
   byArea: GroupMean[];
   /**
+   * By the kind of place, where the form asks what kind of place it is.
+   *
+   * Set beside `counted`, on a share summed from the counts observers
+   * took: a rural station and an urban one are not the same
+   * observation, and the questions around it on the deck are split that
+   * way already. A mean of estimates is not split this way, because the
+   * pages it is drawn on have the party to fit.
+   */
+  byType?: GroupMean[];
+  /**
    * What the figure is a share of, where it was worked out rather than
    * asked for. "32%" under a question headed "Total number of voters who
    * had already voted" is not a figure a reader can place without it.
    */
   basis?: string;
+  /**
+   * The two numbers behind a share that was summed rather than averaged.
+   *
+   * "53%" is a share of the polling staff observed, and a reader cannot
+   * tell whether that is 25 of 47 or 2 of 4 without being told. Written
+   * beside the basis, never instead of it.
+   */
+  counted?: { part: number; whole: number };
 }
 
 /**
@@ -666,6 +684,191 @@ export function percentageOf(
   };
 }
 
+/* ------------------------------------------------------------------ */
+/* A count that is part of another count                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Wording that points back at the question before it.
+ *
+ * "How many of these were sealed" names its denominator by pointing at
+ * it, so the code is enough to say which count that is.
+ */
+const POINTS_BACK = /\bof (these|those|them|which|whom)\b/i;
+
+/**
+ * Wording that names what a count is part of.
+ *
+ * "How many OF THE polling staff are female" also says it is a part,
+ * but it says so by naming a thing, and the thing has to be the one the
+ * parent counted: "how many of the party agents were accredited" under
+ * "how many citizen observers are present" is not a part of it.
+ */
+const NAMES_PART = /\b(of|among) the\b/i;
+
+/**
+ * Words two questions share because they are questions, not because
+ * they are about the same thing.
+ */
+const COMMON_WORDS = new Set([
+  'what', 'how', 'many', 'much', 'total', 'number', 'numbers', 'there', 'these',
+  'those', 'were', 'was', 'are', 'the', 'and', 'any', 'please', 'specify',
+  'present', 'your', 'you', 'their', 'with', 'that', 'this', 'from', 'have',
+  'has', 'did', 'does', 'all', 'other', 'time', 'observe', 'observed',
+]);
+
+/**
+ * What a count counts, for the line under the figure.
+ *
+ * "How many polling staff members are present" is read back as "polling
+ * staff members": the question's wording with the asking taken off it,
+ * because the line says what the share is a share of and not what the
+ * observer was asked.
+ */
+function subjectOf(label: string): string {
+  return label
+    .replace(/^(what is the\s+)?(how many|total number of)\s+/i, '')
+    .replace(/\s+(are|is|were|was)\s+(present|there|available)\b.*$/i, '')
+    .replace(/[.:?]\s*$/, '')
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * The count a count is part of, where the form asks for both.
+ *
+ * Reading one number as part of another invents a denominator if it is
+ * wrong, so the code and the wording both have to say so. The code says
+ * it is a follow-up - E.1.1 of E.1, which `nestFollowUps` already puts
+ * one after the other - and both are counts. Then the wording either
+ * points back at the parent, which settles it, or names what it is a
+ * part of, and the name has to be the parent's own: the two questions
+ * share a word that is not simply a word questions are made of.
+ *
+ * What this keeps out is the follow-up that is a different measurement
+ * of the same event. "If No to D.1, how many minutes was the delay"
+ * follows a question and counts something else entirely.
+ */
+export function parentCount(dataset: Dataset, question: Question): Question | null {
+  if (question.kind !== 'numeric' || isPercentageQuestion(question)) return null;
+  const pointsBack = POINTS_BACK.test(question.label);
+  if (!pointsBack && !NAMES_PART.test(question.label)) return null;
+  const cut = question.code.lastIndexOf('.');
+  if (cut <= 1) return null;
+  const parent = dataset.questions.find((q) => q.code === question.code.slice(0, cut));
+  if (!parent || parent === question) return null;
+  if (parent.kind !== 'numeric' || isPercentageQuestion(parent)) return null;
+  if (parent.columns[0] === undefined || parent.columns[0] === question.columns[0]) return null;
+  if (pointsBack) return parent;
+  const words = (q: Question): Set<string> =>
+    new Set(
+      q.label
+        .toLowerCase()
+        .split(/[^a-z]+/)
+        .filter((w) => w.length >= 4 && !COMMON_WORDS.has(w)),
+    );
+  const mine = words(question);
+  return [...words(parent)].some((w) => mine.has(w)) ? parent : null;
+}
+
+/**
+ * A count that is part of another count, as the share of it that it is.
+ *
+ * "How many of the polling staff are female" counted in its own right
+ * says how many observers wrote the digit 4, which is partly a picture
+ * of how big the stations were: two of five and two of four stand in
+ * the same bar, and a station staffed by one can never reach the fourth
+ * bar at all. The figure is the share - women as a proportion of the
+ * polling staff observed - which is what the pair of questions was
+ * asked to produce and what a mission reports against its benchmarks.
+ *
+ * Summed rather than averaged, which is where this parts company with
+ * `percentageOf` and `shareOfRegister`. Those average a per-report
+ * share because the reports hold estimates, and because summing over
+ * the observed stations would read as a figure for the country. Here
+ * both numbers are headcounts an observer took standing in the room, so
+ * "25 of the 47 polling staff observed were women" is complete and true
+ * of exactly the set it names.
+ *
+ * A report whose part is larger than its whole is dropped: four women
+ * among one member of staff is not a share of anything. The base under
+ * the figure falls by one, which is the honest record of it.
+ */
+export function shareOfParent(
+  dataset: Dataset,
+  question: Question,
+  rowFilter?: boolean[],
+): Percentage | null {
+  const parent = parentCount(dataset, question);
+  const col = question.columns[0];
+  const parentCol = parent?.columns[0];
+  if (!parent || col === undefined || parentCol === undefined) return null;
+
+  const type = stationTypeQuestion(dataset);
+  const tally = new Map<string, { part: number; whole: number; n: number }>();
+  const add = (key: string, part: number, whole: number): void => {
+    const t = tally.get(key) ?? { part: 0, whole: 0, n: 0 };
+    tally.set(key, { part: t.part + part, whole: t.whole + whole, n: t.n + 1 });
+  };
+
+  dataset.table.rows.forEach((row, i) => {
+    if (rowFilter && !rowFilter[i]) return;
+    const raw = clean(row[col] ?? '');
+    if (isBlank(raw)) return;
+    const part = Number(raw);
+    const whole = Number(clean(row[parentCol] ?? ''));
+    if (!Number.isFinite(whole) || whole <= 0) return;
+    if (!Number.isFinite(part) || part < 0 || part > whole) return;
+    add('', part, whole);
+    const party = dataset.rowParty[i];
+    if (party) add(`party:${party}`, part, whole);
+    const area = dataset.rowGroup[i];
+    if (area) add(`area:${area}`, part, whole);
+    const kind = type ? answersFor(type, row)[0] : undefined;
+    if (kind) add(`type:${kind}`, part, whole);
+  });
+
+  const all = tally.get('');
+  if (!all || all.whole === 0) return null;
+
+  const share = (t: { part: number; whole: number }): number => (t.part / t.whole) * 100;
+  const ordered = (prefix: string, order: string[]): GroupMean[] =>
+    order
+      .filter((label) => tally.has(prefix + label))
+      .map((label) => {
+        const t = tally.get(prefix + label)!;
+        return { label, mean: share(t), n: t.n };
+      });
+  // The kinds of place in the order the file first mentions them, which
+  // is the order the question's own pages put them in.
+  const kinds = [...tally.keys()].filter((k) => k.startsWith('type:')).map((k) => k.slice(5));
+
+  return {
+    mean: share(all),
+    n: all.n,
+    byParty: ordered('party:', dataset.parties),
+    byArea: ordered('area:', dataset.groups),
+    byType: ordered('type:', kinds),
+    basis: `As a share of ${subjectOf(parent.label)}`,
+    counted: { part: all.part, whole: all.whole },
+  };
+}
+
+/**
+ * The line under a worked-out percentage.
+ *
+ * What the figure is a share of, and - where it was summed rather than
+ * averaged - the two numbers it was summed from, because 53% reads the
+ * same whether it is 25 of 47 or 2 of 4. One place, so the deck, the
+ * dashboard and the Word report all say it the same way.
+ */
+export function basisLine(p: Percentage): string | null {
+  if (!p.basis) return null;
+  if (!p.counted) return p.basis;
+  const n = (v: number): string => v.toLocaleString('en-GB');
+  return `${p.basis} (${n(p.counted.part)} of ${n(p.counted.whole)})`;
+}
+
 export function analyse(dataset: Dataset, question: Question, rowFilter?: boolean[]): Breakdown {
   const { rows } = dataset.table;
   const include = (i: number) => !rowFilter || rowFilter[i];
@@ -848,8 +1051,13 @@ export function analyse(dataset: Dataset, question: Question, rowFilter?: boolea
     breakdown.percent = percentageOf(dataset, question, rowFilter) ?? undefined;
   } else {
     // A count of votes cast is a share of that station's own list, and only
-    // that reads across stations. See `shareOfRegister`.
-    breakdown.percent = shareOfRegister(dataset, question, rowFilter) ?? undefined;
+    // that reads across stations. See `shareOfRegister`. A count the form
+    // asks for as part of the count before it is that share, and not a
+    // tally of its own. See `shareOfParent`.
+    breakdown.percent =
+      shareOfRegister(dataset, question, rowFilter) ??
+      shareOfParent(dataset, question, rowFilter) ??
+      undefined;
   }
 
   return breakdown;
@@ -1869,6 +2077,10 @@ export function sharesAcross(
      * percentage is averaged rather than banded, and has its own page.
      */
     if (isPercentageQuestion(question)) return null;
+    // A count that is part of another count is drawn as that share, on a
+    // page of its own: "two of the staff are women" is not a thing an
+    // area holds more or less of. See `shareOfParent`.
+    if (parentCount(dataset, question)) return null;
     const bands = bandingFor(dataset, question, rowFilter)?.labels ?? [];
     if (bands.length === 0 || bands.some((l) => l.includes(' to '))) return null;
   }

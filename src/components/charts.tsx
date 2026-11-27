@@ -1,5 +1,5 @@
 import type { Count, GroupMean, Percentage } from '@/lib/analyse';
-import { meanLabel } from '@/lib/analyse';
+import { basisLine, meanLabel } from '@/lib/analyse';
 import { AREA_WORDS, type Division } from '@/lib/gambia';
 import { NON_ANSWERS } from '@/lib/schema';
 import { ACCENT, ACCENT_DEEP, CAT, NOT_APPLICABLE, SCALE } from '@/lib/theme';
@@ -225,11 +225,17 @@ export function PercentPanel({ p, division }: { p: Percentage; division: Divisio
         * number of voters who had already voted" needs its denominator: it
         * is a share of the station's list, not of the reports.
         */}
-      {p.basis && <p className="muted small percent-basis">{p.basis}</p>}
+      {basisLine(p) && <p className="muted small percent-basis">{basisLine(p)}</p>}
       {p.byParty.length > 1 && (
         <>
           <h4 className="chart-sub">By party</h4>
           <MeanBars rows={p.byParty} />
+        </>
+      )}
+      {p.byType && p.byType.length > 1 && (
+        <>
+          <h4 className="chart-sub">By station type</h4>
+          <MeanBars rows={p.byType} />
         </>
       )}
       {p.byArea.length > 1 && (

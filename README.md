@@ -400,6 +400,32 @@ observers gave as they left - section I on the Gambian form - and the mission re
 conditions at the station before the arithmetic of the day; a deck whose questions include
 no section C has nowhere to put it but the front, where it was.
 
+**A count the form asks for as part of another count is that share.** "E.1.1 How many of
+the polling staff are female" is not a tally of its own: every woman it counts is one of
+the staff that E.1 counted. Charted in its own right it says how many observers wrote the
+digit 4, which is partly a picture of how big the stations were - two of five and two of
+four stand in the same bar, and a station staffed by one can never reach the fourth bar at
+all. The figure the pair of questions was asked to produce is the share, and it is what a
+mission reports: women as a proportion of the polling staff observed.
+
+Reading one number as part of another invents a denominator if it is wrong, so the code
+and the wording both have to say so. The code says it is a follow-up - E.1.1 of E.1 - and
+both are counts. Then the wording either points back at the parent, "how many of these
+were sealed", which settles it, or names what it is a part of, "of the polling staff", in
+a word the parent used too. That last test is what keeps out the follow-up that measures
+something else: "how many of the party agents were accredited" under "how many citizen
+observers are present" is not a part of it.
+
+It is summed rather than averaged, which is where it parts company with the turnout
+reading above. Turnout averages a per-station share because summing over the stations that
+were visited would read as a figure for the country. Here both numbers are headcounts an
+observer took standing in the room, so "25 of the 47 polling staff observed were women" is
+complete and true of exactly the set it names, and it is the sentence the report writes.
+The page carries both numbers under the figure, because 53% reads the same whether it is
+25 of 47 or 2 of 4. A report counting more parts than it has wholes is dropped - four
+women among one member of staff is not a share of anything - and the base falls by one,
+which is the honest record of it.
+
 **A scored question wears the words from its own legend.** The forms score the overall
 assessments 1 to 4 and put the key in a column header of its own - "4=Very good 3=Good
 2=Bad 1=Very bad" - so the deck carried five charts of 1, 2, 3 and 4 with the key nowhere
