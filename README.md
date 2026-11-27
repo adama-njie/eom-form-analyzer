@@ -408,6 +408,31 @@ scale is kept, including points nobody used, because the better half of a four-p
 scale is a different half from the better half of the three points that happened to be
 answered.
 
+**A scale is held worst first and charted best first.** It is stored in the order it scores
+in - Very bad, Bad, Good, Very good - because that is what makes a mean rating mean
+anything, and the chart reads the other way round: a briefing looks for how much of the day
+was good before it looks for how much of it was not, and the mission's own reference deck
+stacks "Muy bueno" at the foot of every column with "Muy malo" on top. Only the drawing
+order changes. The mean, the better half of the scale and the colour each point is given
+are all still read off the scale itself, which does not move, and the screen takes its
+order from the same place as the deck.
+
+**A rating question is mapped on the worse end of its scale.** It used to get a pie on each
+area, which for four answers across seven areas holding one or two reports each is a page of
+coloured dots. What a mission wants off a map of a rating is where the day was rated badly,
+which is the only thing the reference deck maps: one shaded map of Bad and Very bad
+together. The midpoint of an odd scale counts as neither, as it does in the better half,
+and a form where nobody rated anything badly draws no map at all rather than an empty one.
+
+**The headline rating gets a page against the clock.** How the day went is what the deck
+opens on; when it went that way is what a mission asks next, and the reference deck gives it
+a page. The hour is the one the observer left, the same reading the turnout curve is drawn
+from, because that is when they had seen the whole of their visit. It is drawn as counts
+rather than shares - an hour holding two reports and an hour holding forty are not the same
+evidence, and the columns say so by their height - with the hour's own total above the
+column. The first rating question only: five of these would be five pages saying the same
+thing five ways.
+
 **A slide does not explain its own chart.** The line under the heading - "Each bar is all
 of the reports that answered that question" - was prose where the page needed room, and
 the room it took came off the bottom, where the names under the columns are: on a

@@ -906,8 +906,24 @@ export function realTotal(counts: Count[]): number {
  * could line up with - and so a numeric question could not be compared
  * across anything.
  */
-export function displayCounts(_q: Question, b: Breakdown): Count[] {
-  return b.total;
+export function displayCounts(q: Question, b: Breakdown): Count[] {
+  /*
+   * A scale is held worst first, because that is the order it scores
+   * in, and charted best first.
+   *
+   * A briefing reads a rating chart for how much of the day was good
+   * before it reads how much of it was not, and the mission's own
+   * reference deck stacks "Muy bueno" at the foot of every column with
+   * "Muy malo" on the top. The order here is the chart's; `meanScore`
+   * and the better half of the scale are still read off `question.scale`,
+   * which does not move. Anything outside the scale - NA - keeps its
+   * place at the end.
+   */
+  if (!q.scale || q.scale.length < 2) return b.total;
+  const scale = q.scale;
+  const rated = b.total.filter((c) => scale.includes(c.label));
+  const rest = b.total.filter((c) => !scale.includes(c.label));
+  return [...rated.reverse(), ...rest];
 }
 
 /* ------------------------------------------------------------------ */
@@ -1028,9 +1044,12 @@ export interface PlaceRate {
 export function rateByPlace(
   dataset: Dataset,
   question: Question,
-  answer: string,
+  answer: string | string[],
   rowFilter?: boolean[],
 ): PlaceRate[] {
+  // One answer or several: a rating question is mapped on the whole of
+  // the worse end of its scale, Bad and Very bad together.
+  const wanted = new Set(Array.isArray(answer) ? answer : [answer]);
   const places = dataset.areas.map((a) => a.name);
   const keyOf = (i: number) => (dataset.rowArea[i] ? lgaName(dataset.rowArea[i]!) : null);
 
@@ -1051,7 +1070,7 @@ export function rateByPlace(
     const real = answers.filter((a) => !NON_ANSWERS.has(a));
     if (real.length === 0) return;
     totals.set(place, (totals.get(place) ?? 0) + 1);
-    if (real.includes(answer)) hits.set(place, (hits.get(place) ?? 0) + 1);
+    if (real.some((a) => wanted.has(a))) hits.set(place, (hits.get(place) ?? 0) + 1);
   });
 
   return places.map((place) => {
@@ -1391,6 +1410,69 @@ export function turnoutByHour(dataset: Dataset, rowFilter?: boolean[]): Turnout 
   return { points, readings: n, register };
 }
 
+/** The question asking what time the observer left, if the form asks. */
+export function departureTime(dataset: Dataset): Question | null {
+  return (
+    dataset.questions.find((q) => q.kind === 'time' && READING_MOMENT.test(q.label)) ?? null
+  );
+}
+
+/** One hour of the day, and how the reports filed from it rated the question. */
+export interface HourRatings {
+  /** The hour the observers left, as the clock reads it. */
+  label: string;
+  /** One entry per scale point, in the order the chart draws them. */
+  counts: Count[];
+  /** Reports rating it in that hour. */
+  n: number;
+}
+
+/**
+ * A rating question read against the clock.
+ *
+ * "J.1 The overall conduct of the voting in this PS was" answered by
+ * nine stations says how the day went; the same answers against the
+ * hour each observer left say when it went that way, which is the
+ * question a mission asks next - the reference deck gives it a page of
+ * its own. The hour is the departure reading, as the turnout curve is,
+ * because that is when the observer had seen the whole of their visit.
+ */
+export function ratingByHour(
+  dataset: Dataset,
+  question: Question,
+  rowFilter?: boolean[],
+): { hours: HourRatings[]; answers: string[] } | null {
+  const time = departureTime(dataset);
+  if (!time || !question.scale || question.scale.length < 2) return null;
+
+  const b = analyse(dataset, question, rowFilter);
+  const answers = displayCounts(question, b)
+    .filter((c) => question.scale!.includes(c.label))
+    .map((c) => c.label);
+  if (answers.length === 0) return null;
+
+  const byHour = new Map<string, Map<string, number>>();
+  dataset.table.rows.forEach((row, i) => {
+    if (rowFilter && !rowFilter[i]) return;
+    const hour = answersFor(time, row)[0];
+    const given = answersFor(question, row)[0];
+    if (!hour || !given || !answers.includes(given)) return;
+    const m = byHour.get(hour) ?? new Map<string, number>();
+    m.set(given, (m.get(given) ?? 0) + 1);
+    byHour.set(hour, m);
+  });
+  if (byHour.size === 0) return null;
+
+  const hours = [...byHour.entries()]
+    .sort((a, c) => a[0].localeCompare(c[0]))
+    .map(([label, m]) => {
+      const counts = answers.map((a) => ({ label: a, n: m.get(a) ?? 0, pct: 0 }));
+      const n = counts.reduce((t, c) => t + c.n, 0);
+      return { label, counts: counts.map((c) => ({ ...c, pct: n > 0 ? (c.n / n) * 100 : 0 })), n };
+    });
+  return { hours, answers };
+}
+
 /**
  * A count of votes cast, as the share of the station's list that it is.
  *
@@ -1475,12 +1557,30 @@ const RATING_WORDS = /(very good|very bad|excellent|good|bad|poor|satisfactory)/
  * nothing at all for a morning's observation.
  */
 export function ratingQuestions(dataset: Dataset): Question[] {
-  return dataset.questions.filter(
-    (q) =>
-      q.kind === 'ordinal' &&
-      (q.scale?.length ?? 0) > 1 &&
-      q.scale!.some((v) => RATING_WORDS.test(v)),
+  return dataset.questions.filter(isRatingQuestion);
+}
+
+/** Whether a question asks an observer to rate something. */
+export function isRatingQuestion(q: Question): boolean {
+  return (
+    q.kind === 'ordinal' &&
+    (q.scale?.length ?? 0) > 1 &&
+    q.scale!.some((v) => RATING_WORDS.test(v))
   );
+}
+
+/**
+ * The worse end of a rating scale, named.
+ *
+ * The strict bottom half, so the midpoint of an odd scale - "Not
+ * good/Not bad" - is counted as neither: the better half leaves it out
+ * too, and a map headed "rated Bad or Very bad" must not shade a place
+ * where nobody said either.
+ */
+export function poorLabels(question: Question): string[] {
+  const scale = question.scale;
+  if (!scale || scale.length < 2) return [];
+  return scale.slice(0, Math.floor(scale.length / 2));
 }
 
 /** How a rating question came out: its mean, and the share rated above halfway. */
@@ -1800,7 +1900,8 @@ export function sectionOverviews(
     const section = id.split('\u0001')[0]!;
     const scale = members[0]!.q.scale;
     const answers = [
-      ...(scale && scale.length > 1 ? scale : ['Yes', 'No']),
+      // Best first, as everywhere a scale is charted. See `displayCounts`.
+      ...(scale && scale.length > 1 ? [...scale].reverse() : ['Yes', 'No']),
       // NA is a segment here as everywhere, and last.
       ...[...NON_ANSWERS].filter((na) =>
         members.some((m) => m.b.total.some((c) => c.label === na && c.n > 0)),

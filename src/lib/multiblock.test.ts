@@ -111,8 +111,11 @@ describe('a block of tick boxes', () => {
       const texts = await Promise.all(charts.map((f) => zip.files[f]!.async('string')));
       const page = texts.find((x) => x.includes('Mandinka'))!;
       expect(page).toContain('Share of all 4 reports');
-      // The count is in the option's own name, as the base is elsewhere.
-      expect(page).toContain('Mandinka (3)');
+      // The share and the count are written together, after the bar, so
+      // a reader does not carry the count across the chart to reach it.
+      const slides = Object.keys(zip.files).filter((f) => /ppt\/slides\/slide\d+\.xml$/.test(f));
+      const written = await Promise.all(slides.map((f) => zip.files[f]!.async('string')));
+      expect(written.some((x) => x.includes('<a:t>75% (3)</a:t>'))).toBe(true);
     });
   });
 });

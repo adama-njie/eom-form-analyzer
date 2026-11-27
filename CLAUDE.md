@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 264 tests
+npm test           # vitest, 267 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 221 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 224 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -176,6 +176,30 @@ geography.
   on the answers the column holds rather than on the scale, so a
   four-point legend still names a column of digits read against the
   five-point one.
+- **A scale is held worst first and charted best first.** `displayCounts`
+  reverses it for the chart, and `sectionOverviews` does the same for the
+  section's page, so a column stacks Very good at the foot and Very bad
+  on top, as the mission's own reference deck draws every one of them.
+  `question.scale` does not move: `meanScore`, the better half of the
+  scale and `colourFor`'s place along it are all read off it. The screen
+  takes its order from `displayCounts` too, so the dashboard and the deck
+  read the same way round.
+- **A rating question is mapped on the worse end of its scale.**
+  `mapKindFor` returns `poor` for it rather than `pie`: four answers pied
+  across seven areas holding one or two reports each is a page of
+  coloured dots, and what a mission wants off a map of a rating is where
+  the day was rated badly - which is what the reference deck maps and
+  nothing else. `poorLabels` is the strict bottom half, so the midpoint
+  of an odd scale is neither good nor bad, and a form where nobody rated
+  anything badly draws no map rather than an empty one.
+- **The headline rating gets a page against the clock.** How the day went
+  is what the deck opens on; when it went that way is the question a
+  mission asks next. `ratingByHour` groups the ratings by the hour of the
+  departure reading - the same clock the turnout curve uses, because that
+  is when the observer had seen the whole of their visit - and
+  `addRatingHourSlide` draws it as stacked counts with the hour's own
+  total above the column. The first rating question only: five of these
+  would be five pages saying the same thing five ways.
 - **A scored question wears the words from its own legend.** The forms put
   the key in a column of its own - "4=Very good 3=Good 2=Bad 1=Very bad" -
   and store the digit, so a rating chart read 1, 2, 3, 4 with the key
@@ -372,8 +396,13 @@ geography.
   three reports of four is 75%, and dividing by the ticks drew it as
   43%, which answers a question nobody asked. `analyse` sets a multi
   block's `pct` against `reports`, and the deck charts that share with
-  the count in the option's own name and the base written over the
-  chart - the reference deck's own treatment of "unauthorised persons".
+  the base written over the chart - the reference deck's own treatment
+  of "unauthorised persons". The share and the count are written
+  together after the bar, "78% (7)", because a PowerPoint data label
+  holds one number and the count used to sit in the option's name at
+  the far end of the row: the plot area is stated and the axis fixed at
+  0 to 100, so where each bar ends is known and the pair can be written
+  there - and two of these blocks can be read against each other.
   The share is of every report in the export rather than of the ones
   that reached the question, so a follow-up asked only of the reports
   that answered Yes is not a share of a different denominator on every

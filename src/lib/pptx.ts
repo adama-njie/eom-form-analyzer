@@ -3,6 +3,8 @@ import {
   analyse,
   coverage,
   displayCounts,
+  poorLabels,
+  ratingByHour,
   isInverted,
   meanLabel,
   rateByPlace,
@@ -715,14 +717,16 @@ function addRateMapSlide(
   dataset: Dataset,
   filter: boolean[] | undefined,
   planned: Planned,
+  answers?: string[],
 ): void {
   const { q, b } = planned;
-  if (!dataset.geo || q.kind !== 'binary') return;
+  if (!dataset.geo) return;
   if (Object.keys(b.byArea).length < 3) return;
-  const inverted = isInverted(q.label);
-  const label = inverted ? 'No' : 'Yes';
-  const hit = b.total.find((c) => c.label === label);
-  if (!hit || hit.n === 0) return;
+  // A yes/no question is shaded on the answer that matters; a rating
+  // question on the whole of the worse end of its scale.
+  const shaded = answers ?? [isInverted(q.label) ? 'No' : 'Yes'];
+  const label = shaded.join(' or ');
+  if (!shaded.some((a) => (b.total.find((c) => c.label === a)?.n ?? 0) > 0)) return;
 
   const s = pptx.addSlide({ masterName: 'BASE' });
   // The question is the title. It used to be the subtitle under "C.7 by
@@ -744,7 +748,7 @@ function addRateMapSlide(
    * colour only has to be the same one every time.
    */
   const img = mapPng(
-    rateByPlace(dataset, q, label, filter),
+    rateByPlace(dataset, q, shaded, filter),
     '%',
     ACCENT_DEEP,
     1400,
@@ -979,13 +983,91 @@ function addQuestionSlides(
         const kind = mapKindFor(dataset, p.q, p.b);
         if (kind === 'area') addMapSlide(pptx, dataset, filter);
         else if (kind === 'rate') addRateMapSlide(pptx, dataset, filter, p);
+        else if (kind === 'poor') addRateMapSlide(pptx, dataset, filter, p, poorLabels(p.q));
         else if (kind === 'pie') addPieMapSlide(pptx, dataset, p);
       }
       if (!sharesFirst) addSharesSlide(pptx, p);
+      addRatingHourSlide(pptx, dataset, p.q, filter);
     }
   }
   // Where section C is the last one in the deck, the curve closes it.
   if (pending && opened.has(TURNOUT_AFTER)) pending();
+}
+
+/**
+ * The headline rating against the hour the observer left.
+ *
+ * How the day went is the question the deck opens on; when it went that
+ * way is the question a mission asks next, and the reference deck gives
+ * it a page of its own. Drawn for the first rating question only - five
+ * of these would be five pages saying the same thing in five ways - and
+ * as counts rather than shares, because an hour holding two reports and
+ * an hour holding forty are not the same evidence and the columns say
+ * so by their height.
+ */
+function addRatingHourSlide(
+  pptx: PptxGenJS,
+  dataset: Dataset,
+  q: Question,
+  filter: boolean[] | undefined,
+): void {
+  if (ratingQuestions(dataset)[0]?.columns[0] !== q.columns[0]) return;
+  const read = ratingByHour(dataset, q, filter);
+  if (!read || read.hours.length < 2) return;
+
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  const top = heading(
+    s,
+    `${q.code} ${q.label}`.trim(),
+    'By the hour the observer left, in reports.',
+  );
+  const colours = read.answers.map((label, i) => colourFor(label, i, q.scale));
+
+  const legendH = 0.46;
+  const totalH = (TYPE.category * 1.7) / 72;
+  const band = ((TYPE.category * 1.4) / 72) * 2;
+  const frameH = PAD.bottom - legendH - top;
+  const plotH = frameH - totalH - band;
+
+  s.addChart(
+    pptx.ChartType.bar,
+    read.answers.map((label) => ({
+      name: label,
+      labels: read.hours.map((h) => h.label),
+      values: read.hours.map((h) => h.counts.find((c) => c.label === label)?.n ?? 0),
+    })),
+    {
+      ...place({ x: PAD.x, y: top, w: CONTENT.w, h: frameH }, 'rating by hour'),
+      ...BARE,
+      layout: { x: 0, y: totalH / frameH, w: 1, h: plotH / frameH },
+      barDir: 'col',
+      barGrouping: 'stacked',
+      barGapWidthPct: 40,
+      chartColors: colours,
+      showValue: true,
+      dataLabelPosition: 'ctr',
+      dataLabelColor: ON_FILL,
+      dataLabelFontSize: TYPE.dataLabel,
+      // An hour nobody rated that way is not labelled nought.
+      dataLabelFormatCode: '0;;;',
+      catAxisLabelFontSize: TYPE.category,
+      showLegend: false,
+    },
+  );
+
+  // The hour's own total, over the column, as on the shares page.
+  read.hours.forEach((h, i) => {
+    const slot = CONTENT.w / read.hours.length;
+    s.addText(String(h.n), {
+      ...place({ x: PAD.x + i * slot, y: top, w: slot, h: totalH }, `hour total ${i}`),
+      fontSize: TYPE.category, color: MUTED, fontFace: FONT,
+      align: 'center', valign: 'bottom',
+    });
+  });
+
+  addLegendRow(pptx, s, read.answers, colours, {
+    x: PAD.x, y: PAD.bottom - legendH, w: CONTENT.w, h: legendH,
+  });
 }
 
 /**
@@ -1072,7 +1154,12 @@ function addSharesSlide(pptx: PptxGenJS, planned: Planned): void {
    * constant is the room the panel's own title and axis labels need
    * whatever is in it.
    */
-  const weights = shares.panels.map((p) => p.groups.length + 1.2);
+  /*
+   * The floor is for the panel of one column: at two and a bit it was
+   * narrow enough that PowerPoint broke "11%" after the digits and set
+   * the per cent sign on a line of its own, under the number.
+   */
+  const weights = shares.panels.map((p) => Math.max(p.groups.length + 1.2, 2.8));
   const total = weights.reduce((a, w) => a + w, 0);
   const free = CONTENT.w - PAD.gap * (shares.panels.length - 1);
   const titleH = 0.56;
@@ -1695,27 +1782,75 @@ function drawAnswerChart(
    * denominator on every page.
    */
   if (q.kind === 'multi' && b.reports > 0) {
-    const named = counts.map((c) => `${c.label} (${c.n})`);
-    const share = counts.map((c) => Math.round((c.n / b.reports) * 100));
+    const rows = counts.map((c) => ({
+      label: c.label,
+      n: c.n,
+      pct: Math.round((c.n / b.reports) * 100),
+    }));
+
+    /*
+     * The count and the share are written together, after the bar.
+     *
+     * A PowerPoint data label holds one number, and the count was in
+     * the option's name at the far end of the row from the share, so a
+     * reader had to carry "(7)" across the chart to put it beside
+     * "78%". The pair is written here instead - "78% (7)", the
+     * reference deck's own form - which means knowing where each bar
+     * ends: the plot area is stated rather than fitted and the axis is
+     * a fixed 0 to 100, as it is on every other chart of a share in
+     * this deck, so two of these blocks can be read against each other.
+     */
+    const pt = TYPE.category;
+    const nameW = Math.min(
+      box.w * 0.45,
+      (Math.max(...rows.map((r) => r.label.length)) * pt * 0.58) / 72 + 0.12,
+    );
+    const valueW = (9 * TYPE.dataLabel * 0.62) / 72 + 0.12;
+    // Room for the line over the chart, which is one line: at 0.62 a
+    // title that ran to two sat on top of the first option's name.
+    const titleH = 0.82;
+    const plotX = box.x + nameW;
+    const plotW = box.w - nameW - valueW;
+    const plotY = box.y + titleH;
+    const plotH = box.h - titleH;
+
     slide.addChart(
       pptx.ChartType.bar,
-      [{ name: 'Share of reports', labels: topDown(named), values: topDown(share) }],
+      [{
+        name: 'Share of reports',
+        labels: topDown(rows.map((r) => r.label)),
+        values: topDown(rows.map((r) => r.pct)),
+      }],
       {
         ...placed,
         ...BARE,
+        layout: { x: nameW / box.w, y: titleH / box.h, w: plotW / box.w, h: plotH / box.h },
         barDir: 'bar', chartColors: topDown(colours), barGapWidthPct: 55,
-        showValue: true, dataLabelPosition: 'outEnd',
-        dataLabelColor: MUTED, dataLabelFontSize: TYPE.dataLabel,
-        dataLabelFormatCode: '0"%"',
-        catAxisLabelFontSize: TYPE.category,
+        showValue: false,
+        catAxisLabelFontSize: pt,
         showTitle: true,
-        title: `Share of all ${b.reports} reports. The number ticking each is in brackets.`,
+        title: `Share of all ${b.reports} reports.`,
         titleFontSize: TYPE.sub,
         titleColor: MUTED,
         showLegend: false,
         valAxisMinVal: 0,
+        valAxisMaxVal: 100,
       },
     );
+
+    const slot = plotH / rows.length;
+    const lineH = (TYPE.dataLabel * 1.7) / 72;
+    rows.forEach((r, i) => {
+      const end = plotX + (plotW * r.pct) / 100;
+      slide.addText(`${r.pct}% (${r.n})`, {
+        ...place(
+          { x: end + 0.06, y: plotY + i * slot + slot / 2 - lineH / 2, w: valueW, h: lineH },
+          `tick share ${q.code} ${i}`,
+        ),
+        fontSize: TYPE.dataLabel, color: MUTED, fontFace: FONT,
+        align: 'left', valign: 'middle', wrap: false,
+      });
+    });
     return;
   }
 

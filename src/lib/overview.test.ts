@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
 import { buildDeck, labelBand } from './pptx';
-import { defaultSelection, exportableQuestions, questionKey } from './selection';
+import { defaultSelection, exportableQuestions, mapKindFor, questionKey } from './selection';
 import {
   analyse,
   buildDataset,
+  displayCounts,
+  poorLabels,
+  rateByPlace,
+  ratingByHour,
   sectionOverviews,
   sharesAcross,
   teamQuestion,
@@ -162,11 +166,17 @@ describe('a section on one page', () => {
     expect(overcrowded.n).toBe(6);
   });
 
-  it('reads a scored section in the words of its own legend', () => {
+  it('reads a scored section in the words of its own legend, best first', () => {
+    // The scale is held worst first, because that is the order it
+    // scores in; a chart of it reads the other way round, as the
+    // mission's own reference deck draws every one of them.
     const ds = form();
     const j = sectionOverviews(ds, ds.questions).find((o) => o.section === 'J')!;
     expect(j.rows.map((r) => r.question.code)).toEqual(['J.1', 'J.2', 'J.3']);
-    expect(j.answers).toEqual(['Very bad', 'Bad', 'Good', 'Very good']);
+    expect(j.answers).toEqual(['Very good', 'Good', 'Bad', 'Very bad']);
+    expect(ds.questions.find((q) => q.code === 'J.1')?.scale).toEqual([
+      'Very bad', 'Bad', 'Good', 'Very good',
+    ]);
   });
 
   it('leaves a section of one or two questions to its own pages', () => {
@@ -401,5 +411,73 @@ describe('a scale and the answers nobody gave', () => {
     ]);
     // The rate is still of the reports that could answer it.
     expect(b.answered).toBe(2);
+  });
+});
+
+/** A polling-day form that scores the day and records when the observer left. */
+function ratedForm() {
+  const table = toTable([
+    [
+      'B.1 Polling station administrative area',
+      'I.1 Time of departure',
+      '4=Very good 3=Good 2=Bad 1=Very bad',
+      'J.1 The overall conduct of the voting in this PS was',
+    ],
+    ['Banjul', '08:10', '', '4'],
+    ['Banjul', '08:40', '', '3'],
+    ['Kanifing', '11:05', '', '2'],
+    ['Kanifing', '11:50', '', '3'],
+    ['Basse', '16:20', '', '1'],
+    ['Basse', '16:30', '', '4'],
+  ]);
+  return buildDataset(table, inferSchema(table));
+}
+
+describe('a rating, read the way a briefing reads it', () => {
+  it('charts the scale best first, while scoring it worst first', () => {
+    const ds = ratedForm();
+    const q = ds.questions.find((x) => x.code === 'J.1')!;
+    const b = analyse(ds, q);
+    expect(q.scale).toEqual(['Very bad', 'Bad', 'Good', 'Very good']);
+    expect(displayCounts(q, b).map((c) => c.label)).toEqual([
+      'Very good',
+      'Good',
+      'Bad',
+      'Very bad',
+    ]);
+    // The mean is read off the scale, which has not moved: 4+3+2+3+1+4.
+    expect(b.meanScore).toBeCloseTo(17 / 6, 5);
+  });
+
+  it('maps the worse end of the scale, not a pie of all four answers', () => {
+    /*
+     * Four answers pied across the areas, one or two reports in each,
+     * is a page of coloured dots. What a mission wants off a map of a
+     * rating is where the day was rated badly.
+     */
+    const ds = ratedForm();
+    const q = ds.questions.find((x) => x.code === 'J.1')!;
+    expect(poorLabels(q)).toEqual(['Very bad', 'Bad']);
+    expect(mapKindFor(ds, q, analyse(ds, q))).toBe('poor');
+    const rates = rateByPlace(ds, q, poorLabels(q));
+    expect(rates.find((r) => r.place === 'Kanifing')?.pct).toBe(50);
+    expect(rates.find((r) => r.place === 'Banjul')?.pct).toBe(0);
+  });
+
+  it('reads the rating against the hour the observer left', () => {
+    const read = ratingByHour(ratedForm(), ratedForm().questions.find((x) => x.code === 'J.1')!)!;
+    expect(read.hours.map((h) => [h.label, h.n])).toEqual([
+      ['08:00', 2],
+      ['11:00', 2],
+      ['16:00', 2],
+    ]);
+    expect(read.answers).toEqual(['Very good', 'Good', 'Bad', 'Very bad']);
+    const eleven = read.hours.find((h) => h.label === '11:00')!;
+    expect(eleven.counts.map((c) => [c.label, c.n])).toEqual([
+      ['Very good', 0],
+      ['Good', 1],
+      ['Bad', 1],
+      ['Very bad', 0],
+    ]);
   });
 });

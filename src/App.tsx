@@ -12,6 +12,7 @@ import {
 import { GambiaMap } from '@/components/GambiaMap';
 import {
   analyse,
+  displayCounts,
   buildDataset,
   coverage,
   constituencyCoverage,
@@ -855,7 +856,10 @@ function QuestionCard({
     [dataset, q, filter],
   );
   const judged = JUDGED.test(q.label);
-  const order = b.total.map((c) => c.label);
+  // The order a chart reads in, which for a scale is best first. The
+  // deck and the screen take it from the same place.
+  const shown = displayCounts(q, b);
+  const order = shown.map((c) => c.label);
   const areasWithData = Object.keys(b.byArea);
   const partiesWithData = Object.keys(b.byParty);
   const stackable = q.kind === 'binary' || q.kind === 'ordinal' || q.kind === 'categorical';
@@ -891,18 +895,18 @@ function QuestionCard({
         </>
       )}
 
-      {(q.kind === 'binary' || q.kind === 'categorical') && b.total.length <= 6 && (
-        <Donut counts={b.total} scale={q.scale} />
+      {(q.kind === 'binary' || q.kind === 'categorical') && shown.length <= 6 && (
+        <Donut counts={shown} scale={q.scale} />
       )}
 
       {(q.kind === 'multi' || q.kind === 'time' || (q.kind === 'text' && !words) ||
-        ((q.kind === 'categorical' || q.kind === 'ordinal') && b.total.length > 6)) && (
-        <BarList counts={b.total} judged={judged} scale={q.scale} />
+        ((q.kind === 'categorical' || q.kind === 'ordinal') && shown.length > 6)) && (
+        <BarList counts={shown} judged={judged} scale={q.scale} />
       )}
 
-      {q.kind === 'ordinal' && b.total.length <= 6 && (
+      {q.kind === 'ordinal' && shown.length <= 6 && (
         <>
-          <BarList counts={b.total} judged scale={q.scale} />
+          <BarList counts={shown} judged scale={q.scale} />
           {b.meanScore !== undefined && (
             <p className="muted small">Mean score {scoreLabel(b.meanScore)} on a {q.scale?.length}-point scale.</p>
           )}
@@ -951,7 +955,7 @@ function QuestionCard({
             `${q.code || 'question'}.csv`,
             [
               ['Answer', 'Reports', 'Percent'],
-              ...b.total.map((c) => [c.label, c.n, c.pct.toFixed(1)]),
+              ...shown.map((c) => [c.label, c.n, c.pct.toFixed(1)]),
             ],
           )
         }

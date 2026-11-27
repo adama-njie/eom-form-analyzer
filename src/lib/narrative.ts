@@ -95,7 +95,13 @@ export function describe(q: Question, b: Breakdown, geo: boolean): string {
     return `Selected on ${b.answered} reports. Most often ${list(top)}.`;
   }
 
-  const top = b.total[0];
+  /*
+   * The commonest answer, which is the biggest count and not the first
+   * one listed. A scale is listed in the scale's own order, so this
+   * used to name whichever end of it the chart happened to start at.
+   */
+  const ranked = [...b.total].sort((x, y) => y.n - x.n);
+  const top = ranked[0];
   if (!top) return `${b.answered} reports answered.`;
 
   const sentences: string[] = [];
@@ -115,7 +121,7 @@ export function describe(q: Question, b: Breakdown, geo: boolean): string {
     );
   } else {
     sentences.push(
-      `${b.answered} reports. "${top.label}" was the commonest answer at ${pct(top.pct)}${b.total[1] ? `, ahead of "${b.total[1].label}" at ${pct(b.total[1].pct)}` : ''}.`,
+      `${b.answered} reports. "${top.label}" was the commonest answer at ${pct(top.pct)}${ranked[1] ? `, ahead of "${ranked[1].label}" at ${pct(ranked[1].pct)}` : ''}.`,
     );
   }
 

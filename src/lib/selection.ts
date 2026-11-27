@@ -14,6 +14,10 @@ import type { Breakdown, Dataset } from './analyse';
 import {
   analyse,
   displayCounts,
+  isRatingQuestion,
+  poorLabels,
+  ratingByHour,
+  ratingQuestions,
   findings,
   isInverted,
   isWordCloud,
@@ -238,7 +242,7 @@ export function mapKindFor(
   dataset: Dataset,
   q: Question,
   b: Breakdown,
-): 'area' | 'rate' | 'pie' | null {
+): 'area' | 'rate' | 'poor' | 'pie' | null {
   if (!dataset.geo) return null;
   if (isAreaQuestion(dataset, q)) return 'area';
   if (Object.keys(b.byArea).length < 3) return null;
@@ -246,6 +250,20 @@ export function mapKindFor(
     const label = isInverted(q.label) ? 'No' : 'Yes';
     const hit = b.total.find((c) => c.label === label);
     return hit && hit.n > 0 ? 'rate' : null;
+  }
+  /*
+   * A rating question is mapped on the worse end of its scale.
+   *
+   * Four answers pied across seven areas holding one or two reports
+   * each is a page of coloured dots; what a mission wants off a map of
+   * a rating is where the day was rated badly, which is what the
+   * reference deck maps and nothing else. Nowhere rated badly draws no
+   * map rather than an empty one - the dashboard still has the rates.
+   */
+  if (isRatingQuestion(q)) {
+    const poor = poorLabels(q);
+    const any = poor.some((a) => (b.total.find((c) => c.label === a)?.n ?? 0) > 0);
+    return any ? 'poor' : null;
   }
   if (q.kind !== 'categorical' && q.kind !== 'ordinal') return null;
   const answers = b.total.filter((c) => !NON_ANSWERS.has(c.label)).length;
@@ -267,12 +285,21 @@ export function countExtraPages(
   filter?: boolean[],
 ): number {
   let n = sectionOverviews(dataset, questions, filter).length;
+  // The headline rating gets a page of itself against the clock.
+  const headline = ratingQuestions(dataset)[0];
   for (const q of questions) {
     const b = analyse(dataset, q, filter);
     if (sharesAcross(dataset, q, filter, b) !== null) n += 1;
     // The area's own map is the overview map, moved rather than added.
     const kind = selection.maps ? mapKindFor(dataset, q, b) : null;
     if (kind && kind !== 'area') n += 1;
+    if (
+      headline &&
+      q.columns[0] === headline.columns[0] &&
+      (ratingByHour(dataset, q, filter)?.hours.length ?? 0) > 1
+    ) {
+      n += 1;
+    }
   }
   return n;
 }
