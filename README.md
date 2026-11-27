@@ -421,8 +421,9 @@ browser canvas, so it is there whether or not the maps are.
 **A count of a few things is a composition too.** The national, by-station-type and by-area
 page used to be for answers in words only, so "E.1 How many polling staff members are
 present" - answered 1 to 5, and banded one value to a band - did not get one while the
-questions either side of it did. It does now, and keeps its own counting page: the shares
-are the composition and the count is the figure itself. A number banded into ranges still
+questions either side of it did. It does now, and loses its counting page to it, as every other
+question of a few answers does: a bar chart of those answers with the same answers stacked
+across the areas beside it is the shares page over again. A number banded into ranges still
 does not, because an area does not hold more or less of "4,000 to 4,999" and a station's
 own number is an identifier, and nor does a question asked as a percentage, which is
 averaged and has a page of its own.

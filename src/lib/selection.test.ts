@@ -153,11 +153,7 @@ describe.skipIf(!HAS_FIXTURE)('how questions are packed onto slides', () => {
      */
     const counted = all.filter((q) => {
       const b = analyse(ds, q);
-      return needsCountsPage(
-        sharesAcross(ds, q, undefined, b) !== null,
-        slideBreakdown(q, b).parties,
-        q.kind === 'numeric',
-      );
+      return needsCountsPage(sharesAcross(ds, q, undefined, b) !== null, slideBreakdown(q, b).parties);
     }).length;
     expect(pages).toBeLessThan(all.length);
     expect(pages).toBeLessThanOrEqual(counted);

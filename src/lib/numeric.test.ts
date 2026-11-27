@@ -204,9 +204,10 @@ describe('a number across the country', () => {
     ]);
     const q = ds.questions.find((x) => x.code === 'E.1')!;
     expect(sharesAcross(ds, q)).not.toBeNull();
-    // And it keeps its own count page: the shares are a composition,
-    // the count is the figure itself.
-    expect(needsCountsPage(true, [], q.kind === 'numeric')).toBe(true);
+    // And loses its counting page to it, as every other question of a
+    // few answers does: a bar chart of the same answers and the same
+    // answers stacked across the areas is the shares page again.
+    expect(needsCountsPage(true, [])).toBe(false);
   });
 
   it('leaves a number in ranges to its own chart', () => {

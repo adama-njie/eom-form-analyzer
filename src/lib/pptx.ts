@@ -880,7 +880,7 @@ interface Planned {
 
 /** See `needsCountsPage`, which the export dialogue counts from. */
 function countsNeeded(p: Planned): boolean {
-  return needsCountsPage(p.shares !== null, p.parties, p.q.kind === 'numeric');
+  return needsCountsPage(p.shares !== null, p.parties);
 }
 
 function plan(dataset: Dataset, q: Question, filter: boolean[] | undefined): Planned | null {

@@ -292,9 +292,11 @@ geography.
   a question broken down by party, which the shares page does not draw.
   A count of a few things - "E.1 How many polling staff members are
   present", answered 1 to 5 and banded one value to a band - is a
-  composition like any other and gets the shares page too, and keeps
-  its counting page, because the shares are the composition and the
-  count is the figure itself. A number banded into ranges does not: an
+  composition like any other and gets the shares page instead of its
+  counting page, as every question of a few answers does: a bar chart
+  of those answers with the same answers stacked across the areas
+  beside it is the shares page again. A number banded into ranges does
+  not: an
   area does not hold more or less of "4,000 to 4,999", and a station's
   own number is an identifier. Nor does a question asked as a
   percentage, which is averaged and has its own page. The

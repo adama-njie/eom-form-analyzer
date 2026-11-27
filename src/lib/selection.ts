@@ -190,14 +190,8 @@ export function needsOwnSlide(q: Question, b: Breakdown): boolean {
 /** Rows to a page of the table of badly rated stations. See `addPoorTableSlide`. */
 export const POOR_ROWS = 10;
 
-export function needsCountsPage(
-  hasShares: boolean,
-  parties: string[],
-  banded = false,
-): boolean {
-  // A number keeps its counting page whatever else it gets: the shares
-  // page is a composition and the count is the figure itself.
-  return !hasShares || parties.length > 0 || banded;
+export function needsCountsPage(hasShares: boolean, parties: string[]): boolean {
+  return !hasShares || parties.length > 0;
 }
 
 /**
@@ -218,7 +212,6 @@ export function countQuestionPages(
       counts: needsCountsPage(
         sharesAcross(dataset, q, filter, b) !== null,
         slideBreakdown(q, b).parties,
-        q.kind === 'numeric',
       ),
     };
   });
