@@ -9,12 +9,13 @@ import {
   WordCloud,
   fmtPct,
 } from '@/components/charts';
-import { GambiaMap } from '@/components/GambiaMap';
+import { BubbleMap, GambiaMap } from '@/components/GambiaMap';
 import {
   analyse,
   chartScale,
   displayCounts,
   buildDataset,
+  constituencyPoints,
   coverage,
   constituencyCoverage,
   findings,
@@ -745,6 +746,21 @@ function Overview({
           )}
         </section>
       </div>
+
+      {dataset.geo && constituencyPoints(dataset, periodFilter).length > 0 && (
+        <section className="card">
+          <h2>Reports by constituency</h2>
+          <BubbleMap
+            points={constituencyPoints(dataset, periodFilter)}
+            division={dataset.division}
+          />
+          <p className="muted small">
+            A circle on each constituency heard from, sized by its reports. Greater Banjul is
+            drawn again beside the country: it is a hundredth of the land and a third of the
+            electorate. Hover a circle for its name; the list below has them all.
+          </p>
+        </section>
+      )}
 
       {turnout && (
         <section className="card">

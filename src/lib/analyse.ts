@@ -1570,6 +1570,23 @@ export function reportsByUnit(dataset: Dataset, rowFilter?: boolean[]): PlaceRat
 }
 
 /**
+ * The constituencies that were observed, for the bubble map.
+ *
+ * Only the ones with reports: the map draws a circle per constituency
+ * heard from, and the ground behind them is the country, not 46
+ * outlines.
+ */
+export function constituencyPoints(
+  dataset: Dataset,
+  rowFilter?: boolean[],
+): { key: string; label: string; n: number }[] {
+  const byKey = new Map(CONSTITUENCY_UNITS.map((u) => [u.key, u]));
+  return reportsByUnit(dataset, rowFilter)
+    .filter((r) => r.pct !== null)
+    .map((r) => ({ key: r.place, label: byKey.get(r.place)?.label ?? r.place, n: r.n }));
+}
+
+/**
  * Whether the file has enough resolved constituencies to map them.
  *
  * The gazetteer is Gambian, so a form from elsewhere has none; and a

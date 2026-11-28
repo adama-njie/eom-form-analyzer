@@ -20,6 +20,7 @@ import {
   scoreLabel,
   sectionOverviews,
   sharesAcross,
+  constituencyPoints,
   isTeamQuestion,
   namesStations,
   namesStationsOnly,
@@ -61,7 +62,7 @@ import {
 } from './theme';
 import { drawFlag, euFlag, gambiaFlag } from './flags';
 import { AREA_WORDS, type Division } from './gambia';
-import { mapPng, pieMapPng } from './mapImage';
+import { bubbleMapPng, mapPng, pieMapPng } from './mapImage';
 import {
   isAreaQuestion,
   isConstituencyQuestion,
@@ -251,7 +252,10 @@ export function buildDeck(
   addTitleSlide(pptx, sel);
   if (sel.coverage) addCoverageSlide(pptx, dataset, cov, filter);
   if (turnoutPage && !afterSection) turnoutPage();
-  if (canDrawMaps && !areaAsked) addMapSlide(pptx, dataset, filter);
+  if (canDrawMaps && !areaAsked) {
+    addMapSlide(pptx, dataset, filter);
+    addConstituencyMapSlide(pptx, dataset, filter);
+  }
 
   addQuestionSlides(pptx, dataset, questions, filter, canDrawMaps, afterSection);
 
@@ -697,6 +701,41 @@ function addMapSlide(
 
 
 /**
+ * Where the reports came from, one division down.
+ *
+ * A circle on each constituency heard from, sized by its reports, over
+ * the areas; Greater Banjul again in an inset, because at national
+ * scale its constituencies are a few pixels across and that is where
+ * the mission does most of its observing. No names on it: fifty-three
+ * will not fit a country thirty miles across, and the choropleth this
+ * replaced put them in a band underneath on leader lines that crossed
+ * the whole map. Which constituency is which is the list on the
+ * dashboard and the exported table.
+ *
+ * Coverage, and only coverage. A rate at this level often rests on one
+ * report, and a constituency shaded "100%" off a single observer is
+ * the thing this tool exists not to print; where the day was rated
+ * badly is still mapped on the areas.
+ */
+function addConstituencyMapSlide(
+  pptx: PptxGenJS,
+  dataset: Dataset,
+  filter: boolean[] | undefined,
+): void {
+  const points = constituencyPoints(dataset, filter);
+  if (!dataset.geo || points.length === 0) return;
+  const s = pptx.addSlide({ masterName: 'BASE' });
+  const top = heading(s, 'Reports by constituency');
+  const img = bubbleMapPng(points, 1400, ACCENT_DEEP, dataset.division);
+  const w = CONTENT.w;
+  const h = (w / img.width) * img.height;
+  s.addImage({
+    data: `data:image/png;base64,${toBase64(img.data)}`,
+    ...place({ x: PAD.x, y: top, w, h }, 'constituency map'),
+  });
+}
+
+/**
  * A round number at or above the largest value, for an axis the tool
  * places its own labels against.
  *
@@ -1015,7 +1054,12 @@ function addQuestionSlides(
       if (sharesFirst) addSharesSlide(pptx, p);
       if (canDrawMaps) {
         const kind = mapKindFor(dataset, p.q, p.b);
-        if (kind === 'area') addMapSlide(pptx, dataset, filter);
+        if (kind === 'area') {
+          // The question naming the area is followed by both maps: the
+          // areas, and then where the reports came from inside them.
+          addMapSlide(pptx, dataset, filter);
+          addConstituencyMapSlide(pptx, dataset, filter);
+        }
         else if (kind === 'rate') addRateMapSlide(pptx, dataset, filter, p);
         else if (kind === 'poor') addRateMapSlide(pptx, dataset, filter, p, poorLabels(p.q));
         else if (kind === 'pie') addPieMapSlide(pptx, dataset, p);

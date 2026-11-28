@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 324 tests
+npm test           # vitest, 326 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 281 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 283 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -102,32 +102,42 @@ geography.
   and resolves to neither. What does not resolve is shown as written -
   "Westfield", "URR" - on screen and under the deck's table, because
   "constituency not named" reads as missing data when the field was filled in.
-- **The constituency map is half built, and not drawn anywhere yet.**
-  The choropleth version went in and came straight out: 46 shapes, most
-  of the country hatched, the observed ones thin ribbons too small to
-  hold their names, so every label ended in a band under the country on
-  leader lines that crossed the whole map. What stands is the
-  groundwork, and it is sound: `boundaries.ts` carries the 48 ADM2
-  districts again, and **44 of the 53 constituencies are exactly one
-  district** and carry its name once `key` folds the spellings the two
-  sources differ on, with `CONSTITUENCY_BOUNDARY` for the one that
-  differs by a whole word. The other **nine were made by splitting
-  three old districts in the two towns**, and nothing published records
-  which part went where, so `SHARED_UNITS` draws each cluster as one
-  shape - Greater Serrekunda is four, Brikama and Kombo North is five.
-  `CONSTITUENCY_UNITS` is 46 shapes covering all 53 with no white
-  ground, `reportsByUnit` counts into them and `constituency.test.ts`
-  holds it all to that.
-  **What is left is the drawing.** `bubbleMapPng` is written and
-  typechecks but is wired to nothing and has never been rendered: a
-  circle per observed constituency sized by reports, over the areas
-  rather than the 46 outlines, with Greater Banjul - one per cent of
-  the land, a third of the electorate - drawn again in an inset beside
-  the country, `INSET_UNITS` and `INSET_BOX`. `GambiaMap` already takes
-  a `units` prop for the screen version. When it goes in it is coverage
-  only: a rate at this level often rests on one report, and a
-  constituency shaded "100%" off a single observer is the thing this
-  tool exists not to print.
+- **The constituency map is bubbles, not shading, and carries no
+  names.** `bubbleMapPng` on the deck and `BubbleMap` on screen: a
+  circle on each constituency heard from, sized by its reports, over
+  the areas. The choropleth version went in and came straight out -
+  46 shapes on a country thirty miles across is mostly hatching, the
+  observed ones are ribbons along the river too thin to hold a name,
+  so every name ended in a band underneath on leader lines that
+  crossed the whole map and still collided. **No names at all**: 53 of
+  them will never fit, and the ones a reader wants are on hover, in
+  the list under the map and in the exported table. Area carries the
+  count, so the key is two circles, the fewest and the most.
+  **Greater Banjul is drawn again beside the country** - `INSET_UNITS`
+  and `INSET_BOX`, Banjul and Kanifing only, a hundredth of the land
+  and a sixth of the electorate - with a locator box on the country
+  and two leader lines to the panel, because otherwise a reader has a
+  second map of somewhere and no way of telling where. The Brikama
+  townships are not in the inset: they are large enough to hold a
+  circle where they are, and taking them in made the panel taller than
+  the country. The whole picture is capped at 0.47 of its width, which
+  is the tallest image the slide's content area takes under a heading.
+  **Which shapes exist is settled, and was the hard part.** 44 of the
+  53 constituencies are exactly one district and carry its name once
+  `key` folds the spellings the two sources differ on, with
+  `CONSTITUENCY_BOUNDARY` for the one that differs by a whole word.
+  The other nine were made by splitting three old districts in the two
+  towns, and nothing published records which part went where, so
+  `SHARED_UNITS` draws each cluster as one shape - Greater Serrekunda
+  is four, Brikama and Kombo North is five. `CONSTITUENCY_UNITS` is 46
+  shapes covering all 53 with no white ground anywhere in the country.
+  **Coverage, and only coverage.** A rate at this level often rests on
+  one report, and a constituency shaded "100%" off a single observer
+  is the thing this tool exists not to print; where the day was rated
+  badly is still mapped on the areas, and the Map tab still shades a
+  question by area and not below it. If the IEC ever publishes real
+  constituency boundaries, `CONSTITUENCY_UNITS` is the only thing that
+  changes.
 - **A file reports against seven regions or eight LGAs, and the file
   says which.** The campaign form asks for the Local Government Area and
   offers all eight. The polling-day forms ask for the region and offer

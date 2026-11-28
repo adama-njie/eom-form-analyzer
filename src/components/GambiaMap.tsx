@@ -3,10 +3,21 @@ import type { PlaceRate } from '@/lib/analyse';
 import {
   AREA_WORDS,
   areaShapes,
+  CONSTITUENCY_UNITS,
+  inInset,
+  INSET_BOX,
   type Division,
   type MapUnit,
 } from '@/lib/gambia';
-import { labelPoint, makeProjector, pathFor, shapeWidth } from '@/lib/projection';
+import {
+  fitProjector,
+  labelPoint,
+  makeProjector,
+  pathFor,
+  shapeCentre,
+  shapeWidth,
+  type Projector,
+} from '@/lib/projection';
 
 /**
  * Choropleth of The Gambia on its real boundaries.
@@ -288,5 +299,209 @@ export function MapTable({
         </p>
       )}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+/** One constituency's reports. */
+export interface BubblePoint {
+  key: string;
+  label: string;
+  n: number;
+}
+
+/**
+ * Where the reports came from, as a circle on each constituency.
+ *
+ * The same picture the deck draws, and for the same reasons: a
+ * choropleth of 46 shapes is mostly hatching with thin ribbons along
+ * the river, and the names do not fit. The circle says where and how
+ * much; which constituency it is, is on hover and in the list under
+ * the map.
+ */
+export function BubbleMap({
+  points,
+  colour = '#12239E',
+  division = 'lga',
+}: {
+  points: BubblePoint[];
+  colour?: string;
+  division?: Division;
+}) {
+  const titleId = useId();
+  const [hover, setHover] = useState<string | null>(null);
+
+  const projector = useMemo(() => makeProjector(VIEW_W), []);
+  const shapes = useMemo(() => areaShapes(division), [division]);
+  const units = useMemo(() => new Map(CONSTITUENCY_UNITS.map((u) => [u.key, u])), []);
+
+  const size = VIEW_W / 45;
+  const gap = size * 0.8;
+  const titleH = size * 1.5;
+  const [bminLon, bminLat, bmaxLon, bmaxLat] = INSET_BOX;
+  const aspect =
+    ((bmaxLon - bminLon) * Math.cos((((bminLat + bmaxLat) / 2) * Math.PI) / 180)) /
+    (bmaxLat - bminLat);
+  // As on the deck: a wide picture is scaled to its column by width,
+  // so height is the scarce dimension and the inset takes what is left.
+  const insetW = Math.min(VIEW_W * 0.3, (VIEW_W * 0.47 - projector.height - gap - titleH) * aspect);
+  const insetH = insetW / aspect;
+  const x0 = size * 0.6;
+  const y0 = projector.height + gap + titleH;
+  const height = y0 + insetH;
+
+  const inset = useMemo(() => {
+    const fitted = fitProjector(INSET_BOX, insetW, insetH, 2);
+    return {
+      width: insetW,
+      height: insetH,
+      project: (lon: number, lat: number): [number, number] => {
+        const [px, py] = fitted.project(lon, lat);
+        return [x0 + px, y0 + py];
+      },
+    };
+  }, [insetW, insetH, x0, y0]);
+
+  const biggest = Math.max(1, ...points.map((p) => p.n));
+  // The deck sizes them the same way. See `bubbleMapPng`.
+  const rMin = size * 0.32;
+  const rMax = size * 0.95;
+  const radiusOf = (n: number): number => rMin + (rMax - rMin) * Math.sqrt(n / biggest);
+
+  const circles = (p: Projector, which: BubblePoint[]) =>
+    // Biggest first, so a small circle lands on top of a large one
+    // rather than inside it.
+    [...which]
+      .sort((a, b) => b.n - a.n)
+      .map((point) => {
+        const unit = units.get(point.key);
+        if (!unit) return null;
+        const [cx, cy] = p.project(...shapeCentre(unit.shape));
+        const r = radiusOf(point.n);
+        return (
+          <g
+            key={`${p === projector ? 'c' : 'i'}-${point.key}`}
+            onMouseEnter={() => setHover(point.key)}
+            onMouseLeave={() => setHover(null)}
+            tabIndex={0}
+            onFocus={() => setHover(point.key)}
+            onBlur={() => setHover(null)}
+          >
+            <title>{`${point.label}: ${point.n} reports`}</title>
+            <circle
+              cx={cx}
+              cy={cy}
+              r={r}
+              fill={colour}
+              fillOpacity={hover === point.key ? 1 : 0.85}
+              stroke="#FFFFFF"
+              strokeWidth={Math.max(1, size / 12)}
+            />
+            {r > size * 0.62 && (
+              <text
+                x={cx}
+                y={cy}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fill="#FFFFFF"
+                style={{ fontSize: size * 0.8, fontWeight: 700 }}
+                pointerEvents="none"
+              >
+                {point.n}
+              </text>
+            )}
+          </g>
+        );
+      });
+
+  const land = (p: Projector, keyPrefix: string) =>
+    shapes.map(({ key, shape }) => (
+      <path
+        key={`${keyPrefix}-${key}`}
+        d={pathFor(shape, p)}
+        fill="#EDF0F3"
+        stroke="#FFFFFF"
+        strokeWidth={1.2}
+      />
+    ));
+
+  const [bx1, by1] = projector.project(bminLon, bmaxLat);
+  const [bx2, by2] = projector.project(bmaxLon, bminLat);
+  const hovered = points.find((p) => p.key === hover);
+
+  return (
+    <figure className="m-0">
+      <svg
+        viewBox={`0 0 ${VIEW_W} ${height}`}
+        className="map"
+        role="group"
+        aria-labelledby={titleId}
+      >
+        <title id={titleId}>
+          Reports by constituency, as a circle on each one heard from, with Greater Banjul
+          drawn again beside the country. The same figures are in the list below.
+        </title>
+        <defs>
+          <clipPath id={`${titleId}-inset`}>
+            <rect x={x0} y={y0} width={insetW} height={insetH} />
+          </clipPath>
+        </defs>
+
+        {land(projector, 'c')}
+        {circles(projector, points.filter((p) => !inInset(p.key)))}
+
+        {/* The box on the country saying where the inset is: without it
+            a reader has a second map of somewhere and no way of telling
+            where. */}
+        <rect
+          x={bx1}
+          y={by1}
+          width={bx2 - bx1}
+          height={by2 - by1}
+          fill="none"
+          stroke="#5D6B76"
+          strokeWidth={1.2}
+        />
+        <path
+          d={`M${bx1} ${by2} L${x0} ${y0} M${bx2} ${by2} L${x0 + insetW} ${y0}`}
+          stroke="#5D6B76"
+          strokeWidth={1.2}
+          fill="none"
+        />
+        <text
+          x={x0}
+          y={y0 - size * 0.45}
+          fill="#252423"
+          style={{ fontSize: size * 0.8, fontWeight: 700 }}
+        >
+          Greater Banjul
+        </text>
+
+        <g clipPath={`url(#${titleId}-inset)`}>
+          {land(inset, 'i')}
+          {circles(inset, points.filter((p) => inInset(p.key)))}
+        </g>
+        <rect
+          x={x0}
+          y={y0}
+          width={insetW}
+          height={insetH}
+          fill="none"
+          stroke="#5D6B76"
+          strokeWidth={1.2}
+        />
+      </svg>
+
+      {hovered && (
+        <div className="card map-readout" role="status">
+          <strong>{hovered.label}</strong>
+          <span>
+            {' '}
+            · <strong>{hovered.n}</strong> {hovered.n === 1 ? 'report' : 'reports'}
+          </span>
+        </div>
+      )}
+    </figure>
   );
 }

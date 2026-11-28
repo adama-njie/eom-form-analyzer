@@ -679,16 +679,17 @@ export function unitOfConstituency(name: string): string | null {
 /**
  * The corner of the country a national map cannot show.
  *
- * Banjul, Kanifing and the Brikama townships are about one per cent of
- * the land and a third of the electorate, so on a map of the whole
- * country they are a few pixels across - and they are where a mission
- * does most of its observing. They are drawn again in an inset beside
- * the country, at whatever scale the panel allows.
+ * Banjul and Kanifing together are a hundredth of the land and a
+ * sixth of the electorate, so on a map of the whole country they are a
+ * few pixels across - and they are where a mission does much of its
+ * observing. They are drawn again in an inset beside the country, at
+ * whatever scale the panel allows. The Brikama townships are not in
+ * it: they are large enough to hold a circle where they are, and
+ * taking them in made the inset taller than the country.
  */
 const INSET_LGAS: LgaCode[] = ['BJL', 'KMC'];
 
 export const INSET_UNITS: MapUnit[] = CONSTITUENCY_UNITS.filter((u) => {
-  if (u.key === 'Brikama and Kombo North') return true;
   const codes = u.constituencies.map((c) => lgaLookup.get(key(c)));
   return codes.every((code) => code !== undefined && INSET_LGAS.includes(code));
 });

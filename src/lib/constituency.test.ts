@@ -4,10 +4,17 @@ import {
   analyse,
   buildDataset,
   constituencyCoverage,
+  constituencyPoints,
   mapsConstituencies,
   reportsByUnit,
 } from './analyse';
-import { ALL_CONSTITUENCIES, CONSTITUENCY_UNITS, unitOfConstituency } from './gambia';
+import {
+  ALL_CONSTITUENCIES,
+  CONSTITUENCY_UNITS,
+  inInset,
+  INSET_UNITS,
+  unitOfConstituency,
+} from './gambia';
 import { buildDeck } from './pptx';
 import { inferSchema, toTable } from './schema';
 import { defaultSelection, exportableQuestions, questionKey } from './selection';
@@ -219,6 +226,39 @@ describe('constituencies on the map', () => {
     // "Westfield" is a place rather than a constituency, so it is in no
     // shape - and a shape with no reports is null, never nought.
     expect(rates.filter((r) => r.pct === null)).toHaveLength(41);
+  });
+
+  it('gives the map a circle for each constituency heard from, and no others', () => {
+    // The map draws circles, not shaded shapes: 46 shapes on a country
+    // thirty miles across is mostly hatching, and the observed ones
+    // are ribbons too thin to hold a name.
+    const points = constituencyPoints(form());
+    expect(points.map((p) => `${p.label} ${p.n}`).sort()).toEqual([
+      'Bakau 1',
+      'Foni Bintang 1',
+      'Jimara 1',
+      'Kantora 1',
+      'Serekunda West 2',
+    ]);
+  });
+
+  it('puts Banjul and Kanifing in the inset, and leaves the Kombos on the country', () => {
+    /*
+     * The two together are a hundredth of the land and a sixth of the
+     * electorate, so at national scale they are a few pixels across.
+     * The Brikama townships are big enough to hold a circle where they
+     * are, and taking them in made the inset taller than the country.
+     */
+    expect(INSET_UNITS.map((u) => u.key)).toEqual([
+      'Banjul North',
+      'Banjul Central',
+      'Banjul South',
+      'Bakau',
+      'Jeshwang',
+      'Greater Serrekunda',
+      'Serekunda West',
+    ]);
+    expect(inInset('Brikama and Kombo North')).toBe(false);
   });
 
   it('draws no constituency map for a form from another country', () => {

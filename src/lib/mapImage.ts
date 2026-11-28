@@ -637,9 +637,11 @@ export function bubbleMapPng(
   ctx.fillRect(0, 0, width, height);
 
   const biggest = Math.max(1, ...points.map((p) => p.n));
-  const rMin = size * 0.55;
-  const rMax = size * 1.9;
   // Area, not radius, carries the count: a reader compares the blobs.
+  // Small enough that a dozen of them in the Kombos do not merge into
+  // one blob, large enough to hold their own figure.
+  const rMin = size * 0.32;
+  const rMax = size * 0.95;
   const radiusOf = (n: number): number => rMin + (rMax - rMin) * Math.sqrt(n / biggest);
   const [cr, cg, cb] = hexToRgb(colourHex);
   const fill = `rgba(${cr}, ${cg}, ${cb}, 0.85)`;
@@ -657,10 +659,16 @@ export function bubbleMapPng(
 
   land(projector);
 
-  type Box = { x: number; y: number; w: number; h: number };
-
-  /** One circle, with its figure inside it and its name under it. */
-  const bubble = (p: Projector, point: MapPoint, unit: MapUnit, taken: Box[]): void => {
+  /*
+   * One circle, with its figure inside it and no name.
+   *
+   * Fifty-three names will not fit a country thirty miles across, and
+   * the version that tried put them in a band underneath on leader
+   * lines that crossed the whole map and still collided. The circle
+   * says where and how much; which constituency it is, is on the list
+   * under the map and in the exported table.
+   */
+  const bubble = (p: Projector, point: MapPoint, unit: MapUnit): void => {
     const [cx, cy] = p.project(...shapeCentre(unit.shape));
     const r = radiusOf(point.n);
     ctx.beginPath();
@@ -677,33 +685,15 @@ export function bubbleMapPng(
     ctx.fillStyle = '#FFFFFF';
     if (r > size * 0.62) ctx.fillText(String(point.n), cx, cy);
 
-    ctx.font = `700 ${size}px Arial, "Segoe UI", system-ui, sans-serif`;
-    const w = ctx.measureText(point.label).width;
-    /*
-     * The name under the circle, pushed down where a neighbour's is
-     * already there. Two names on one line read as one name, and the
-     * leader lines this map replaced were the other way of solving it.
-     */
-    let y = cy + r + size * 0.8;
-    const clashes = (at: number): boolean =>
-      taken.some(
-        (t) =>
-          Math.abs(t.x - cx) < (t.w + w) / 2 + size * 0.3 &&
-          Math.abs(t.y - at) < (t.h + size) / 2 + size * 0.2,
-      );
-    for (let i = 0; i < 8 && clashes(y); i += 1) y += size * 1.2;
-    taken.push({ x: cx, y, w, h: size });
-    label(ctx, point.label, cx, y, size);
   };
 
   const byKey = new Map(CONSTITUENCY_UNITS.map((u) => [u.key, u]));
   // Biggest first, so a small circle lands on top of a large one
   // rather than inside it.
   const bySize = (a: MapPoint, b: MapPoint): number => b.n - a.n;
-  const placed: Box[] = [];
   for (const point of points.filter((p) => !inInset(p.key)).sort(bySize)) {
     const unit = byKey.get(point.key);
-    if (unit) bubble(projector, point, unit, placed);
+    if (unit) bubble(projector, point, unit);
   }
 
   /*
@@ -746,10 +736,9 @@ export function bubbleMapPng(
     },
   };
   land(inset);
-  const here: Box[] = [];
   for (const point of points.filter((p) => inInset(p.key)).sort(bySize)) {
     const unit = byKey.get(point.key);
-    if (unit) bubble(inset, point, unit, here);
+    if (unit) bubble(inset, point, unit);
   }
   ctx.restore();
   ctx.strokeStyle = 'rgba(93, 107, 118, 0.85)';
@@ -768,7 +757,9 @@ export function bubbleMapPng(
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.font = `${size * 0.9}px Arial, "Segoe UI", system-ui, sans-serif`;
-  let kx = width - size * 9;
+  // Wide enough for two circles, their figures and the word after
+  // them: "reports" was running off the right edge.
+  let kx = width - size * 13;
   for (const n of steps) {
     const r = radiusOf(n);
     ctx.beginPath();

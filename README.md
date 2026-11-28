@@ -288,7 +288,7 @@ other - and the date. The title itself starts as the form's own name, read off t
 rather than the workbook's file name: it is printed on a cover as well as on a file, and
 neither wants to read "campaign-report-20261124-143212.xlsx".
 
-**There is a constituency map, and it took three attempts.** The first two were drawn on
+**There is a constituency map, and it took four attempts.** The first two were drawn on
 district boundaries matched by name, and the names did not match: the urban constituencies
 fell out, so the map was blank exactly where the mission was working and the footnote
 explaining that grew longer than anything the picture said.
@@ -303,14 +303,22 @@ shape over the constituencies inside it, and the line under the map says so: 46 
 53 constituencies, every constituency inside exactly one of them, and no white ground
 anywhere in the country.
 
+Shading those shapes was still wrong, which took the fourth attempt to see. Most of the
+country is hatched, the observed ones are ribbons along the river too thin to hold a name,
+and the names therefore ended up in a band underneath joined by leader lines that crossed
+the whole map and still collided with one another. The map is circles now: one on each
+constituency heard from, sized by its reports, over the areas rather than the 46 outlines.
+It carries no names at all - fifty-three will never fit - so the circle says where and how
+much, and which constituency it is comes from hovering it, from the list under the map and
+from the exported table. Greater Banjul is drawn again in a panel beside the country, with
+a box on the country saying which corner it is, because Banjul and Kanifing between them
+are a hundredth of the land and a sixth of the electorate.
+
 It shows coverage and nothing else. A rate at this level often rests on a single report,
 and a constituency shaded "100%" off one observer is the thing this tool exists not to
 print; where the day was rated badly is still mapped on the areas. Which constituencies
 the mission reached is a real figure whatever the size of the deployment, and it is what a
-map gets looked at for during the day. Only the units with reports are named, because
-forty-six names will not fit a country thirty miles across: on the deck the small ones get
-a leader line into the band below the country, the way Banjul and Kanifing do on the area
-map, and on screen a name wider than its own shape is dropped and its figure stays.
+map gets looked at for during the day.
 
 **Coverage by constituency left the deck.** It was a slide, a table of all 53 under their
 areas with the register beside the reports, and it worked on the campaign form. On the
