@@ -17,12 +17,10 @@ import {
   ratingOf,
   ratingQuestions,
   reportsByPlace,
-  reportsByUnit,
   scoreLabel,
   sectionOverviews,
   sharesAcross,
   isTeamQuestion,
-  mapsConstituencies,
   namesStations,
   namesStationsOnly,
   stationTypeQuestion,
@@ -62,7 +60,7 @@ import {
   TYPE,
 } from './theme';
 import { drawFlag, euFlag, gambiaFlag } from './flags';
-import { AREA_WORDS, CONSTITUENCY_UNITS, SHARED_UNITS, type Division } from './gambia';
+import { AREA_WORDS, type Division } from './gambia';
 import { mapPng, pieMapPng } from './mapImage';
 import {
   isAreaQuestion,
@@ -253,10 +251,7 @@ export function buildDeck(
   addTitleSlide(pptx, sel);
   if (sel.coverage) addCoverageSlide(pptx, dataset, cov, filter);
   if (turnoutPage && !afterSection) turnoutPage();
-  if (canDrawMaps && !areaAsked) {
-    addMapSlide(pptx, dataset, filter);
-    addConstituencyMapSlide(pptx, dataset, filter);
-  }
+  if (canDrawMaps && !areaAsked) addMapSlide(pptx, dataset, filter);
 
   addQuestionSlides(pptx, dataset, questions, filter, canDrawMaps, afterSection);
 
@@ -700,59 +695,6 @@ function addMapSlide(
   });
 }
 
-/**
- * The same map one division down: where the mission worked, by
- * constituency.
- *
- * Coverage, and only coverage. A rate at this level often rests on one
- * report, and a constituency shaded "100%" off a single observer is
- * the one thing this tool is built not to print; where the day was
- * rated badly is still mapped on the areas. Which constituencies were
- * reached is a real figure at any size of deployment, and it is the
- * question a mission asks of a map during the day.
- *
- * Only the units that were observed are named on it. Forty-six names
- * will not fit a country thirty miles across, and the hatching says
- * the rest.
- */
-function addConstituencyMapSlide(
-  pptx: PptxGenJS,
-  dataset: Dataset,
-  filter: boolean[] | undefined,
-): void {
-  if (!mapsConstituencies(dataset, filter)) return;
-  const s = pptx.addSlide({ masterName: 'BASE' });
-  /*
-   * The one line of prose a map is allowed, and it states a unit.
-   *
-   * Nine constituencies share a shape with their neighbours, because
-   * the published boundaries are the districts those nine were made by
-   * splitting. A reader counting shapes would otherwise count 46 and
-   * believe it was 53.
-   */
-  const shared = SHARED_UNITS.map((u) => `${u.label} is ${u.constituencies.length}`).join(
-    ', ',
-  );
-  const top = heading(
-    s,
-    'Reports by constituency',
-    `Forty-four of the 53 constituencies are drawn on their own boundary; ${shared}.`,
-  );
-  const img = mapPng(
-    reportsByUnit(dataset, filter),
-    '',
-    ACCENT_DEEP,
-    1400,
-    dataset.division,
-    CONSTITUENCY_UNITS,
-  );
-  const w = CONTENT.w;
-  const h = (w / img.width) * img.height;
-  s.addImage({
-    data: `data:image/png;base64,${toBase64(img.data)}`,
-    ...place({ x: PAD.x, y: top, w, h }, 'constituency map'),
-  });
-}
 
 /**
  * A round number at or above the largest value, for an axis the tool
@@ -1073,12 +1015,7 @@ function addQuestionSlides(
       if (sharesFirst) addSharesSlide(pptx, p);
       if (canDrawMaps) {
         const kind = mapKindFor(dataset, p.q, p.b);
-        if (kind === 'area') {
-          // The question naming the area is followed by both maps: the
-          // areas, and then the same thing one division down.
-          addMapSlide(pptx, dataset, filter);
-          addConstituencyMapSlide(pptx, dataset, filter);
-        }
+        if (kind === 'area') addMapSlide(pptx, dataset, filter);
         else if (kind === 'rate') addRateMapSlide(pptx, dataset, filter, p);
         else if (kind === 'poor') addRateMapSlide(pptx, dataset, filter, p, poorLabels(p.q));
         else if (kind === 'pie') addPieMapSlide(pptx, dataset, p);

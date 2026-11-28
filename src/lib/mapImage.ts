@@ -8,8 +8,22 @@
  */
 
 import type { PlaceRate } from './analyse';
-import { areaShapes, type Division } from './gambia';
-import { labelPoint, makeProjector, shapeWidth } from './projection';
+import {
+  areaShapes,
+  CONSTITUENCY_UNITS,
+  inInset,
+  INSET_BOX,
+  type Division,
+  type MapUnit,
+} from './gambia';
+import {
+  fitProjector,
+  labelPoint,
+  makeProjector,
+  shapeCentre,
+  shapeWidth,
+  type Projector,
+} from './projection';
 import type { BoundaryShape } from '@/data/boundaries';
 
 export interface MapImage {
@@ -546,6 +560,230 @@ export function pieMapPng(
   });
   ctx.textAlign = 'start';
   ctx.textBaseline = 'alphabetic';
+
+  const url = canvas.toDataURL('image/png');
+  const binary = atob(url.slice(url.indexOf(',') + 1));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return { data: bytes, width, height };
+}
+
+/* ------------------------------------------------------------------ */
+/* Bubbles on the map                                                  */
+/* ------------------------------------------------------------------ */
+
+/** One constituency's reports, for the bubble map. */
+export interface MapPoint {
+  /** The map unit: a constituency, or the shape a few of them share. */
+  key: string;
+  label: string;
+  n: number;
+}
+
+/**
+ * Where the reports came from, as a circle on each constituency.
+ *
+ * A choropleth of 46 shapes was unreadable. Most of the country is
+ * hatched, the shaded ones are thin ribbons along the river, and the
+ * nine or ten that were observed could not hold their own names - so
+ * every label ended up in a band under the country, joined to its
+ * shape by a leader line, and the lines crossed the whole map. A
+ * circle says the same thing in the space it occupies, and its size
+ * says how much observation is behind it.
+ *
+ * The country under the circles is drawn in areas, not constituencies:
+ * the circle is the constituency, and 46 outlines behind it were a
+ * mesh.
+ *
+ * Greater Banjul is drawn again beside the country. It is one per cent
+ * of the land and a third of the electorate, and at national scale its
+ * constituencies are a few pixels across - which is where the mission
+ * does most of its observing.
+ */
+export function bubbleMapPng(
+  points: MapPoint[],
+  width = 1400,
+  colourHex = '#12239E',
+  division: Division = 'lga',
+): MapImage {
+  const projector = makeProjector(width, 8);
+  const size = mapLabelSize(width);
+  const country = projector.height;
+
+  /*
+   * The inset is as tall as its shape wants, within what the page has
+   * room for. A wide picture is scaled to the slide by its width, so
+   * height is the scarce dimension: 0.47 of the width is the tallest
+   * image the content area takes under a heading.
+   */
+  const insetTitle = size * 1.5;
+  const gap = size * 0.8;
+  const [bminLon, bminLat, bmaxLon, bmaxLat] = INSET_BOX;
+  const aspect =
+    ((bmaxLon - bminLon) * Math.cos((((bminLat + bmaxLat) / 2) * Math.PI) / 180)) /
+    (bmaxLat - bminLat);
+  const insetW = Math.min(width * 0.3, (width * 0.47 - country - gap - insetTitle) * aspect);
+  const insetH = insetW / aspect;
+  const height = Math.round(country + gap + insetTitle + insetH);
+  const dpr = 2;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(width * dpr);
+  canvas.height = height * dpr;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas is unavailable in this browser.');
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, width, height);
+
+  const biggest = Math.max(1, ...points.map((p) => p.n));
+  const rMin = size * 0.55;
+  const rMax = size * 1.9;
+  // Area, not radius, carries the count: a reader compares the blobs.
+  const radiusOf = (n: number): number => rMin + (rMax - rMin) * Math.sqrt(n / biggest);
+  const [cr, cg, cb] = hexToRgb(colourHex);
+  const fill = `rgba(${cr}, ${cg}, ${cb}, 0.85)`;
+
+  const land = (p: Projector): void => {
+    for (const { shape } of areaShapes(division)) {
+      trace(ctx, shape, p.project.bind(p));
+      ctx.fillStyle = '#EDF0F3';
+      ctx.fill();
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+  };
+
+  land(projector);
+
+  type Box = { x: number; y: number; w: number; h: number };
+
+  /** One circle, with its figure inside it and its name under it. */
+  const bubble = (p: Projector, point: MapPoint, unit: MapUnit, taken: Box[]): void => {
+    const [cx, cy] = p.project(...shapeCentre(unit.shape));
+    const r = radiusOf(point.n);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = Math.max(1, size / 12);
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `700 ${size * 0.8}px Arial, "Segoe UI", system-ui, sans-serif`;
+    ctx.fillStyle = '#FFFFFF';
+    if (r > size * 0.62) ctx.fillText(String(point.n), cx, cy);
+
+    ctx.font = `700 ${size}px Arial, "Segoe UI", system-ui, sans-serif`;
+    const w = ctx.measureText(point.label).width;
+    /*
+     * The name under the circle, pushed down where a neighbour's is
+     * already there. Two names on one line read as one name, and the
+     * leader lines this map replaced were the other way of solving it.
+     */
+    let y = cy + r + size * 0.8;
+    const clashes = (at: number): boolean =>
+      taken.some(
+        (t) =>
+          Math.abs(t.x - cx) < (t.w + w) / 2 + size * 0.3 &&
+          Math.abs(t.y - at) < (t.h + size) / 2 + size * 0.2,
+      );
+    for (let i = 0; i < 8 && clashes(y); i += 1) y += size * 1.2;
+    taken.push({ x: cx, y, w, h: size });
+    label(ctx, point.label, cx, y, size);
+  };
+
+  const byKey = new Map(CONSTITUENCY_UNITS.map((u) => [u.key, u]));
+  // Biggest first, so a small circle lands on top of a large one
+  // rather than inside it.
+  const bySize = (a: MapPoint, b: MapPoint): number => b.n - a.n;
+  const placed: Box[] = [];
+  for (const point of points.filter((p) => !inInset(p.key)).sort(bySize)) {
+    const unit = byKey.get(point.key);
+    if (unit) bubble(projector, point, unit, placed);
+  }
+
+  /*
+   * The inset, and the box on the country saying where it is.
+   *
+   * Without the box a reader has a second map of somewhere and no way
+   * of telling where.
+   */
+  const x0 = size * 0.6;
+  const y0 = country + gap + insetTitle;
+  const [bx1, by1] = projector.project(bminLon, bmaxLat);
+  const [bx2, by2] = projector.project(bmaxLon, bminLat);
+  ctx.strokeStyle = 'rgba(93, 107, 118, 0.85)';
+  ctx.lineWidth = Math.max(1, size / 14);
+  ctx.strokeRect(bx1, by1, bx2 - bx1, by2 - by1);
+  ctx.beginPath();
+  ctx.moveTo(bx1, by2);
+  ctx.lineTo(x0, y0);
+  ctx.moveTo(bx2, by2);
+  ctx.lineTo(x0 + insetW, y0);
+  ctx.stroke();
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.font = `700 ${size}px Arial, "Segoe UI", system-ui, sans-serif`;
+  ctx.fillStyle = '#252423';
+  ctx.fillText('Greater Banjul', x0, y0 - size * 0.45);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x0, y0, insetW, insetH);
+  ctx.clip();
+  const fitted = fitProjector(INSET_BOX, insetW, insetH, 2);
+  const inset: Projector = {
+    width: insetW,
+    height: insetH,
+    project: (lon, lat) => {
+      const [px, py] = fitted.project(lon, lat);
+      return [x0 + px, y0 + py];
+    },
+  };
+  land(inset);
+  const here: Box[] = [];
+  for (const point of points.filter((p) => inInset(p.key)).sort(bySize)) {
+    const unit = byKey.get(point.key);
+    if (unit) bubble(inset, point, unit, here);
+  }
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(93, 107, 118, 0.85)';
+  ctx.lineWidth = Math.max(1, size / 14);
+  ctx.strokeRect(x0, y0, insetW, insetH);
+
+  /*
+   * A key of two circles, the fewest reports and the most.
+   *
+   * Area carries the count, and nobody reads an area off a picture
+   * without being shown what the sizes mean.
+   */
+  const keyY = y0 + insetH - size * 1.1;
+  const fewest = Math.min(...points.map((p) => p.n), biggest);
+  const steps = fewest === biggest ? [biggest] : [fewest, biggest];
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.font = `${size * 0.9}px Arial, "Segoe UI", system-ui, sans-serif`;
+  let kx = width - size * 9;
+  for (const n of steps) {
+    const r = radiusOf(n);
+    ctx.beginPath();
+    ctx.arc(kx + r, keyY, r, 0, Math.PI * 2);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = Math.max(1, size / 12);
+    ctx.stroke();
+    ctx.fillStyle = '#252423';
+    ctx.fillText(String(n), kx + r * 2 + size * 0.35, keyY);
+    kx += r * 2 + size * 1.8;
+  }
+  ctx.fillStyle = '#5D6B76';
+  ctx.fillText('reports', kx, keyY);
 
   const url = canvas.toDataURL('image/png');
   const binary = atob(url.slice(url.indexOf(',') + 1));

@@ -21,6 +21,7 @@
  */
 
 import { DISTRICT_BOUNDARIES, LGA_BOUNDARIES, type BoundaryShape } from '@/data/boundaries';
+import { boxOf } from './projection';
 
 export type LgaCode = 'BJL' | 'KMC' | 'BRI' | 'KER' | 'MAN' | 'KUN' | 'JAN' | 'BAS';
 
@@ -673,4 +674,32 @@ for (const unit of CONSTITUENCY_UNITS) {
 /** The shape a constituency is drawn in, or null for a name off the gazetteer. */
 export function unitOfConstituency(name: string): string | null {
   return unitLookup.get(key(name)) ?? null;
+}
+
+/**
+ * The corner of the country a national map cannot show.
+ *
+ * Banjul, Kanifing and the Brikama townships are about one per cent of
+ * the land and a third of the electorate, so on a map of the whole
+ * country they are a few pixels across - and they are where a mission
+ * does most of its observing. They are drawn again in an inset beside
+ * the country, at whatever scale the panel allows.
+ */
+const INSET_LGAS: LgaCode[] = ['BJL', 'KMC'];
+
+export const INSET_UNITS: MapUnit[] = CONSTITUENCY_UNITS.filter((u) => {
+  if (u.key === 'Brikama and Kombo North') return true;
+  const codes = u.constituencies.map((c) => lgaLookup.get(key(c)));
+  return codes.every((code) => code !== undefined && INSET_LGAS.includes(code));
+});
+
+/** The box the inset covers, in degrees. */
+export const INSET_BOX: [number, number, number, number] = boxOf(
+  INSET_UNITS.map((u) => u.shape),
+  0.08,
+);
+
+/** Whether a unit is drawn in the inset rather than on the country. */
+export function inInset(unitKey: string): boolean {
+  return INSET_UNITS.some((u) => u.key === unitKey);
 }

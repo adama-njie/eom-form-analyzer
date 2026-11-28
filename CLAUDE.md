@@ -102,38 +102,32 @@ geography.
   and resolves to neither. What does not resolve is shown as written -
   "Westfield", "URR" - on screen and under the deck's table, because
   "constituency not named" reads as missing data when the field was filled in.
-- **There is a constituency map, and it is of coverage only.** Two
-  earlier attempts failed because the match was made on names alone,
-  which left the urban constituencies white - a third of the
-  electorate, and the ground the mission works on. Matched properly,
-  **44 of the 53 constituencies are exactly one district** and carry
-  its name; `key` already folds the spellings the two sources differ
-  on, and `CONSTITUENCY_BOUNDARY` covers the one that differs by a
-  whole word. The other **nine were made by splitting three old
-  districts in the two towns**, and nothing published records which
-  part went where, so `SHARED_UNITS` draws each cluster as one shape
-  over the constituencies inside it - Greater Serrekunda is four,
-  Brikama and Kombo North is five. That is 46 shapes for 53
-  constituencies, every constituency inside exactly one of them, and
-  no white ground anywhere in the country. The two shared shapes are
-  named in the line under the map, because a reader counting shapes
-  would otherwise count 46 and believe it was 53.
-  **Coverage, and only coverage.** A rate at this level often rests on
-  one report, and a constituency shaded "100%" off a single observer is
-  the thing this tool exists not to print; where the day was rated
-  badly is still mapped on the areas, and the Map tab still shades a
-  question by area and not below it. Which constituencies were reached
-  is a real figure at any size of deployment.
-  **Only the units with reports are named.** Forty-six names will not
-  fit a country thirty miles across. On the deck's canvas the small
-  ones get the callout band and a leader line, as Banjul and Kanifing
-  do on the area map; on screen a name wider than its own shape is
-  dropped and the figure stays, because "Banjul North" written across
-  Bakau leaves neither readable.
-  `mapPng` and `GambiaMap` take the units to draw, defaulting to the
-  areas, so there is one renderer and not two. If the IEC ever
-  publishes real constituency boundaries, `CONSTITUENCY_UNITS` is the
-  only thing that changes.
+- **The constituency map is half built, and not drawn anywhere yet.**
+  The choropleth version went in and came straight out: 46 shapes, most
+  of the country hatched, the observed ones thin ribbons too small to
+  hold their names, so every label ended in a band under the country on
+  leader lines that crossed the whole map. What stands is the
+  groundwork, and it is sound: `boundaries.ts` carries the 48 ADM2
+  districts again, and **44 of the 53 constituencies are exactly one
+  district** and carry its name once `key` folds the spellings the two
+  sources differ on, with `CONSTITUENCY_BOUNDARY` for the one that
+  differs by a whole word. The other **nine were made by splitting
+  three old districts in the two towns**, and nothing published records
+  which part went where, so `SHARED_UNITS` draws each cluster as one
+  shape - Greater Serrekunda is four, Brikama and Kombo North is five.
+  `CONSTITUENCY_UNITS` is 46 shapes covering all 53 with no white
+  ground, `reportsByUnit` counts into them and `constituency.test.ts`
+  holds it all to that.
+  **What is left is the drawing.** `bubbleMapPng` is written and
+  typechecks but is wired to nothing and has never been rendered: a
+  circle per observed constituency sized by reports, over the areas
+  rather than the 46 outlines, with Greater Banjul - one per cent of
+  the land, a third of the electorate - drawn again in an inset beside
+  the country, `INSET_UNITS` and `INSET_BOX`. `GambiaMap` already takes
+  a `units` prop for the screen version. When it goes in it is coverage
+  only: a rate at this level often rests on one report, and a
+  constituency shaded "100%" off a single observer is the thing this
+  tool exists not to print.
 - **A file reports against seven regions or eight LGAs, and the file
   says which.** The campaign form asks for the Local Government Area and
   offers all eight. The polling-day forms ask for the region and offer
