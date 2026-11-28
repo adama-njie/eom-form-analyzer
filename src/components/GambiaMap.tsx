@@ -1,6 +1,11 @@
 import { useId, useMemo, useState } from 'react';
 import type { PlaceRate } from '@/lib/analyse';
-import { AREA_WORDS, areaShapes, type Division } from '@/lib/gambia';
+import {
+  AREA_WORDS,
+  areaShapes,
+  type Division,
+  type MapUnit,
+} from '@/lib/gambia';
 import { labelPoint, makeProjector, pathFor, shapeWidth } from '@/lib/projection';
 
 /**
@@ -29,6 +34,14 @@ export interface MapProps {
   compact?: boolean;
   /** Which division the file counts: eight LGAs, or seven regions. */
   division?: Division;
+  /**
+   * The shapes to draw, where they are not the areas.
+   *
+   * The constituency map passes its forty-six units, and only the ones
+   * that were observed are named: forty-six names will not fit a
+   * country thirty miles across, and the hatching says the rest.
+   */
+  units?: MapUnit[];
 }
 
 export function GambiaMap({
@@ -39,12 +52,13 @@ export function GambiaMap({
   onSelect,
   compact,
   division = 'lga',
+  units,
 }: MapProps) {
   const titleId = useId();
   const [hover, setHover] = useState<string | null>(null);
 
   const projector = useMemo(() => makeProjector(VIEW_W), []);
-  const shapes = useMemo(() => areaShapes(division), [division]);
+  const shapes = useMemo(() => units ?? areaShapes(division), [units, division]);
   const byPlace = useMemo(() => new Map(rates.map((r) => [r.place, r])), [rates]);
 
   const max = useMemo(() => {
@@ -133,21 +147,34 @@ export function GambiaMap({
 
 
         {!compact &&
-          drawn.map(({ key, name, label }) => {
+          drawn.map(({ key, name, label, width }) => {
             const r = byPlace.get(key);
             const has = r && r.pct !== null;
+            if (units && !has) return null;
             const size = 15;
+            /*
+             * A name wider than the shape it names is dropped.
+             *
+             * On the areas every name fits. On the constituencies the
+             * urban ones are a few pixels across, and "Banjul North"
+             * written over them lands on Bakau and then neither can be
+             * read. The figure stays, the name is on hover, and the
+             * list below the map names them all.
+             */
+            const fits = !units || name.length * size * 0.55 <= width;
             return (
               <g key={`t-${key}`} pointerEvents="none">
-                <text
-                  x={label[0]}
-                  y={label[1] - 4}
-                  textAnchor="middle"
-                  className="map-name"
-                  style={{ fontSize: size }}
-                >
-                  {name}
-                </text>
+                {fits && (
+                  <text
+                    x={label[0]}
+                    y={label[1] - 4}
+                    textAnchor="middle"
+                    className="map-name"
+                    style={{ fontSize: size }}
+                  >
+                    {name}
+                  </text>
+                )}
                 <text
                   x={label[0]}
                   y={label[1] + 13}

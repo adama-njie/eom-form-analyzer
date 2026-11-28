@@ -288,13 +288,29 @@ other - and the date. The title itself starts as the form's own name, read off t
 rather than the workbook's file name: it is printed on a cover as well as on a file, and
 neither wants to read "campaign-report-20261124-143212.xlsx".
 
-**There is no constituency map.** There was one, drawn on district boundaries, and it went
-through three names before it went altogether. The trouble was never the title: the 53
-constituencies have no published boundaries, the 48 districts are a different division, and
-eleven constituencies - the urban ones, where most of the reports come from - have no district
-to be drawn on. The map was therefore blank exactly where the mission was working, and the
-footnote explaining that grew longer than anything the picture said. Coverage by constituency
-is a list on screen instead, which can show all 53 without apologising for any of them.
+**There is a constituency map, and it took three attempts.** The first two were drawn on
+district boundaries matched by name, and the names did not match: the urban constituencies
+fell out, so the map was blank exactly where the mission was working and the footnote
+explaining that grew longer than anything the picture said.
+
+Matched properly the picture is quite different. Forty-four of the 53 constituencies are
+exactly one district and carry its name, once the spellings the two sources differ on are
+folded - Niumi and Nuimi, Baddibu and Badibu, Fulladu and Fuladu, Wulli and Wuli, Jokadou
+and Jokadu - which the gazetteer was already doing for observers' own spellings. The other
+nine were made by splitting three old districts in Serrekunda and the Kombos, and nothing
+published records which part went where. So each of those two clusters is drawn as one
+shape over the constituencies inside it, and the line under the map says so: 46 shapes for
+53 constituencies, every constituency inside exactly one of them, and no white ground
+anywhere in the country.
+
+It shows coverage and nothing else. A rate at this level often rests on a single report,
+and a constituency shaded "100%" off one observer is the thing this tool exists not to
+print; where the day was rated badly is still mapped on the areas. Which constituencies
+the mission reached is a real figure whatever the size of the deployment, and it is what a
+map gets looked at for during the day. Only the units with reports are named, because
+forty-six names will not fit a country thirty miles across: on the deck the small ones get
+a leader line into the band below the country, the way Banjul and Kanifing do on the area
+map, and on screen a name wider than its own shape is dropped and its figure stays.
 
 **Coverage by constituency left the deck.** It was a slide, a table of all 53 under their
 areas with the register beside the reports, and it worked on the campaign form. On the

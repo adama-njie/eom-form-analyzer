@@ -14,6 +14,7 @@ import {
   analyse,
   chartScale,
   displayCounts,
+  mapsConstituencies,
   buildDataset,
   coverage,
   constituencyCoverage,
@@ -22,6 +23,7 @@ import {
   ratingOf,
   ratingQuestions,
   reportsByPlace,
+  reportsByUnit,
   scoreLabel,
   stationsObserved,
   textValues,
@@ -38,7 +40,7 @@ import {
   type Period,
 } from '@/lib/period';
 import { inferSchema, toTable, type Question, type Table } from '@/lib/schema';
-import { AREA_WORDS, type Division } from '@/lib/gambia';
+import { AREA_WORDS, CONSTITUENCY_UNITS, SHARED_UNITS, type Division } from '@/lib/gambia';
 import { wordFrequencies } from '@/lib/text';
 import { downloadCsv, exportAllTables } from '@/lib/export';
 import { exportPptx } from '@/lib/pptx';
@@ -745,6 +747,30 @@ function Overview({
           )}
         </section>
       </div>
+
+      {mapsConstituencies(dataset, periodFilter) && (
+        <section className="card">
+          <h2>Reports by constituency</h2>
+          {/*
+            * The one line of prose a map gets, and it states a unit:
+            * nine constituencies share a shape with their neighbours,
+            * so a reader counting shapes would count 46 and believe it
+            * was 53. See `CONSTITUENCY_UNITS`.
+            */}
+          <p className="muted small">
+            Forty-four of the 53 constituencies are drawn on their own boundary;{' '}
+            {SHARED_UNITS.map((u) => `${u.label} is ${u.constituencies.length}`).join(', ')}.
+            Only the ones with reports are named. Hatched ground returned no reports, which is
+            not the same as reporting no problems.
+          </p>
+          <GambiaMap
+            rates={reportsByUnit(dataset, periodFilter)}
+            suffix=""
+            division={dataset.division}
+            units={CONSTITUENCY_UNITS}
+          />
+        </section>
+      )}
 
       {turnout && (
         <section className="card">

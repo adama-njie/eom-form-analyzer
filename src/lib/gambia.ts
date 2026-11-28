@@ -20,7 +20,7 @@
  * Boundaries are real, from geoBoundaries gbOpen, in `../data/boundaries`.
  */
 
-import { LGA_BOUNDARIES, type BoundaryShape } from '@/data/boundaries';
+import { DISTRICT_BOUNDARIES, LGA_BOUNDARIES, type BoundaryShape } from '@/data/boundaries';
 
 export type LgaCode = 'BJL' | 'KMC' | 'BRI' | 'KER' | 'MAN' | 'KUN' | 'JAN' | 'BAS';
 
@@ -246,6 +246,7 @@ function key(s: string): string {
     .replace(/serrekunda|serekunda/g, 'serekunda')
     .replace(/illiassa|illiasa/g, 'iliasa')
     .replace(/sanjal|sanjar/g, 'sanja')
+    .replace(/jokadou|jokadu/g, 'jokadu')
     .replace(/mentereng|menterreng/g, 'menterng')
     .replace(/karanai|karenai/g, 'karanai')
     .replace(/[^a-z0-9]/g, '');
@@ -548,4 +549,128 @@ export function teamKey(name: string): string {
 /** The teams deployed as this type, or null where the mission lists none. */
 export function deployedTeams(type: string): readonly string[] | null {
   return DEPLOYMENT[teamKey(type)] ?? null;
+}
+
+/* ------------------------------------------------------------------ */
+/* Constituencies on the map                                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Where a constituency's shape is filed under a longer name.
+ *
+ * `key` already folds the spellings the two sources differ on -
+ * Niumi/Nuimi, Baddibu/Badibu, Fulladu/Fuladu, Wulli/Wuli,
+ * Illiassa/Illiasa, Sanjal/Sanjar, Jokadou/Jokadu - which is most of
+ * them. This is for the one that differs by a whole word.
+ */
+const CONSTITUENCY_BOUNDARY: Record<string, string> = {
+  'Foni Bintang': 'Foni Bintang Karanai',
+};
+
+/**
+ * The two places where the boundary file is coarser than the
+ * constituencies.
+ *
+ * Forty-four of the fifty-three constituencies are one district and
+ * carry its name. The nine that are not were made by splitting three
+ * old districts in the two towns, and nothing published records which
+ * part went where - so each cluster is drawn as one shape covering the
+ * constituencies inside it, and says so. The alternative was to leave
+ * them white, which is what the first attempt at this map did: a third
+ * of the electorate, and the ground the mission works on.
+ */
+export const SHARED_UNITS: {
+  label: string;
+  constituencies: string[];
+  boundaries: string[];
+}[] = [
+  {
+    label: 'Greater Serrekunda',
+    constituencies: [
+      'Serekunda',
+      'Bundungka Kunda',
+      'Latrikunda Sabiji',
+      'Tallinding Kunjang',
+    ],
+    boundaries: ['Serrekunda Central', 'Serrekunda East'],
+  },
+  {
+    label: 'Brikama and Kombo North',
+    constituencies: [
+      'Sanneh Mentereng',
+      'Old Yundum',
+      'Busumbala',
+      'Brikama North',
+      'Brikama South',
+    ],
+    boundaries: ['Kombo North', 'Kombo Central'],
+  },
+];
+
+/** One shape on the constituency map, and what it covers. */
+export interface MapUnit {
+  /** What rates are grouped by: the constituency, or the shared unit. */
+  key: string;
+  /** What the map prints. */
+  label: string;
+  /** The constituencies inside this shape: one, or several. */
+  constituencies: string[];
+  shape: BoundaryShape;
+}
+
+function district(name: string): BoundaryShape {
+  const want = key(CONSTITUENCY_BOUNDARY[name] ?? name);
+  const shape = DISTRICT_BOUNDARIES.find((b) => key(b.name) === want);
+  if (!shape) throw new Error(`No boundary for ${name}`);
+  return shape;
+}
+
+/**
+ * Every shape the constituency map draws, in the gazetteer's order.
+ *
+ * Forty-six units for fifty-three constituencies, and every
+ * constituency is inside exactly one of them: the map has no white
+ * ground anywhere in the country.
+ */
+export const CONSTITUENCY_UNITS: MapUnit[] = (() => {
+  const shared = new Map<string, (typeof SHARED_UNITS)[number]>();
+  for (const unit of SHARED_UNITS) {
+    for (const c of unit.constituencies) shared.set(key(c), unit);
+  }
+  const out: MapUnit[] = [];
+  const done = new Set<string>();
+  for (const name of ALL_CONSTITUENCIES) {
+    const group = shared.get(key(name));
+    if (!group) {
+      out.push({
+        key: name,
+        label: name,
+        constituencies: [name],
+        shape: district(name),
+      });
+      continue;
+    }
+    if (done.has(group.label)) continue;
+    done.add(group.label);
+    out.push({
+      key: group.label,
+      label: group.label,
+      constituencies: group.constituencies,
+      shape: {
+        name: group.label,
+        rings: group.boundaries.flatMap((b) => district(b).rings),
+      },
+    });
+  }
+  return out;
+})();
+
+const unitLookup = new Map<string, string>();
+for (const unit of CONSTITUENCY_UNITS) {
+  for (const c of unit.constituencies) unitLookup.set(key(c), unit.key);
+}
+
+/** The shape a constituency is drawn in, or null for a name off the gazetteer. */
+export function unitOfConstituency(name: string): string | null {
+  return unitLookup.get(key(name)) ?? null;
 }

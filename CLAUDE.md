@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 319 tests
+npm test           # vitest, 324 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 276 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 281 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -70,7 +70,7 @@ src/
     period.ts          the campaign period, and the dashboard's view of it
     layout.ts          slide geometry; `place()` throws on anything that would not fit
     theme.ts           every colour and type size in the product
-  data/boundaries.ts   real LGA boundaries (geoBoundaries gbOpen, ADM1)
+  data/boundaries.ts   real boundaries: LGAs (ADM1) and districts (ADM2)
 ```
 
 Nothing is specific to one country except `gambia.ts`. Point the tool at a form
@@ -102,15 +102,38 @@ geography.
   and resolves to neither. What does not resolve is shown as written -
   "Westfield", "URR" - on screen and under the deck's table, because
   "constituency not named" reads as missing data when the field was filled in.
-- **Maps are of LGAs only.** There is no constituency map and no district
-  map; `mapPng` and `GambiaMap` take rates and nothing else. A map below
-  the LGA was tried twice: the 53 constituencies have no published
-  boundaries, and the 48 districts that do are a different division, so
-  eleven constituencies - the urban ones, which is where the reports are -
-  could not be drawn and the map was blank where the mission was working.
-  Coverage by constituency is a list on screen, which can show all 53. Do
-  not reintroduce the district layer without a real constituency boundary
-  file; `scripts/build_boundaries.py` still writes the ADM2 shapes.
+- **There is a constituency map, and it is of coverage only.** Two
+  earlier attempts failed because the match was made on names alone,
+  which left the urban constituencies white - a third of the
+  electorate, and the ground the mission works on. Matched properly,
+  **44 of the 53 constituencies are exactly one district** and carry
+  its name; `key` already folds the spellings the two sources differ
+  on, and `CONSTITUENCY_BOUNDARY` covers the one that differs by a
+  whole word. The other **nine were made by splitting three old
+  districts in the two towns**, and nothing published records which
+  part went where, so `SHARED_UNITS` draws each cluster as one shape
+  over the constituencies inside it - Greater Serrekunda is four,
+  Brikama and Kombo North is five. That is 46 shapes for 53
+  constituencies, every constituency inside exactly one of them, and
+  no white ground anywhere in the country. The two shared shapes are
+  named in the line under the map, because a reader counting shapes
+  would otherwise count 46 and believe it was 53.
+  **Coverage, and only coverage.** A rate at this level often rests on
+  one report, and a constituency shaded "100%" off a single observer is
+  the thing this tool exists not to print; where the day was rated
+  badly is still mapped on the areas, and the Map tab still shades a
+  question by area and not below it. Which constituencies were reached
+  is a real figure at any size of deployment.
+  **Only the units with reports are named.** Forty-six names will not
+  fit a country thirty miles across. On the deck's canvas the small
+  ones get the callout band and a leader line, as Banjul and Kanifing
+  do on the area map; on screen a name wider than its own shape is
+  dropped and the figure stays, because "Banjul North" written across
+  Bakau leaves neither readable.
+  `mapPng` and `GambiaMap` take the units to draw, defaulting to the
+  areas, so there is one renderer and not two. If the IEC ever
+  publishes real constituency boundaries, `CONSTITUENCY_UNITS` is the
+  only thing that changes.
 - **A file reports against seven regions or eight LGAs, and the file
   says which.** The campaign form asks for the Local Government Area and
   offers all eight. The polling-day forms ask for the region and offer

@@ -11,5 +11,13 @@ export default defineConfig({
   plugins: [react(), viteSingleFile()],
   resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
   build: { target: 'es2022', assetsInlineLimit: 100_000_000, chunkSizeWarningLimit: 8000 },
-  test: { environment: 'node', include: ['src/**/*.test.ts'] },
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.ts'],
+    // Building a whole deck takes a couple of seconds on its own and
+    // longer with the rest of the suite running beside it, so the
+    // default five seconds had the deck tests failing on load rather
+    // than on anything wrong with them.
+    testTimeout: 30_000,
+  },
 });

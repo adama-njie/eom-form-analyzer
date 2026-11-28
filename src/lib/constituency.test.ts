@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import JSZip from 'jszip';
-import { analyse, buildDataset, constituencyCoverage } from './analyse';
+import {
+  analyse,
+  buildDataset,
+  constituencyCoverage,
+  mapsConstituencies,
+  reportsByUnit,
+} from './analyse';
+import { ALL_CONSTITUENCIES, CONSTITUENCY_UNITS, unitOfConstituency } from './gambia';
 import { buildDeck } from './pptx';
 import { inferSchema, toTable } from './schema';
 import { defaultSelection, exportableQuestions, questionKey } from './selection';
@@ -165,5 +172,62 @@ describe('the deck', () => {
     // 53. "Westfield" is not one of them, and is not counted as one.
     expect(page).toContain('Constituencies');
     expect(page).toContain('5 / 53');
+  });
+});
+
+describe('constituencies on the map', () => {
+  it('gives every one of the 53 a shape, in 46 units', () => {
+    /*
+     * Forty-four constituencies are one district and carry its name;
+     * the other nine were made by splitting three old districts in the
+     * two towns, and are drawn as the two shapes those splits came
+     * from. Nothing in the country is left white.
+     */
+    expect(CONSTITUENCY_UNITS).toHaveLength(46);
+    const uncovered = ALL_CONSTITUENCIES.filter((c) => unitOfConstituency(c) === null);
+    expect(uncovered).toEqual([]);
+    const alone = CONSTITUENCY_UNITS.filter((u) => u.constituencies.length === 1);
+    expect(alone).toHaveLength(44);
+  });
+
+  it('puts a town constituency in the shape it shares with its neighbours', () => {
+    expect(unitOfConstituency('Latrikunda Sabiji')).toBe('Greater Serrekunda');
+    expect(unitOfConstituency('Brikama North')).toBe('Brikama and Kombo North');
+    // And one that has its own boundary keeps its own name.
+    expect(unitOfConstituency('Bakau')).toBe('Bakau');
+  });
+
+  it('finds a boundary filed under a longer name than the constituency', () => {
+    // The district is "Foni Bintang Karanai"; the constituency is not.
+    const unit = CONSTITUENCY_UNITS.find((u) => u.key === 'Foni Bintang');
+    expect(unit?.shape.rings.length).toBeGreaterThan(0);
+  });
+
+  it('counts the reports into the shape they were filed from', () => {
+    const ds = form();
+    const rates = reportsByUnit(ds);
+    const got = Object.fromEntries(
+      rates.filter((r) => r.pct !== null).map((r) => [r.place, r.n]),
+    );
+    expect(got).toEqual({
+      'Serekunda West': 2,
+      Bakau: 1,
+      Jimara: 1,
+      Kantora: 1,
+      'Foni Bintang': 1,
+    });
+    // "Westfield" is a place rather than a constituency, so it is in no
+    // shape - and a shape with no reports is null, never nought.
+    expect(rates.filter((r) => r.pct === null)).toHaveLength(41);
+  });
+
+  it('draws no constituency map for a form from another country', () => {
+    const table = toTable([
+      ['A.2 District', 'B.5 Was a candidate present'],
+      ['Kigali', 'Yes'],
+      ['Huye', 'No'],
+    ]);
+    const ds = buildDataset(table, inferSchema(table));
+    expect(mapsConstituencies(ds)).toBe(false);
   });
 });

@@ -164,6 +164,15 @@ export function mapPng(
   width = 700,
   /** Which division the file counts: eight LGAs, or seven regions. */
   division: Division = 'lga',
+  /**
+   * The shapes to draw, where they are not the areas.
+   *
+   * The constituency map passes its forty-six units, and only the ones
+   * that were observed are labelled: forty-six names will not fit a
+   * country thirty miles across, and the ones a reader is looking for
+   * are the shaded ones.
+   */
+  units?: { key: string; label: string; shape: BoundaryShape }[],
 ): MapImage {
   const projector = makeProjector(width, 8);
   /*
@@ -188,7 +197,8 @@ export function mapPng(
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, width, height);
 
-  const shapes = areaShapes(division);
+  const shapes = units ?? areaShapes(division);
+  const onlyObserved = units !== undefined;
   const byPlace = new Map(rates.map((r) => [r.place, r]));
   const vals = rates.map((r) => r.pct).filter((v): v is number => v !== null);
   const max = vals.length ? Math.max(...vals, 0.0001) : 1;
@@ -251,6 +261,7 @@ export function mapPng(
     const r = byPlace.get(key);
     const has = r && r.pct !== null;
     const [cx, cy] = labelPoint(shape, projector);
+    if (onlyObserved && !has) continue;
     // Central River is drawn twice the size of the Janjanbureh on a
     // campaign map, so in region mode the shape says which it is.
     const name = mapLabel;

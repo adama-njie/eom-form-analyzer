@@ -12,6 +12,7 @@ import {
   LGAS,
   TOTAL_REGISTERED_2026,
   areaUnits,
+  CONSTITUENCY_UNITS,
   DEPLOYMENT,
   deployedTeams,
   lgaName,
@@ -19,6 +20,7 @@ import {
   resolveLga,
   teamKey,
   unitCodeFor,
+  unitOfConstituency,
   type AreaUnit,
   type Division,
   type LgaCode,
@@ -1542,6 +1544,41 @@ export function reportsByPlace(dataset: Dataset, rowFilter?: boolean[]): PlaceRa
     const n = counts.get(place) ?? 0;
     return { place, total: n, n, pct: n > 0 ? n : null };
   });
+}
+
+/**
+ * Reports per shape on the constituency map.
+ *
+ * Keyed by the map unit rather than by the constituency, because nine
+ * of the fifty-three share a shape with their neighbours. A unit
+ * nobody reported from is `null` rather than nought, as on every other
+ * map: "nobody observed here" and "nobody found anything here" are
+ * different statements. See `CONSTITUENCY_UNITS`.
+ */
+export function reportsByUnit(dataset: Dataset, rowFilter?: boolean[]): PlaceRate[] {
+  const counts = new Map<string, number>();
+  dataset.table.rows.forEach((_row, i) => {
+    if (rowFilter && !rowFilter[i]) return;
+    const named = dataset.rowConstituency[i];
+    const unit = named ? unitOfConstituency(named) : null;
+    if (unit) counts.set(unit, (counts.get(unit) ?? 0) + 1);
+  });
+  return CONSTITUENCY_UNITS.map((u) => {
+    const n = counts.get(u.key) ?? 0;
+    return { place: u.key, total: n, n, pct: n > 0 ? n : null };
+  });
+}
+
+/**
+ * Whether the file has enough resolved constituencies to map them.
+ *
+ * The gazetteer is Gambian, so a form from elsewhere has none; and a
+ * form that asks for the constituency but whose answers never resolve
+ * would draw an empty country, which says the mission observed nowhere.
+ */
+export function mapsConstituencies(dataset: Dataset, rowFilter?: boolean[]): boolean {
+  if (!dataset.geo) return false;
+  return reportsByUnit(dataset, rowFilter).some((r) => r.pct !== null);
 }
 
 /* ------------------------------------------------------------------ */
