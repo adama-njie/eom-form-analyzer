@@ -646,8 +646,21 @@ export function bubbleMapPng(
   const [cr, cg, cb] = hexToRgb(colourHex);
   const fill = `rgba(${cr}, ${cg}, ${cb}, 0.85)`;
 
-  const land = (p: Projector): void => {
-    for (const { shape } of areaShapes(division)) {
+  /*
+   * The country, and the name of each area on it.
+   *
+   * The circles carry no names of their own - fifty-three will not fit
+   * - so the area under them is what tells a reader where they are
+   * looking. It is set in the muted grey and drawn before the circles,
+   * because it is the ground and they are the figures. An area too
+   * narrow for its own name goes without one: Banjul and Kanifing are
+   * named in the inset, where there is room.
+   */
+  type Spot = { cx: number; cy: number; r: number };
+
+  const land = (p: Projector, spots: Spot[]): void => {
+    const shapes = areaShapes(division);
+    for (const { shape } of shapes) {
       trace(ctx, shape, p.project.bind(p));
       ctx.fillStyle = '#EDF0F3';
       ctx.fill();
@@ -655,9 +668,49 @@ export function bubbleMapPng(
       ctx.lineWidth = 1.2;
       ctx.stroke();
     }
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `${size * 0.78}px Arial, "Segoe UI", system-ui, sans-serif`;
+    ctx.fillStyle = '#5D6B76';
+    for (const { label: name, shape } of shapes) {
+      const w = ctx.measureText(name).width;
+      if (w > shapeWidth(shape, p)) continue;
+      const [nx, ny] = p.project(...shapeCentre(shape));
+      /*
+       * Clear of the circles, which are drawn over the names.
+       *
+       * An area's centroid is often where one of its circles lands
+       * too, and "Kerewan" with a blue disc through the middle of it
+       * is worse than no name at all. The name steps up and down
+       * until it is clear, and is dropped if it never is.
+       */
+      const clear = (at: number): boolean =>
+        !spots.some(
+          (sp) =>
+            Math.abs(sp.cx - nx) < sp.r + w / 2 + size * 0.2 &&
+            Math.abs(sp.cy - at) < sp.r + size * 0.6,
+        );
+      const at = [0, -1.3, 1.3, -2.6, 2.6].map((k) => ny + k * size).find(clear);
+      if (at === undefined) continue;
+      ctx.fillText(name, nx, at);
+      // A name just placed is something for the next one to avoid:
+      // Kerewan and Mansa Konko both stepped down onto the same line.
+      spots.push({ cx: nx, cy: at, r: Math.max(w, size) / 2 });
+    }
   };
 
-  land(projector);
+  const byKey = new Map(CONSTITUENCY_UNITS.map((u) => [u.key, u]));
+  const spotsOf = (p: Projector, which: MapPoint[]): Spot[] =>
+    which.flatMap((point) => {
+      const unit = byKey.get(point.key);
+      if (!unit) return [];
+      const [cx, cy] = p.project(...shapeCentre(unit.shape));
+      return [{ cx, cy, r: radiusOf(point.n) }];
+    });
+
+  const onCountry = points.filter((pt) => !inInset(pt.key));
+  const urban = points.filter((pt) => inInset(pt.key));
+  land(projector, spotsOf(projector, onCountry));
 
   /*
    * One circle, with its figure inside it and no name.
@@ -687,11 +740,10 @@ export function bubbleMapPng(
 
   };
 
-  const byKey = new Map(CONSTITUENCY_UNITS.map((u) => [u.key, u]));
   // Biggest first, so a small circle lands on top of a large one
   // rather than inside it.
   const bySize = (a: MapPoint, b: MapPoint): number => b.n - a.n;
-  for (const point of points.filter((p) => !inInset(p.key)).sort(bySize)) {
+  for (const point of [...onCountry].sort(bySize)) {
     const unit = byKey.get(point.key);
     if (unit) bubble(projector, point, unit);
   }
@@ -735,8 +787,8 @@ export function bubbleMapPng(
       return [x0 + px, y0 + py];
     },
   };
-  land(inset);
-  for (const point of points.filter((p) => inInset(p.key)).sort(bySize)) {
+  land(inset, spotsOf(inset, urban));
+  for (const point of [...urban].sort(bySize)) {
     const unit = byKey.get(point.key);
     if (unit) bubble(inset, point, unit);
   }

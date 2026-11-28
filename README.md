@@ -308,9 +308,11 @@ country is hatched, the observed ones are ribbons along the river too thin to ho
 and the names therefore ended up in a band underneath joined by leader lines that crossed
 the whole map and still collided with one another. The map is circles now: one on each
 constituency heard from, sized by its reports, over the areas rather than the 46 outlines.
-It carries no names at all - fifty-three will never fit - so the circle says where and how
-much, and which constituency it is comes from hovering it, from the list under the map and
-from the exported table. Greater Banjul is drawn again in a panel beside the country, with
+It carries no constituency names - fifty-three will never fit - so the circle says where
+and how much, and which constituency it is comes from hovering it, from the list under the
+map and from the exported table. The areas underneath are named, because something has to
+say where a reader is looking: in the muted grey, under the circles rather than over them,
+and stepped clear of any circle or name already placed. Greater Banjul is drawn again in a panel beside the country, with
 a box on the country saying which corner it is, because Banjul and Kanifing between them
 are a hundredth of the land and a sixth of the electorate.
 

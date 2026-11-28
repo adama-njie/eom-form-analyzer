@@ -415,8 +415,26 @@ export function BubbleMap({
         );
       });
 
-  const land = (p: Projector, keyPrefix: string) =>
-    shapes.map(({ key, shape }) => (
+  /*
+   * The country, and the name of each area on it. The circles carry no
+   * names - fifty-three will not fit - so the area under them is what
+   * says where a reader is looking. An area too narrow for its own
+   * name goes without one; Banjul and Kanifing are named in the inset.
+   */
+  const spotsOf = (p: Projector, which: BubblePoint[]) =>
+    which.flatMap((point) => {
+      const unit = units.get(point.key);
+      if (!unit) return [];
+      const [cx, cy] = p.project(...shapeCentre(unit.shape));
+      return [{ cx, cy, r: radiusOf(point.n) }];
+    });
+
+  const land = (
+    p: Projector,
+    keyPrefix: string,
+    spots: { cx: number; cy: number; r: number }[],
+  ) => [
+    ...shapes.map(({ key, shape }) => (
       <path
         key={`${keyPrefix}-${key}`}
         d={pathFor(shape, p)}
@@ -424,8 +442,48 @@ export function BubbleMap({
         stroke="#FFFFFF"
         strokeWidth={1.2}
       />
-    ));
+    )),
+    ...shapes
+      .map(({ key, label, shape }) => {
+        // The deck measures the text; an SVG cannot, so this is the
+        // width of an average character in this face, and a shade
+        // under it rather than over: a name dropped that would have
+        // fitted is the worse mistake of the two.
+        const w = label.length * size * 0.38;
+        if (w > shapeWidth(shape, p)) return null;
+        const [nx, ny] = p.project(...shapeCentre(shape));
+        // Clear of the circles, which are drawn over the names: an
+        // area's centroid is often where one of its circles lands.
+        const clear = (at: number): boolean =>
+          !spots.some(
+            (sp) =>
+              Math.abs(sp.cx - nx) < sp.r + w / 2 + size * 0.2 &&
+              Math.abs(sp.cy - at) < sp.r + size * 0.6,
+          );
+        const at = [0, -1.3, 1.3, -2.6, 2.6].map((k) => ny + k * size).find(clear);
+        if (at === undefined) return null;
+        // A name just placed is something for the next one to avoid.
+        spots.push({ cx: nx, cy: at, r: Math.max(w, size) / 2 });
+        return (
+          <text
+            key={`${keyPrefix}-n-${key}`}
+            x={nx}
+            y={at}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fill="#5D6B76"
+            style={{ fontSize: size * 0.78 }}
+            pointerEvents="none"
+          >
+            {label}
+          </text>
+        );
+      })
+      .filter((n) => n !== null),
+  ];
 
+  const onCountry = points.filter((p) => !inInset(p.key));
+  const urban = points.filter((p) => inInset(p.key));
   const [bx1, by1] = projector.project(bminLon, bmaxLat);
   const [bx2, by2] = projector.project(bmaxLon, bminLat);
   const hovered = points.find((p) => p.key === hover);
@@ -448,8 +506,8 @@ export function BubbleMap({
           </clipPath>
         </defs>
 
-        {land(projector, 'c')}
-        {circles(projector, points.filter((p) => !inInset(p.key)))}
+        {land(projector, 'c', spotsOf(projector, onCountry))}
+        {circles(projector, onCountry)}
 
         {/* The box on the country saying where the inset is: without it
             a reader has a second map of somewhere and no way of telling
@@ -479,8 +537,8 @@ export function BubbleMap({
         </text>
 
         <g clipPath={`url(#${titleId}-inset)`}>
-          {land(inset, 'i')}
-          {circles(inset, points.filter((p) => inInset(p.key)))}
+          {land(inset, 'i', spotsOf(inset, urban))}
+          {circles(inset, urban)}
         </g>
         <rect
           x={x0}

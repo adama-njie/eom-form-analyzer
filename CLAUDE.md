@@ -113,6 +113,15 @@ geography.
   them will never fit, and the ones a reader wants are on hover, in
   the list under the map and in the exported table. Area carries the
   count, so the key is two circles, the fewest and the most.
+  **The areas are named under the circles**, which is what tells a
+  reader where they are looking now that the constituencies are not
+  named. In the muted grey, drawn before the circles because they are
+  the ground and it is the figures, and stepped up or down until it is
+  clear of them and of the name placed before it - an area's centroid
+  is often where one of its own circles lands, and "Kerewan" with a
+  blue disc through the middle of it is worse than no name. A name too
+  wide for its area is dropped; Banjul and Kanifing are named in the
+  inset, where there is room.
   **Greater Banjul is drawn again beside the country** - `INSET_UNITS`
   and `INSET_BOX`, Banjul and Kanifing only, a hundredth of the land
   and a sixth of the electorate - with a locator box on the country
