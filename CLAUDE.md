@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 312 tests
+npm test           # vitest, 314 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 269 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 271 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -345,10 +345,13 @@ geography.
   columns are the staff themselves rather than the reports, which is
   the one thing about the page that is not the same as every other, so
   `Shares.unit` says so under the heading and the figure over each
-  column counts people. `partLabel` names the two segments from the
-  question's own wording - "Female" and "Other", never "male": the form
-  asked one question and the answer to the other one is not in the
-  file. The dashboard and the Word report still show the figure, the
+  column counts people. `partLabel` names the counted segment from the
+  question's own wording and `restLabel` names the rest of the whole:
+  "Female" and "Male", because that is the pair the mission reports and
+  "Female / Other" reads as though a third kind of staff had been left
+  off the chart. Only for a pair `OPPOSITE` knows; anything else is
+  "Other", because the form asked one question and the answer to the
+  other one is not in the file. The dashboard and the Word report still show the figure, the
   basis and the two splits as bars.
 - **A rating question is found by its scale, not by its section letter.**
   It was `/^J\./`, and the opening form rates one thing in section G, so a
@@ -586,6 +589,13 @@ geography.
   similarity — two spellings of a name stay apart.
 - **Multi-answer blocks** are matched on the *last* bracketed group in the
   header, so "B.15 Language(s) of the speeches (Mandinka)" keeps its block.
+- **A tick box reads commonest first.** The options come out of the
+  form in the order whoever wrote the questionnaire thought of them,
+  and what a reader wants off a page of nine of them is which of the
+  nine happened most often - a question the page answers at a glance
+  when the bars descend and not at all when they do not.
+  `displayCounts` sorts a `multi` question by count, which is also by
+  share, since each option is a share of the same reports.
 - **A tick box is a share of the reports, not of the ticks.** One report
   ticks several options, so the ticks outnumber the reports: Mandinka on
   three reports of four is 75%, and dividing by the ticks drew it as
@@ -655,13 +665,19 @@ geography.
   area a drill-down and the deck a grouped page, and a group never splits
   across a column. Constituency answers are resolved against the gazetteer so
   spelling variants collapse; unrecognised answers stay as written.
-- **Nothing on a slide is set below 18pt**, and a question title below 24pt.
+- **Nothing on a slide is set below 20pt**, and a question title below 24pt.
   Inside a chart the floor is `CHART_MIN`, four points lower, and a value
   written on a mark is `LABEL_MIN`, two points lower again: a data label
   has only the width of the mark it is on, and at 18pt "100%" did not fit
   a column of a 100% stacked chart, so PowerPoint drew nothing at all,
   and at 14pt it broke "11%" over two lines and set the per cent sign on
-  a line of its own. `typefloor.test.ts` enforces all three.
+  a line of its own. `typefloor.test.ts` enforces all three. The whole
+  scale went up two points once the deck had been read on a screen in
+  the room, the titles excepted: `MIN`, `CHART_MIN` and `LABEL_MIN`
+  moved together, and `mapLabelSize` with them - it was a fiftieth of
+  the drawing width, which came to the old floor exactly. The headings
+  stayed where they were, because a question title two points larger
+  would have met the slide heading above it.
 - **A mean score is written to one decimal place.** `scoreLabel`, in the
   deck, on the dashboard, in the Word report and in its sentences. Two
   decimals said more than the scale knows: a mean of 3.44 out of 4 is

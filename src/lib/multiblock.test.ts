@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
-import { analyse, buildDataset } from './analyse';
+import { analyse, buildDataset, displayCounts } from './analyse';
 import { buildDeck } from './pptx';
 import { defaultSelection, exportableQuestions, questionKey } from './selection';
 import { inferSchema, type Table } from './schema';
@@ -32,6 +32,26 @@ const LANGUAGES: Table = {
 };
 
 describe('multi-answer blocks', () => {
+  it('reads commonest first, not in the order the form printed the options', () => {
+    /*
+     * The options come out in the order whoever wrote the
+     * questionnaire thought of them. What a reader wants off a page of
+     * nine tick boxes is which of the nine happened most often, which
+     * the page answers at a glance only when the bars descend. Each
+     * option is a share of the reports rather than of the ticks, so
+     * the order by count is the order by share.
+     */
+    const ds = buildDataset(LANGUAGES, inferSchema(LANGUAGES));
+    const q = ds.questions.find((x) => x.code === 'B.15')!;
+    const shown = displayCounts(q, analyse(ds, q));
+    expect(shown.map((c) => `${c.label} ${c.n}`)).toEqual([
+      'Mandinka 3',
+      'English 1',
+      'No speech delivered 1',
+      'Wolof 1',
+    ]);
+  });
+
   it('keeps a block together when the question text has its own brackets', () => {
     const q = inferSchema(LANGUAGES).find((x) => x.code === 'B.15')!;
     expect(q.kind).toBe('multi');

@@ -178,11 +178,11 @@ export const HEADER_BLUE = '3C6CB4';
  * The deck is read from the back of a briefing room, and an 11pt axis label
  * that is perfectly legible on the laptop it was built on is not legible
  * there. Where this floor and the available space conflict, the space gives
- * way: a chart with too many categories to label at 18pt is given a slide of
- * its own, and failing that PowerPoint thins the labels out, which is a
+ * way: a chart with too many categories to label is given a slide of its
+ * own, and failing that PowerPoint thins the labels out, which is a
  * better outcome than a row of text nobody can read.
  */
-export const MIN = 18;
+export const MIN = 20;
 
 /**
  * The smallest type on a chart.
@@ -193,7 +193,7 @@ export const MIN = 18;
  * and at 16pt seven area names still crowded the page they are the
  * point of.
  */
-export const CHART_MIN = 14;
+export const CHART_MIN = 16;
 
 /**
  * A value written on the mark itself.
@@ -207,7 +207,7 @@ export const CHART_MIN = 14;
  * still read from the back of the room - and a figure that is drawn is
  * worth more than one set two points larger and dropped.
  */
-export const LABEL_MIN = 12;
+export const LABEL_MIN = 14;
 
 /**
  * Type sizes, in points.
@@ -224,14 +224,14 @@ export const TYPE = {
   /** A question's own title. */
   chartTitle: 24,
   /** A chart's title within a question's slide, such as the by-area one. */
-  chartTitleSmall: 20,
+  chartTitleSmall: 22,
   /** Values printed on or beside the marks. */
   dataLabel: LABEL_MIN,
   /** Category names along the axis. */
   category: CHART_MIN,
   legend: CHART_MIN,
   /** A tile's big number. */
-  figure: 40,
+  figure: 42,
   /** A tile's caption. */
   figureLabel: MIN,
   body: MIN,
@@ -240,7 +240,7 @@ export const TYPE = {
 
   /* Cover. */
   coverTitle: 28,
-  coverSubtitle: 20,
+  coverSubtitle: 22,
   coverStamp: MIN,
   coverMission: MIN,
   coverElection: MIN,

@@ -375,6 +375,12 @@ observers gave as they left - section I on the Gambian form - and the mission re
 conditions at the station before the arithmetic of the day; a deck whose questions include
 no section C has nowhere to put it but the front, where it was.
 
+**A tick box reads commonest first.** The options come out of the form in the order
+whoever wrote the questionnaire thought of them. What a reader wants off a page of nine
+tick boxes is which of the nine happened most often, and the page answers that at a glance
+when the bars descend and not at all when they do not. Each option is a share of the same
+reports rather than of the ticks, so ordering by count is ordering by share.
+
 **Two answers on one chart are never one colour.** The deck fixes three colours - Yes is
 the deep blue, No the light one, and anything that means "no answer" is grey - and steps a
 categorical palette through whatever is left. Both halves of that went wrong on the

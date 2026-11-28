@@ -87,7 +87,9 @@ function label(
  * which is what the 18pt floor is about.
  */
 export function mapLabelSize(width: number): number {
-  return width / 50;
+  // A fiftieth of the drawing width came to the old floor exactly, so it
+  // moved with it: a forty-fifth is the floor as it now stands.
+  return width / 45;
 }
 
 /** What `mapLabelSize` comes to on a slide, once the map is scaled to fit. */

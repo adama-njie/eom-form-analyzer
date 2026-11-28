@@ -4,6 +4,8 @@ import {
   basisLine,
   buildDataset,
   parentCount,
+  partLabel,
+  restLabel,
   shareOfParent,
   sharesAcross,
 } from './analyse';
@@ -86,6 +88,15 @@ describe('the share a part is of its whole', () => {
     expect(p.counted).toEqual({ part: 14, whole: 36 });
   });
 
+  it('names the rest of the whole as the pair the mission reports', () => {
+    // "Female / Other" reads as though a third kind of staff had been
+    // left off the chart. Where the tool knows of no pair, the rest of
+    // the whole is "Other" and stays that way.
+    expect(partLabel(q('E.1.1'))).toBe('Female');
+    expect(restLabel(q('E.1.1'))).toBe('Male');
+    expect(restLabel(q('F.2.1'))).toBe('Other');
+  });
+
   it('says what it is a share of, and what it was summed from', () => {
     const p = shareOfParent(form(), q('E.1.1'))!;
     expect(basisLine(p)).toBe('As a share of polling staff members (14 of 36)');
@@ -119,7 +130,11 @@ describe('the share a part is of its whole', () => {
     // of answers, and a station staffed by two can never reach a bar
     // above two at all. The columns are the staff instead.
     const shares = sharesAcross(form(), q('E.1.1'))!;
-    expect(shares.answers).toEqual(['Female', 'Other']);
+    // Female and Male, because that is the pair the mission reports;
+    // "Female / Other" reads as though a third kind of staff had been
+    // left off the chart. Anything the tool cannot name a pair for is
+    // still "Other". See `restLabel`.
+    expect(shares.answers).toEqual(['Female', 'Male']);
     expect(shares.unit).toBe('Columns are polling staff members, not reports.');
     const national = shares.panels[0]!.groups[0]!;
     expect(national.n).toBe(36);

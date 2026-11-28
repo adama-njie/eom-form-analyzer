@@ -851,9 +851,7 @@ function partTallies(
  *
  * "How many of the polling staff are female" is "Female", which is the
  * predicate with the asking taken off it. A predicate too long for a
- * legend keeps its first word - "sealed in front of you" is "Sealed" -
- * and the rest of the whole is "Other", never "male": the form asked
- * one question and the answer to the other one is not in the file.
+ * legend keeps its first word - "sealed in front of you" is "Sealed".
  */
 export function partLabel(question: Question): string {
   const said = /\s(?:are|is|were|was)\s+(.+)$/i.exec(question.label.replace(/[.:?]\s*$/, ''));
@@ -861,6 +859,29 @@ export function partLabel(question: Question): string {
   const short = word.length > 0 && word.length <= 20 ? word : (word.split(/\s+/)[0] ?? '');
   const name = short.length > 0 ? short : 'Counted';
   return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+/**
+ * What the rest of the whole is called.
+ *
+ * "Other" for anything the tool cannot name, because the form asked one
+ * question and the answer to the other one is not in the file. Where
+ * the part is one of a pair the mission reports as a pair, it is the
+ * other of them: the staff a form counts as female are reported
+ * against the staff who are not, and "Female / Other" reads on a slide
+ * as though a third kind of answer had been left out.
+ */
+const OPPOSITE: Record<string, string> = {
+  female: 'Male',
+  male: 'Female',
+  women: 'Men',
+  men: 'Women',
+  woman: 'Men',
+  man: 'Women',
+};
+
+export function restLabel(question: Question): string {
+  return OPPOSITE[partLabel(question).toLowerCase()] ?? 'Other';
 }
 
 /**
@@ -884,13 +905,14 @@ export function sharesOfParent(
   if (!tally || !parent || !all || all.whole === 0) return null;
 
   const part = partLabel(question);
-  const answers = [part, 'Other'];
+  const rest = restLabel(question);
+  const answers = [part, rest];
   const group = (label: string, t: PartTally): SharePanel['groups'][number] => ({
     label,
     n: t.whole,
     counts: [
       { label: part, n: t.part, pct: (t.part / t.whole) * 100 },
-      { label: 'Other', n: t.whole - t.part, pct: ((t.whole - t.part) / t.whole) * 100 },
+      { label: rest, n: t.whole - t.part, pct: ((t.whole - t.part) / t.whole) * 100 },
     ],
   });
   const groupsFor = (prefix: string, order: string[]): SharePanel['groups'] =>
@@ -1233,6 +1255,22 @@ export function displayCounts(q: Question, b: Breakdown): Count[] {
    * The bands themselves stay in order wherever they are counted; this
    * is the chart's order, as it is for a scale.
    */
+  /*
+   * A tick box is ordered by how often it was ticked.
+   *
+   * The options come out in the order the form printed them, which is
+   * the order whoever wrote the questionnaire thought of them. "E.4 Are
+   * any of the following present during the vote count" offers nine,
+   * and what a reader wants off that page is which of the nine were
+   * there most often - a question the page answers at a glance when the
+   * bars descend and not at all when they do not. Each option is a
+   * share of the reports rather than of the ticks, so the order by
+   * count and the order by share are the same order.
+   */
+  if (q.kind === 'multi') {
+    return [...b.total].sort((x, y) => y.n - x.n || x.label.localeCompare(y.label));
+  }
+
   const counted = q.kind === 'numeric' ? countScale(q, b.total) : undefined;
   const scale = q.scale && q.scale.length > 1 ? q.scale : counted;
   if (!scale) return b.total;
