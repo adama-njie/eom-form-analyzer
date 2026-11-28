@@ -10,11 +10,12 @@ import {
   namesStationsOnly,
   sectionOverviews,
   sharesAcross,
+  teamColumns,
   teamReports,
 } from './analyse';
 import { answerHead, colourFor } from './pptx';
 import { COUNT, SCALE } from './theme';
-import { inferSchema, toTable } from './schema';
+import { inferSchema, parseCode, toTable } from './schema';
 
 /**
  * An opening form with the things a section's pages are read for: who
@@ -301,6 +302,63 @@ describe('a count with one impossible answer in it', () => {
     // the ramp, in the same colour.
     const wide = ['0', '1', '2', '678'];
     expect(new Set(wide.map((l) => colourFor(l, 0, wide))).size).toBe(4);
+  });
+});
+
+describe('a form whose headers lost something', () => {
+  it('reads a code the questionnaire typed with a space', () => {
+    // The collation form heads one question "E 3.1 If Yes, did you
+    // observe any discrepancy". Read strictly that is no code at all:
+    // the question lost its section, its place after E.3 and the
+    // question it follows up.
+    expect(parseCode('E 3.1 If Yes, did you observe any discrepancy?')).toEqual({
+      code: 'E.3.1',
+      label: 'If Yes, did you observe any discrepancy?',
+      section: 'E',
+    });
+  });
+
+  it('names a team column whose type the export left off', () => {
+    // "A.1 Team number" with the "- CT" of every other form missing,
+    // where CT is the one type on the roster nothing else accounts
+    // for, is the contact teams' column.
+    const table = toTable([
+      [
+        'A.2 Local Government Area (LGA)',
+        'A.1 Team number - LTO',
+        'A.1 Team number - STO',
+        'A.1 Team number - LSTO',
+        'A.1 Team number - MEP',
+        'A.1 Team number',
+      ],
+      ['Banjul', 'LTO 01', '', '', '', ''],
+      ['Kanifing', 'LTO 02', 'STO 0101', '', '', ''],
+    ]);
+    const ds = buildDataset(table, inferSchema(table));
+    expect(teamColumns(ds).map((c) => c.label)).toEqual(['LTO', 'STO', 'LSTO', 'MEP', 'CT']);
+  });
+
+  it('drops an unnamed team column it cannot place and nobody filed', () => {
+    // Two types unaccounted for is not a deduction, and a panel headed
+    // "Team number" saying "No reports" is neither a kind of team nor
+    // a gap in the deployment.
+    const table = toTable([
+      ['A.2 Local Government Area (LGA)', 'A.1 Team number - LTO', 'A.1 Team number'],
+      ['Banjul', 'LTO 01', ''],
+      ['Kanifing', 'LTO 02', ''],
+    ]);
+    const ds = buildDataset(table, inferSchema(table));
+    expect(teamColumns(ds).map((c) => c.label)).toEqual(['LTO']);
+  });
+
+  it('keeps an unnamed team column that somebody filed', () => {
+    const table = toTable([
+      ['A.2 Local Government Area (LGA)', 'A.1 Team number - LTO', 'A.1 Team number'],
+      ['Banjul', 'LTO 01', 'Roving 2'],
+      ['Kanifing', 'LTO 02', ''],
+    ]);
+    const ds = buildDataset(table, inferSchema(table));
+    expect(teamColumns(ds)).toHaveLength(2);
   });
 });
 

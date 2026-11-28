@@ -12,6 +12,7 @@ import {
   LGAS,
   TOTAL_REGISTERED_2026,
   areaUnits,
+  DEPLOYMENT,
   deployedTeams,
   lgaName,
   resolveConstituency,
@@ -2637,19 +2638,51 @@ export function isTeamQuestion(dataset: Dataset, q: Question): boolean {
  * `splitBase` leaves those apart on purpose. They are still the same
  * question to a reader, and still belong on one page.
  */
+/** Whether any report wrote anything in this column. */
+function holdsAnswers(dataset: Dataset, col: number): boolean {
+  return dataset.table.rows.some((row) => {
+    const v = clean(row[col] ?? '');
+    return !isBlank(v) && !NON_ANSWERS.has(v);
+  });
+}
+
 export function teamColumns(dataset: Dataset): { col: number; label: string }[] {
   const first = teamQuestion(dataset);
   if (!first) return [];
-  const out: { col: number; label: string }[] = [];
+  const found: { col: number; label: string | undefined }[] = [];
   for (const q of dataset.questions) {
     if (q.code !== first.code || !namesATeam(q)) continue;
     const labels = q.columnLabels ?? [];
     q.columns.forEach((col, i) => {
-      const suffix = splitBase(dataset.table.headers[col] ?? '')?.suffix;
-      out.push({ col, label: labels[i] ?? suffix ?? q.label });
+      found.push({ col, label: labels[i] ?? splitBase(dataset.table.headers[col] ?? '')?.suffix });
     });
   }
-  return out.sort((a, b) => a.col - b.col);
+
+  /*
+   * A column whose type the export left off.
+   *
+   * The collation form heads its last team column "A.1 Team number",
+   * with the "- CT" of every other form missing, so the page carried a
+   * panel headed "Team number" saying "No reports" - which is not a
+   * kind of team and not a gap in the deployment either. Where the
+   * mission's roster leaves exactly one type unaccounted for, that is
+   * which column this is, and naming it is the difference between a
+   * page that says the contact teams have filed nothing and a page
+   * that does not mention them. Where the roster leaves none or
+   * several, nothing is guessed.
+   */
+  const unnamed = found.filter((f) => f.label === undefined);
+  const named = new Set(found.map((f) => f.label).filter((l): l is string => l !== undefined));
+  const missing = Object.keys(DEPLOYMENT).filter((type) => !named.has(type));
+  if (unnamed.length === 1 && missing.length === 1) unnamed[0]!.label = missing[0]!;
+
+  return found
+    // A column that still names no type is a panel only if it holds
+    // reports: a report filed is a report filed, under the only name
+    // there is, but an empty one is noise.
+    .filter((f) => f.label !== undefined || holdsAnswers(dataset, f.col))
+    .map((f) => ({ col: f.col, label: f.label ?? first.label }))
+    .sort((a, b) => a.col - b.col);
 }
 
 /**

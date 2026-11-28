@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 314 tests
+npm test           # vitest, 318 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 271 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 275 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -513,6 +513,24 @@ geography.
   text that is neither the constituency nor a word cloud, and `plan`
   would have made a cloud of team numbers out of it anyway. Both ask
   `isTeamQuestion` first now.
+- **A team column whose type the export left off is still a type.**
+  The collation form heads its last one "A.1 Team number", with the
+  "- CT" every other form carries missing, so the page drew a panel
+  headed "Team number" saying "No reports" - which is not a kind of
+  team and not a gap in the deployment either. Where `DEPLOYMENT`
+  leaves exactly one type unaccounted for by the columns that are
+  named, that is which column it is, and naming it is the difference
+  between a page that says the contact teams have filed nothing and a
+  page that does not mention them. Where the roster leaves none or
+  several, nothing is guessed: a column that still names no type is a
+  panel only if it holds reports, because a report filed is a report
+  filed and an empty one is noise.
+- **A question code may be typed with a space.** The collation form
+  heads one question "E 3.1 If Yes, did you observe any discrepancy",
+  and read strictly that is not a code at all: the question lost its
+  code, its section, its place after E.3 and the question it follows
+  up, and the deck left it out. `CODE` takes a space where the dot
+  should be.
 - **The teams are a chart per team type.** The form asks for the team
   number once per team type, so the columns are the types and the answers
   in them are the teams: sixty bars on one axis is a wall, and the

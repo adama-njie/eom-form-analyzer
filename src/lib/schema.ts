@@ -127,8 +127,18 @@ export function clean(value: unknown): string {
   return String(value).replace(/\s+/g, ' ').trim();
 }
 
-/** Matches a leading question code such as "C.3.1" or "A.0". */
-const CODE = /^([A-Z])\.(\d+(?:\.\d+)*)\s*/;
+/**
+ * Matches a leading question code such as "C.3.1" or "A.0".
+ *
+ * The dot after the section letter may be a space, because on the
+ * collation form one question is headed "E 3.1 If Yes, did you observe
+ * any discrepancy". Read strictly that is not a code at all: the
+ * question lost its code, its section and its place after E.3, and
+ * `nestFollowUps` could not find the question it follows up. A letter
+ * and a number at the head of a column is a question code however the
+ * typing went.
+ */
+const CODE = /^([A-Z])[. ](\d+(?:\.\d+)*)\s*/;
 
 export function parseCode(header: string): { code: string; label: string; section: string } {
   const m = CODE.exec(header);
