@@ -2377,6 +2377,41 @@ function sumCounts(counts: Count[]): number {
 /** The minimum places worth a chart of their own: two is a comparison. */
 const MIN_SHARE_GROUPS = 3;
 
+/**
+ * Every point a question could be answered on, used or not.
+ *
+ * The section's page has always done this - it groups by the scale
+ * rather than by the answers that were given - and the question's own
+ * page did not, so "E.3.1 If Yes, did you observe any discrepancy",
+ * answered No on all four reports that reached it, had an answer set
+ * of one and was ruled not a composition. It is the clearest result
+ * on the form: nobody saw a discrepancy anywhere. Drawn against both
+ * points it says so, and it says it in the colours every other Yes/No
+ * page uses.
+ *
+ * A scale too long to pad is left as it was answered. Six colours
+ * stacked in a column is a pattern rather than a chart, and a page
+ * drawn on the answers given is better than no page.
+ */
+function withEveryPoint(question: Question, counts: Count[]): Count[] {
+  const points =
+    question.scale && question.scale.length > 1
+      ? [...question.scale].reverse()
+      : question.kind === 'binary'
+        ? ['Yes', 'No']
+        : [];
+  if (points.length === 0) return counts;
+  const missing = points.filter((p) => !counts.some((c) => c.label === p));
+  if (missing.length === 0) return counts;
+  const padded = [
+    ...points.map(
+      (label) => counts.find((c) => c.label === label) ?? { label, n: 0, pct: 0 },
+    ),
+    ...counts.filter((c) => !points.includes(c.label)),
+  ];
+  return padded.length <= 5 ? padded : counts;
+}
+
 export function sharesAcross(
   dataset: Dataset,
   question: Question,
@@ -2421,7 +2456,7 @@ export function sharesAcross(
     if (bands.length === 0 || bands.some((l) => l.includes(' to '))) return null;
   }
   const b = breakdown ?? analyse(dataset, question, rowFilter);
-  const counts = displayCounts(question, b);
+  const counts = withEveryPoint(question, displayCounts(question, b));
   // Six colours stacked in a column is a pattern rather than a chart, and
   // one answer is not a composition.
   if (counts.length < 2 || counts.length > 5) return null;

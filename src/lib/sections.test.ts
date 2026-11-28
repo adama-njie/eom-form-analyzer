@@ -305,6 +305,41 @@ describe('a count with one impossible answer in it', () => {
   });
 });
 
+describe('a question nobody answered both ways', () => {
+  function oneWay(): ReturnType<typeof buildDataset> {
+    const table = toTable([
+      [
+        'A.2 Local Government Area (LGA)',
+        'B.5 Polling station type',
+        'E.3 Were you able to observe the collation sheets?',
+        'E.3.1 If Yes, did you observe any discrepancy?',
+      ],
+      ['Banjul', 'Urban', 'Yes', 'No'],
+      ['Kanifing', 'Urban', 'Yes', 'No'],
+      ['Brikama', 'Rural', 'Yes', 'No'],
+      ['Basse', 'Rural', 'No', ''],
+    ]);
+    return buildDataset(table, inferSchema(table));
+  }
+
+  it('is still drawn against both points of its scale', () => {
+    /*
+     * The section's page has always grouped by the scale rather than
+     * by the answers that were given. The question's own page did
+     * not, so a follow-up answered No on every report that reached it
+     * had an answer set of one and was ruled not a composition - and
+     * it is the clearest result on the form: nobody saw a discrepancy
+     * anywhere.
+     */
+    const ds = oneWay();
+    const q = ds.questions.find((x) => x.code === 'E.3.1')!;
+    const shares = sharesAcross(ds, q)!;
+    expect(shares.answers).toEqual(['Yes', 'No']);
+    const national = shares.panels[0]!.groups[0]!;
+    expect(national.counts.map((c) => c.n)).toEqual([0, 3]);
+  });
+});
+
 describe('a form whose headers lost something', () => {
   it('reads a code the questionnaire typed with a space', () => {
     // The collation form heads one question "E 3.1 If Yes, did you

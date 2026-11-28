@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 318 tests
+npm test           # vitest, 319 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 275 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 276 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -427,7 +427,16 @@ geography.
   Counts cannot be compared between an area holding eighty reports and
   one holding nine, and the columns are of reports rather than of
   answers, so NA is a segment and every column is full height - a
-  composition, not the rate the findings table and the maps print. Every
+  composition, not the rate the findings table and the maps print.
+  **Every point of the scale is on it, used or not** -
+  `withEveryPoint`, which is what the section's page has always done.
+  "E.3.1 If Yes, did you observe any discrepancy", answered No on all
+  four reports that reached it, had an answer set of one and was
+  ruled not a composition; it is the clearest result on the form, and
+  drawn against both points it says so, in the colours every other
+  Yes/No page uses. A scale too long to pad - more than five points
+  with NA among them - is left as it was answered, because a page
+  drawn on the answers given is better than no page. Every
   column carries its own base above it, as a figure of the slide's own,
   because "Mansa Konko (1)" is half again as long as "Mansa Konko" and
   the names are what decide how much of the page is left for the
