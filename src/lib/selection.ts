@@ -17,7 +17,9 @@ import {
   isRatingQuestion,
   poorLabels,
   answeredReports,
+  isTeamQuestion,
   namesStations,
+  namesStationsOnly,
   poorReports,
   ratingByHour,
   ratingQuestions,
@@ -86,6 +88,15 @@ export function questionKey(q: Question): string {
 export function exportableQuestions(dataset: Dataset): Question[] {
   return dataset.questions.filter((q) => {
     if (q.kind === 'meta' || q.columns.length === 0) return false;
+    /*
+     * The team numbers, whatever they classify as.
+     *
+     * Eight reports from eight different teams is a column of eight
+     * distinct values, which is free text by every test this tool has
+     * - and the page it draws is the deployment. The closing form had
+     * no A.1 slide at all for exactly that reason.
+     */
+    if (isTeamQuestion(dataset, q)) return true;
     if (q.kind === 'text') return isConstituencyQuestion(dataset, q) || isWordCloud(dataset, q);
     return true;
   });
@@ -211,10 +222,12 @@ export function countQuestionPages(
     const b = analyse(dataset, q, filter);
     return {
       full: needsOwnSlide(q, b),
-      counts: needsCountsPage(
-        sharesAcross(dataset, q, filter, b) !== null,
-        slideBreakdown(q, b).parties,
-      ),
+      counts:
+        !namesStationsOnly(dataset, q) &&
+        needsCountsPage(
+          sharesAcross(dataset, q, filter, b) !== null,
+          slideBreakdown(q, b).parties,
+        ),
     };
   });
   let n = 0;

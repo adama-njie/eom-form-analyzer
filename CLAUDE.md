@@ -32,7 +32,7 @@ by accident.
 npm install
 npm run dev        # Vite dev server
 npm run build      # typecheck, then build dist/index.html (the deliverable)
-npm test           # vitest, 304 tests
+npm test           # vitest, 312 tests
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -44,7 +44,7 @@ rather than lingering.
 
 Four test files run against real form exports that are not in the repository
 (`public/gambia.xlsx`, `sample/Form B sample.xlsx`). They skip themselves when
-the file is absent, so a fresh clone runs 261 tests and skips 43. Everything
+the file is absent, so a fresh clone runs 269 tests and skips 43. Everything
 else is synthetic and always runs. `describe.skipIf` still executes the body of
 a `describe`, so any fixture read there has to be lazy — see the `load()`
 helpers in `engine.test.ts` and `selection.test.ts`.
@@ -208,10 +208,17 @@ geography.
   answered 0, 1, 2, 3, 4 and 9 on eleven reports, so one station with
   nine cost the question that page altogether. `bandsFor` gathers the
   tail into "4 or more" instead. Only for a count of things in a
-  polling station - whole numbers, none above twenty - because six
-  distinct voter-list totals are six sizes of station and "3,300 or
-  more" said about one report is not a band. The station with nine is
-  still in the exported table.
+  polling station: whole numbers, and the band the tail starts at no
+  higher than `COUNT_MAX`. It is the cut that has to be small and not
+  the largest answer - the largest answer is exactly what the tail is
+  for, and on the closing form one station reported 678 citizen
+  observers, which under the old test cost the question its page all
+  over again. Six distinct voter-list totals are still six sizes of
+  station: "3,300 or more" said about one report is not a band. The
+  station with 678 is in the exported table and in Data quality.
+  `rampColour` has the same limit for the same reason: against a range
+  of 678 every other answer came out at one end of the ramp in one
+  colour, so a spread that wide is shaded by position instead.
 - **A scale is held worst first and charted best first.** `displayCounts`
   reverses it for the chart, and `sectionOverviews` does the same for the
   section's page, so a column stacks Very good at the foot and Very bad
@@ -242,7 +249,17 @@ geography.
   one table across both Gambian forms and not seven. The last column is
   headed from the question's own wording - "the delay was:" is
   "Delay" - and anything that will not shorten to a heading is headed
-  "Answer" rather than repeating the question.
+  "Answer" rather than repeating the question; a count is headed "How
+  many", because "If Yes, how many approximately?" shortens to nothing
+  a table can use.
+  **A count asked this way gets the table and no chart at all** -
+  `namesStationsOnly`. "D.1.1 If Yes, how many approximately?" was
+  answered 89, 34, 57 and 15 by the four stations still holding a
+  queue at closing, and counted that is four bands of one report drawn
+  as four equal quarters of a column, which says only that four
+  different numbers were written down. A follow-up answered in a fixed
+  set of words keeps its chart, because the same two answers recurring
+  across the stations is a composition worth drawing.
 - **A rating question is mapped on the worse end of its scale.**
   `mapKindFor` returns `poor` for it rather than `pie`: four answers pied
   across seven areas holding one or two reports each is a page of
@@ -486,6 +503,13 @@ geography.
   is on: ten short-term teams on one page and three members of
   parliament on the next drew the three as blocks four times as deep,
   which reads as a different unit rather than as a shorter list.
+- **The team numbers are exportable whatever they classify as.** Eight
+  reports from eight different teams is a column of eight distinct
+  values, which is free text by every test this tool has, so the
+  closing form had no A.1 slide at all - `exportableQuestions` drops
+  text that is neither the constituency nor a word cloud, and `plan`
+  would have made a cloud of team numbers out of it anyway. Both ask
+  `isTeamQuestion` first now.
 - **The teams are a chart per team type.** The form asks for the team
   number once per team type, so the columns are the types and the answers
   in them are the teams: sixty bars on one axis is a wall, and the
@@ -509,9 +533,28 @@ geography.
   names (West Coast, North Bank, Lower River, Upper River) are aliases that
   still resolve on import, and the area question's own answers are resolved
   too, so one slide never shows both spellings.
-- **Yes is dark blue, No is light blue, NA is orange — always.** The palette
-  does not change with whether Yes is the bad answer on this question. Which
-  answer is the worrying one is the findings table's job.
+- **Yes is dark blue, No is light blue, NA is dark grey — always.** The
+  palette does not change with whether Yes is the bad answer on this
+  question; which answer is the worrying one is the findings table's
+  job. NA was the deck's orange until the closing form, which asks
+  seven questions on Never / Sometimes / Mostly / Always and offers N/A
+  on each: "Sometimes" is the second point of a four-point scale, which
+  is that same orange, so a legend named two different answers in one
+  colour. A pale grey was wrong for the opposite reason - on a
+  projector it is the one thing nobody can see, and NA is often the
+  largest answer on the chart - so it is dark enough to carry white
+  text, and no scale point and no categorical fill is grey.
+  **And no answer is ever handed a colour another answer on the same
+  chart already has.** "H.1 Did the total reconcile" is answered Yes,
+  No or N/K, and the third answer, being second in the list, took the
+  second categorical fill, which is the deep blue of Yes. `answerFills`
+  steps the palette past what is taken, and the deck and the dashboard
+  both read it, so the two cannot drift.
+- **"N/K" is a non-answer, like NA and DK.** The closing form offers
+  Yes, No and N/K to "did the total number of votes reconcile", and an
+  observer who did not know did not answer No: counted as one it would
+  have been a reconciliation that failed. It is in `NON_ANSWERS`, which
+  charts it last and keeps it out of every rate.
 - **A shaded map is the deck's blue, pale to deep.** `ACCENT_DEEP` on the
   deck, in the Word report and on screen, with the ramp carrying the rate.
   A flagged question used to be shaded in orange, so two maps of the same

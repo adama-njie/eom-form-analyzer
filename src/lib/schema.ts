@@ -85,8 +85,24 @@ export interface Question {
  */
 const BLANKS = new Set(['', '.', '-', 'none']);
 
-/** Answers that are present but carry no information about the question. */
-export const NON_ANSWERS = new Set(['NA', 'DK', 'N/A', 'Not applicable']);
+/**
+ * Answers that are present but carry no information about the question.
+ *
+ * "N/K" is one of them. The closing form offers Yes, No and N/K to "did
+ * the total number of votes reconcile", and an observer who did not
+ * know did not answer No: counted as one it would have been a
+ * reconciliation that failed. It is the same answer as DK, spelled the
+ * way that form spells it.
+ */
+export const NON_ANSWERS = new Set([
+  'NA',
+  'DK',
+  'NK',
+  'N/A',
+  'N/K',
+  'Not applicable',
+  'Not known',
+]);
 
 const YES_NO = ['Yes', 'No'];
 

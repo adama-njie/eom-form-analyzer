@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import JSZip from 'jszip';
-import { buildDataset } from './analyse';
+import { buildDataset, isTeamQuestion } from './analyse';
 import { layoutCloud } from './chartImage';
 import { buildDeck } from './pptx';
 import { inferSchema, toTable } from './schema';
@@ -64,13 +64,21 @@ describe('a prose question in the deck', () => {
     const codes = exportableQuestions(ds).map((q) => q.code);
     expect(codes).toContain('C.10');
     expect(codes).not.toContain('B.1');
+    // Eight reports from eight teams is a column of distinct values,
+    // which is free text by every test here, and it is still the page
+    // that says who has filed.
+    expect(codes).toContain('A.1');
   });
 
   it('becomes a slide carrying an image, not a chart', async () => {
     stubCanvas();
     const table = toTable(grid());
     const ds = buildDataset(table, inferSchema(table));
-    const prose = exportableQuestions(ds).filter((q) => q.kind === 'text');
+    // The team numbers are free text too, and are a page of their own
+    // rather than a cloud of team names. See `isTeamQuestion`.
+    const prose = exportableQuestions(ds).filter(
+      (q) => q.kind === 'text' && !isTeamQuestion(ds, q),
+    );
     expect(prose).toHaveLength(1);
 
     const deck = buildDeck(ds, undefined, {

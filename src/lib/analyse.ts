@@ -22,6 +22,7 @@ import {
   type Division,
   type LgaCode,
 } from './gambia';
+import { COUNT_MAX } from './theme';
 import {
   NON_ANSWERS,
   clean,
@@ -1344,13 +1345,20 @@ export function bandsFor(values: number[], target = 6, unit = ''): Bands {
    * is gathered instead: "4 or more" is as true as the list was, and
    * the station with nine is still in the exported table.
    *
-   * Only for a count of things in a polling station - whole numbers,
-   * none of them above twenty. Six distinct voter-list totals are six
+   * Only for a count of things in a polling station, which is what the
+   * band the tail starts at says: whole numbers, and the fifth of them
+   * no higher than `COUNT_MAX`. Six distinct voter-list totals are six
    * sizes of station rather than a quantity to gather a tail from, and
-   * "3,300 or more" said about one report is not a band.
+   * "3,300 or more" said about one report is not a band. It is the cut
+   * that has to be small and not the largest answer, because the
+   * largest answer is exactly what the tail is for: one station
+   * reported 678 citizen observers, and testing the maximum let that
+   * one number cost the question its page.
    */
   const countable =
-    distinct.length <= 8 && distinct.every((v) => Number.isInteger(v) && v >= 0 && v <= 20);
+    distinct.length <= 8 &&
+    distinct.every((v) => Number.isInteger(v) && v >= 0) &&
+    distinct[4]! <= COUNT_MAX;
   if (countable) {
     const head = distinct.slice(0, 4);
     const cut = distinct[4]!;
@@ -1927,12 +1935,30 @@ function namedReports(
  * offers a tick box per option is a block, not a column.
  */
 export function namesStations(dataset: Dataset, question: Question): boolean {
-  if (question.kind !== 'categorical' && question.kind !== 'ordinal') return false;
+  const kinds = ['categorical', 'ordinal', 'numeric'];
+  if (!kinds.includes(question.kind)) return false;
   if (stationQuestion(dataset) === null) return false;
   const cut = question.code.lastIndexOf('.');
   if (cut <= 1) return false;
   const parent = dataset.questions.find((q) => q.code === question.code.slice(0, cut));
   return parent !== undefined && parent !== question && parent.kind === 'binary';
+}
+
+/**
+ * A follow-up that is a list rather than a chart.
+ *
+ * "D.1.1 If Yes, how many approximately?" was answered 89, 15, 34 and
+ * 57 by the four stations that still had a queue at closing. Counted,
+ * that is four bands of one report drawn as four equal quarters of a
+ * column, which says only that four different numbers were written
+ * down; what a mission wants is which four stations and how many
+ * people were standing in each. So this one gets the table and no
+ * chart at all. A follow-up answered in a fixed set of words keeps its
+ * chart as well, because the same two answers recurring across the
+ * stations is a composition worth drawing.
+ */
+export function namesStationsOnly(dataset: Dataset, question: Question): boolean {
+  return question.kind === 'numeric' && namesStations(dataset, question);
 }
 
 /** The question asking what time the observer left, if the form asks. */
@@ -2349,6 +2375,9 @@ export function sharesAcross(
      * the staff themselves. See `sharesOfParent`.
      */
     if (parentCount(dataset, question)) return sharesOfParent(dataset, question, rowFilter);
+    // A count asked only of the reports that answered Yes is a list of
+    // stations, and the table is where it is read. See `namesStationsOnly`.
+    if (namesStationsOnly(dataset, question)) return null;
     const bands = bandingFor(dataset, question, rowFilter)?.labels ?? [];
     if (bands.length === 0 || bands.some((l) => l.includes(' to '))) return null;
   }

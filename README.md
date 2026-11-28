@@ -41,21 +41,11 @@ That is the whole workflow. To share the tool, email the HTML file.
 
 Four tabs:
 
-- **Overview** — reports, LGAs and constituencies covered, polling stations observed,
-  reports by team and area, turnout through the day where the form supports it, and the
-  mean of each overall assessment question with the share rated good or better.
-- **Map** — the real map of The Gambia, shaded by *any* question and *any* answer, across the
-  eight Local Government Areas. Pick "C.3 problem in the vicinity" and "Yes" and the map shows
-  where that problem clusters. Click a place to filter the whole report to it. Places that returned
-  no reports are hatched, never shaded at the bottom of the ramp, because "nobody observed here"
-  and "nobody reported a problem here" are different statements.
-- **Findings** — every question where the answer indicates a problem, ranked by how often it
-  occurred, each with the areas that are above the overall rate. This is the triage view, and it is
-  the part the current Power BI report does not produce.
-- **All questions** — a chart per question, chosen automatically by question type, each with a
-  by-area breakdown and a CSV button. Filter by code or text.
-- **Data quality** — what the tool detected, which columns it could not map, and which rows had an
-  area it could not match. Check this first when something looks wrong.
+- **Overview** — reports, LGAs and constituencies covered, polling stations observed, reports by team and area, turnout through the day where the form supports it, and the mean of each overall assessment question with the share rated good or better.
+- **Map** — the real map of The Gambia, shaded by *any* question and *any* answer, across the eight Local Government Areas. Pick "C.3 problem in the vicinity" and "Yes" and the map shows where that problem clusters. Click a place to filter the whole report to it. Places that returned no reports are hatched, never shaded at the bottom of the ramp, because "nobody observed here" and "nobody reported a problem here" are different statements.
+- **Findings** — every question where the answer indicates a problem, ranked by how often it occurred, each with the areas that are above the overall rate. This is the triage view, and it is the part the current Power BI report does not produce.
+- **All questions** — a chart per question, chosen automatically by question type, each with a by-area breakdown and a CSV button. Filter by code or text.
+- **Data quality** — what the tool detected, which columns it could not map, and which rows had an area it could not match. Check this first when something looks wrong.
 
 Filter the entire report by area, team and period from the header.
 
@@ -64,48 +54,34 @@ team and wrong for almost every audience it gets shown to. Pressing PowerPoint, 
 Print opens a dialogue: set the title and subtitle, pick which sections to include, and tick the
 questions you want. Four presets cover most of it:
 
-| Preset | What it gives you |
-| --- | --- |
-| Short brief | Coverage, maps and ranked findings. No question pages. |
-| Findings and the questions behind them | The brief, plus a page per flagged question. |
-| Everything | Every section and every question. |
-| Questions only | No front matter, for when that is already written. |
+| Preset                                 | What it gives you                                      |
+|----------------------------------------|--------------------------------------------------------|
+| Short brief                            | Coverage, maps and ranked findings. No question pages. |
+| Findings and the questions behind them | The brief, plus a page per flagged question.           |
+| Everything                             | Every section and every question.                      |
+| Questions only                         | No front matter, for when that is already written.     |
 
 The deck estimate in the dialogue is exact, not approximate. The selection is remembered for the
 rest of the session, so exporting the same cut again is two clicks.
 
 **Four outputs**, all built in the browser:
 
-- **PowerPoint** — a full deck: the mission cover, coverage, a ranked findings table, overall
-  assessments, then the questions, and a closing slide on how to read it. A question with a
-  by-area comparison takes a slide and shows its answers beside the same answers stacked by Local
-  Government Area; shorter ones go two to a slide. Includes a map slide at both levels and a
-  mapped slide for each of the three leading findings. The question charts are *native PowerPoint
-  charts, not images*, so the briefing team can restyle them, fix a label or drop a series without
-  coming back for a re-export. Around 70 slides and 100 native charts from a 100-row form.
-- **Build report** — a Word document: summary, coverage, ranked findings with a paragraph on each,
-  overall assessments, then a section per question with a chart, a by-area comparison and a
-  written description, closing with method and limits. Around 390 paragraphs, 7 tables and 99
-  charts from a 100-row form, including both national maps and a by-area map for the leading
-  findings. Charts here are images rather than native Word charts, because a native Word chart
-  carries an embedded spreadsheet and opens badly outside Word.
-- **Print / PDF** — the chosen sections and questions as a document, two to a page. It prints the
-  selection rather than whichever tab is open, so the output does not depend on where you were
-  standing when you pressed the button.
-- **Export tables** — one CSV with every question's figures, overall and by area, for pasting into a
-  report or checking a number without opening the tool.
+- **PowerPoint** — a full deck: the mission cover, coverage, a ranked findings table, overall assessments, then the questions, and a closing slide on how to read it. A question with a by-area comparison takes a slide and shows its answers beside the same answers stacked by Local Government Area; shorter ones go two to a slide. Includes a map slide at both levels and a mapped slide for each of the three leading findings. The question charts are *native PowerPoint charts, not images*, so the briefing team can restyle them, fix a label or drop a series without coming back for a re-export. Around 70 slides and 100 native charts from a 100-row form.
+- **Build report** — a Word document: summary, coverage, ranked findings with a paragraph on each, overall assessments, then a section per question with a chart, a by-area comparison and a written description, closing with method and limits. Around 390 paragraphs, 7 tables and 99 charts from a 100-row form, including both national maps and a by-area map for the leading findings. Charts here are images rather than native Word charts, because a native Word chart carries an embedded spreadsheet and opens badly outside Word.
+- **Print / PDF** — the chosen sections and questions as a document, two to a page. It prints the selection rather than whichever tab is open, so the output does not depend on where you were standing when you pressed the button.
+- **Export tables** — one CSV with every question's figures, overall and by area, for pasting into a report or checking a number without opening the tool.
 
 ## How question types are inferred
 
 The forms follow a consistent grammar, which is what makes this automatable:
 
-| Header | Read as |
-| --- | --- |
-| `C.2 Is there a long line of voters...` | single-answer question |
-| `C.3.1 If Yes, please specify:` | first option of a multi-answer block |
-| `C.3.1 If Yes, please specify: (Unrest)` | further options of the same block |
-| `4=Very good 3=Good 2=Bad 1=Very bad` | a legend, ignored |
-| `Chair of Polling and Counting Committee` | sub-item of the preceding question |
+| Header                                    | Read as                              |
+|-------------------------------------------|--------------------------------------|
+| `C.2 Is there a long line of voters...`   | single-answer question               |
+| `C.3.1 If Yes, please specify:`           | first option of a multi-answer block |
+| `C.3.1 If Yes, please specify: (Unrest)`  | further options of the same block    |
+| `4=Very good 3=Good 2=Bad 1=Very bad`     | a legend, ignored                    |
+| `Chair of Polling and Counting Committee` | sub-item of the preceding question   |
 
 The first column of a multi-answer block carries only the question name, so its own option label is
 recovered from the values in the column. Types are then inferred from the data: Yes/No becomes a
@@ -183,8 +159,7 @@ record. It exists to exercise the tooling before real data arrives.
 ## How it looks
 
 The deck, the report and the screen share one palette, set in `theme.ts`. The
-values were measured out of the mission's own Power BI reports, `Form B
-sample.pdf` and `Campaign Report Analysis Nov 29.pdf`, so an exported deck sits
+values were measured out of the mission's own Power BI reports, `Form B sample.pdf` and `Campaign Report Analysis Nov 29.pdf`, so an exported deck sits
 beside the existing ones without looking like it came from somewhere else:
 Arial throughout, the Power BI default fills, `#252423` for titles and
 `#6C6966` for everything secondary.
@@ -399,6 +374,23 @@ The curve is read after section C rather than in the overview. It is an answer t
 observers gave as they left - section I on the Gambian form - and the mission reads the
 conditions at the station before the arithmetic of the day; a deck whose questions include
 no section C has nowhere to put it but the front, where it was.
+
+**Two answers on one chart are never one colour.** The deck fixes three colours - Yes is
+the deep blue, No the light one, and anything that means "no answer" is grey - and steps a
+categorical palette through whatever is left. Both halves of that went wrong on the
+closing form. NA was the deck's orange, and that form asks seven questions on Never /
+Sometimes / Mostly / Always, where "Sometimes" is the second point of a four-point scale
+and therefore the same orange; and "did the total number of votes reconcile" is answered
+Yes, No or N/K, where the third answer, being second in the list, was handed the second
+categorical fill, which is the deep blue of Yes. A legend naming two different answers in
+one colour is worse than no legend at all. The palette now steps past what is taken, in
+one function the deck and the dashboard both read, and the no-answer grey is dark enough
+to carry white text and to be seen across a room - which is why it was orange in the first
+place, after a pale grey proved invisible on a projector.
+
+N/K went into the non-answers at the same time, which is where it belonged: an observer
+who did not know whether the count reconciled did not answer No, and counting it as one
+would have reported a reconciliation that failed.
 
 **A count is a quantity, and it has a better end.** "E.1 How many polling staff members
 are present" was drawn in the categorical palette - 1 in the deep blue, 2 in the orange
@@ -871,10 +863,8 @@ the grammar assumptions hold. The Gambian forms will differ in wording and geogr
 ## Before using it on live data
 
 - Check the **Data quality** tab. If a question is typed wrongly there, its chart is wrong too.
-- The findings ranking uses keyword matching on question wording to decide which answers indicate a
-  problem. It is a triage aid. Confirm anything before it goes in a report.
-- Area matching is only as good as what observers type. The Data quality tab reports how many rows
-  could not be matched.
+- The findings ranking uses keyword matching on question wording to decide which answers indicate a problem. It is a triage aid. Confirm anything before it goes in a report.
+- Area matching is only as good as what observers type. The Data quality tab reports how many rows could not be matched.
 
 ## Development
 

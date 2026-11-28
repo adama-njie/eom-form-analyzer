@@ -2,7 +2,7 @@ import type { Count, GroupMean, Percentage } from '@/lib/analyse';
 import { basisLine, meanLabel } from '@/lib/analyse';
 import { AREA_WORDS, type Division } from '@/lib/gambia';
 import { NON_ANSWERS } from '@/lib/schema';
-import { ACCENT, ACCENT_DEEP, CAT, NOT_APPLICABLE, SCALE, rampColour } from '@/lib/theme';
+import { ACCENT_DEEP, CAT, NOT_APPLICABLE, SCALE, answerFills } from '@/lib/theme';
 
 /**
  * Hand-rolled SVG charts.
@@ -22,8 +22,6 @@ import { ACCENT, ACCENT_DEEP, CAT, NOT_APPLICABLE, SCALE, rampColour } from '@/l
 export const SCALE_COLOURS = SCALE.map((c) => `#${c}`);
 /** Categorical palette. */
 export const CAT_COLOURS = CAT.map((c) => `#${c}`);
-const YES = `#${ACCENT}`;
-const NO = `#${ACCENT_DEEP}`;
 const NEUTRAL = `#${NOT_APPLICABLE}`;
 /** The single fill for a plain count chart. */
 const BAR = `#${ACCENT_DEEP}`;
@@ -36,16 +34,15 @@ const BAR = `#${ACCENT_DEEP}`;
  * answer to this particular question, which meant the same answer was a
  * different colour on the next card down.
  */
-export function colourFor(label: string, index: number, scale?: string[]): string {
-  if (label === 'Yes') return YES;
-  if (label === 'No') return NO;
-  if (NON_ANSWERS.has(label)) return NEUTRAL;
-  if (scale) {
-    // The deck places a point on its scale the same way. See `rampColour`.
-    const ramp = rampColour(label, scale);
-    if (ramp) return `#${ramp}`;
-  }
-  return CAT_COLOURS[index % CAT_COLOURS.length]!;
+/**
+ * The fills for a chart's marks, in the order its answers are drawn.
+ *
+ * The deck works them out the same way, in `answerFills`, which is the
+ * one place the categorical palette steps past the colours Yes, No and
+ * NA have already taken.
+ */
+export function fillsFor(labels: string[], scale?: string[]): string[] {
+  return answerFills(labels, scale).map((c) => `#${c}`);
 }
 
 export function fmtPct(v: number): string {
@@ -68,6 +65,7 @@ export function Donut({
   const r = size / 2;
   const thickness = size * 0.26;
   const circumference = 2 * Math.PI * (r - thickness / 2);
+  const fills = fillsFor(counts.map((c) => c.label), scale);
   let offset = 0;
 
   return (
@@ -85,7 +83,7 @@ export function Donut({
                 cy={r}
                 r={r - thickness / 2}
                 fill="none"
-                stroke={colourFor(c.label, i, scale)}
+                stroke={fills[i]}
                 strokeWidth={thickness}
                 strokeDasharray={`${dash} ${circumference - dash}`}
                 strokeDashoffset={-offset}
@@ -107,7 +105,7 @@ export function Donut({
           <li key={c.label}>
             <span
               className="swatch"
-              style={{ background: colourFor(c.label, i, scale) }}
+              style={{ background: fills[i] }}
             />
             <span className="legend-label">{c.label}</span>
             <span className="legend-value">
@@ -135,6 +133,7 @@ export function BarList({
 }) {
   if (counts.length === 0) return <p className="muted">No answers.</p>;
   const ceiling = max ?? Math.max(...counts.map((c) => c.n), 1);
+  const fills = fillsFor(counts.map((c) => c.label), scale);
   return (
     <ul className="barlist">
       {counts.map((c, i) => (
@@ -154,7 +153,7 @@ export function BarList({
                 // order the bands are in.
                 background:
                   judged || scale
-                    ? colourFor(c.label, i, scale)
+                    ? fills[i]
                     : NON_ANSWERS.has(c.label)
                       ? NEUTRAL
                       : BAR,
@@ -269,6 +268,7 @@ export function StackedByArea({
   scale?: string[];
 }) {
   if (rows.length === 0) return null;
+  const fills = fillsFor(order, scale);
   return (
     <div className="stacked">
       {rows.map((row) => {
@@ -290,7 +290,7 @@ export function StackedByArea({
                       className="stacked-seg"
                       style={{
                         width: `${pct}%`,
-                        background: colourFor(label, i, scale),
+                        background: fills[i],
                       }}
                       title={`${row.label} — ${label}: ${c.n} (${fmtPct(pct)})`}
                     >
@@ -309,7 +309,7 @@ export function StackedByArea({
           <li key={label}>
             <span
               className="swatch"
-              style={{ background: colourFor(label, i, scale) }}
+              style={{ background: fills[i] }}
             />
             <span className="legend-label">{label}</span>
           </li>

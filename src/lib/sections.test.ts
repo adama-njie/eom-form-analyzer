@@ -7,6 +7,7 @@ import {
   displayCounts,
   moreIsWorse,
   namesStations,
+  namesStationsOnly,
   sectionOverviews,
   sharesAcross,
   teamReports,
@@ -224,6 +225,82 @@ describe('a count of something that should not be there', () => {
     const panels = teamReports(ds);
     expect(panels.map((p) => p.label)).toEqual(['LTO', 'FIELD']);
     expect(panels[1]!.counts).toEqual([]);
+  });
+});
+
+/**
+ * The closing form's shape: a Yes/No question followed by a count, and
+ * a count with one impossible answer in it.
+ */
+const CLOSING = [
+  'A.2 Local Government Area (LGA)',
+  'B.3 Polling station name',
+  'D.1 Were there voters queueing at the time of closing?',
+  'D.1.1 If Yes, how many approximately?',
+  'E.3 How many citizen observers are present',
+];
+
+function closingForm(): ReturnType<typeof buildDataset> {
+  const table = toTable([
+    CLOSING,
+    ['Banjul', 'Albion School', 'Yes', '89', '0'],
+    ['Banjul', 'Half Die', 'No', '', '1'],
+    ['Kanifing', 'Bakau Lower', 'Yes', '34', '2'],
+    ['Kanifing', 'Serrekunda West', 'No', '', '3'],
+    ['Brikama', 'Busumbala', 'Yes', '57', '4'],
+    ['Brikama', 'Kansala', 'No', '', '5'],
+    ['Brikama', 'Sanyang', 'Yes', '15', '678'],
+    ['Basse', 'Basse Lower', 'No', '', '2'],
+  ]);
+  return buildDataset(table, inferSchema(table));
+}
+
+const cq = (code: string) => closingForm().questions.find((x) => x.code === code)!;
+
+describe('a count asked only of the stations where something happened', () => {
+  it('is named rather than charted', () => {
+    // 89, 34, 57 and 15 on four reports is four bands of one, drawn as
+    // four equal quarters of a column: it says only that four different
+    // numbers were written down.
+    expect(namesStationsOnly(closingForm(), cq('D.1.1'))).toBe(true);
+    expect(sharesAcross(closingForm(), cq('D.1.1'))).toBeNull();
+  });
+
+  it('lists the longest queue first, with the station standing in it', () => {
+    const rows = answeredReports(closingForm(), cq('D.1.1'));
+    expect(rows.map((r) => `${r.station} ${r.rating}`)).toEqual([
+      'Albion School 89',
+      'Busumbala 57',
+      'Bakau Lower 34',
+      'Sanyang 15',
+    ]);
+  });
+
+  it('heads the column with what it counts off', () => {
+    expect(answerHead(cq('D.1.1'))).toBe('How many');
+  });
+
+  it('leaves a follow-up answered in words its chart as well', () => {
+    expect(namesStationsOnly(form(), q('D.1.1'))).toBe(false);
+    expect(sharesAcross(form(), q('D.1.1'))).not.toBeNull();
+  });
+});
+
+describe('a count with one impossible answer in it', () => {
+  it('gathers the tail rather than losing the page to the outlier', () => {
+    // One station reported 678 citizen observers. Testing the largest
+    // answer left the question with seven bands and no page at all;
+    // what has to be small is the band the tail starts at.
+    const b = analyse(closingForm(), cq('E.3'));
+    expect(b.total.map((c) => c.label)).toEqual(['0', '1', '2', '3', '4 or more']);
+    expect(sharesAcross(closingForm(), cq('E.3'))).not.toBeNull();
+  });
+
+  it('shades by position where the values are too far apart to place', () => {
+    // Against a range of 678 every other answer sits at the same end of
+    // the ramp, in the same colour.
+    const wide = ['0', '1', '2', '678'];
+    expect(new Set(wide.map((l) => colourFor(l, 0, wide))).size).toBe(4);
   });
 });
 

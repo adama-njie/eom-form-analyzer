@@ -1,3 +1,5 @@
+import { NON_ANSWERS } from './schema';
+
 /**
  * The deck's design system, taken from the mission's own reference report.
  *
@@ -64,14 +66,20 @@ export const CAT = [
 export const GREY = 'D0D0D0';
 
 /**
- * Not applicable and don't know.
+ * Not applicable, don't know, not known.
  *
- * Orange, not the grey this used to be. Grey reads as absence, which is
- * nearly right, but on a projector a grey slice next to two blues is the one
- * thing in the room nobody can see - and on these questions NA is often the
- * largest answer there is.
+ * A dark grey. It was a pale grey once and that was wrong - on a
+ * projector a pale grey slice next to two blues is the one thing in the
+ * room nobody can see, and on these questions NA is often the largest
+ * answer there is. It was then the deck's orange, which is worse: the
+ * closing form asks seven questions on Never / Sometimes / Mostly /
+ * Always and "Sometimes" is the second point of a four-point scale,
+ * which is that same orange, so a legend named two different answers in
+ * one colour. Absence is what grey means, this one is dark enough to
+ * carry white text and to be seen across a room, and no scale point and
+ * no categorical fill is grey.
  */
-export const NOT_APPLICABLE = 'E66C37';
+export const NOT_APPLICABLE = '707070';
 
 /**
  * A rating scale, worst to best, as the reference colours its own.
@@ -107,6 +115,14 @@ export const SCALE = ['6B007B', 'E66C37', 'D9B300', '118DFF', '12239E'];
 export const COUNT = ['8C2D0C', 'B8431A', 'E05A24', '118DFF', '12239E'];
 
 /**
+ * The widest spread this tool will read as a count of things in a
+ * polling station - staff, agents, observers - rather than as a
+ * quantity of a different kind, or a typo. `bandsFor` gathers a tail
+ * below it and `rampColour` shades by value below it.
+ */
+export const COUNT_MAX = 20;
+
+/**
  * Where one answer sits on its scale, as a colour.
  *
  * The deck and the dashboard both ask this, so it is answered once. A
@@ -124,9 +140,23 @@ export function rampColour(label: string, scale: string[]): string | null {
   if (numbers.every((n) => Number.isFinite(n))) {
     const lo = Math.min(...numbers);
     const hi = Math.max(...numbers);
-    const along = hi === lo ? 0 : (numbers[i]! - lo) / (hi - lo);
+    /*
+     * By value, but only where the values are a count of things in a
+     * polling station. One station reported 678 citizen observers, and
+     * against a range of 678 every other answer - 0, 1, 2, 3, 4, 5 -
+     * came out at the same end of the ramp in the same colour. A spread
+     * that wide is a typo or a different kind of number, and position
+     * is the only ordering left that says anything.
+     */
+    const along =
+      hi - lo > COUNT_MAX
+        ? i / (scale.length - 1)
+        : hi === lo
+          ? 0
+          : (numbers[i]! - lo) / (hi - lo);
     // Worst first, so a scale running downwards is one where more is worse.
-    const worst = numbers[0]! <= numbers[numbers.length - 1]! ? along : 1 - along;
+    const descending = numbers[0]! > numbers[numbers.length - 1]!;
+    const worst = descending && hi - lo <= COUNT_MAX ? 1 - along : along;
     return COUNT[Math.round(worst * (COUNT.length - 1))]!;
   }
   return SCALE[Math.round(i * ((SCALE.length - 1) / (scale.length - 1)))]!;
@@ -242,3 +272,45 @@ export const BARE = {
   legendColor: MUTED,
   titleColor: INK,
 } as const;
+
+/**
+ * The colour an answer has whatever chart it is on.
+ *
+ * Yes, No and the non-answers are the same colour on every page of the
+ * deck, so a reader never has to check a legend for them.
+ */
+export function fixedColour(label: string): string | null {
+  if (label === 'Yes') return ACCENT_DEEP;
+  if (label === 'No') return ACCENT;
+  if (NON_ANSWERS.has(label)) return NOT_APPLICABLE;
+  return null;
+}
+
+/**
+ * One fill per answer, for a chart that colours each mark.
+ *
+ * The categorical palette is stepped through for whatever is left after
+ * the fixed answers and the scale, and it skips the colours those have
+ * already taken. "H.1 Did the total reconcile" is answered Yes, No and
+ * N/K; Yes is the deep blue and No the light one, and the third answer,
+ * being the second in the list, was handed the second categorical fill,
+ * which is the same deep blue as Yes. A legend naming two answers in
+ * one colour is worse than no legend.
+ */
+export function answerFills(labels: string[], scale?: string[]): string[] {
+  const taken = new Set(labels.map(fixedColour).filter((c): c is string => c !== null));
+  let next = 0;
+  return labels.map((label) => {
+    const fixed = fixedColour(label);
+    if (fixed) return fixed;
+    if (scale) {
+      const ramp = rampColour(label, scale);
+      if (ramp) return ramp;
+    }
+    while (next < CAT.length && taken.has(CAT[next]!)) next += 1;
+    const colour = CAT[next % CAT.length]!;
+    taken.add(colour);
+    next += 1;
+    return colour;
+  });
+}

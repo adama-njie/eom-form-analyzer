@@ -30,15 +30,40 @@ describe('answer colours', () => {
     expect(colourFor('Yes', 0)).toBe(colourFor('Yes', 3));
   });
 
-  it('holds NA and DK apart from the substantive answers', () => {
-    // Orange, not grey: on these questions NA is often the largest answer
-    // on the chart, and a grey slice is the one thing in a briefing room
-    // nobody can see.
+  it('holds NA, DK and N/K apart from the substantive answers', () => {
     expect(colourFor('NA', 0)).toBe(NOT_APPLICABLE);
     expect(colourFor('DK', 1)).toBe(NOT_APPLICABLE);
     expect(colourFor('N/A', 2)).toBe(NOT_APPLICABLE);
+    expect(colourFor('N/K', 1)).toBe(NOT_APPLICABLE);
     expect(NOT_APPLICABLE).not.toBe(ACCENT);
     expect(NOT_APPLICABLE).not.toBe(ACCENT_DEEP);
+  });
+
+  it('gives it a colour no scale point and no categorical fill uses', () => {
+    /*
+     * The closing form asks seven questions on Never / Sometimes /
+     * Mostly / Always and offers N/A on each. "Sometimes" is the second
+     * point of a four-point scale, which was the same orange NA wore,
+     * so a legend named two different answers in one colour.
+     */
+    const fourPoint = ['Never', 'Sometimes', 'Mostly', 'Always'];
+    for (const point of fourPoint) {
+      expect(colourFor(point, 0, fourPoint)).not.toBe(NOT_APPLICABLE);
+    }
+    expect(CAT).not.toContain(NOT_APPLICABLE);
+  });
+
+  it('never hands a third answer the colour Yes or No already has', () => {
+    // "Did the total reconcile" is answered Yes, No or N/K, and the
+    // third answer, being second in the list, was handed the second
+    // categorical fill - which is the deep blue of Yes.
+    const fills = fillsFor([{ label: 'Yes' }, { label: 'Other' }, { label: 'No' }], {
+      judged: false,
+      perMark: true,
+    });
+    expect(new Set(fills).size).toBe(3);
+    expect(fills[1]).not.toBe(ACCENT_DEEP);
+    expect(fills[1]).not.toBe(ACCENT);
   });
 
   it('keeps Yes blue in a ring, where every slice is coloured', () => {

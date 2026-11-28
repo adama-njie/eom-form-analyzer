@@ -22,6 +22,7 @@ import {
   sharesAcross,
   isTeamQuestion,
   namesStations,
+  namesStationsOnly,
   stationTypeQuestion,
   stationsObserved,
   teamQuestion,
@@ -47,12 +48,13 @@ import {
   RULE,
   BARE,
   CAT,
+  answerFills,
+  fixedColour,
   rampColour,
   FONT,
   HEADER_BLUE,
   INK,
   MUTED,
-  NOT_APPLICABLE,
   ON_FILL,
   PANEL,
   TYPE,
@@ -110,13 +112,12 @@ const DECIMAL = '[$-409]';
 
 /** Answers whose colour is fixed, whatever the chart or the question. */
 function hasOwnColour(label: string): boolean {
-  return label === 'Yes' || label === 'No' || NON_ANSWERS.has(label);
+  return fixedColour(label) !== null;
 }
 
 export function colourFor(label: string, index: number, scale?: string[]): string {
-  if (label === 'Yes') return ACCENT_DEEP;
-  if (label === 'No') return ACCENT;
-  if (NON_ANSWERS.has(label)) return NOT_APPLICABLE;
+  const fixed = fixedColour(label);
+  if (fixed) return fixed;
   // A count takes the count ramp and a judgement the rating scale, and
   // both are placed by `rampColour`, which the dashboard asks too.
   if (scale) {
@@ -141,7 +142,9 @@ export function fillsFor(
   opts: { judged: boolean; scale?: string[]; perMark: boolean },
 ): string[] {
   if (opts.judged || opts.scale || opts.perMark) {
-    return counts.map((c, i) => colourFor(c.label, i, opts.scale));
+    // Through `answerFills`, which steps the categorical palette past
+    // the colours Yes, No and NA have already taken on this chart.
+    return answerFills(counts.map((c) => c.label), opts.scale);
   }
   // One colour down a plain count chart - unless an answer has a colour of
   // its own, which Yes, No and NA always do.
@@ -885,12 +888,37 @@ interface Planned {
 }
 
 /** See `needsCountsPage`, which the export dialogue counts from. */
-function countsNeeded(p: Planned): boolean {
+function countsNeeded(dataset: Dataset, p: Planned): boolean {
+  // A count asked only of the stations where something happened is
+  // named rather than charted. See `namesStationsOnly`.
+  if (namesStationsOnly(dataset, p.q)) return false;
   return needsCountsPage(p.shares !== null, p.parties);
 }
 
 function plan(dataset: Dataset, q: Question, filter: boolean[] | undefined): Planned | null {
   const b = analyse(dataset, q, filter);
+  /*
+   * The teams first, whatever the column classifies as.
+   *
+   * Eight reports from eight different teams is a column of distinct
+   * values, which is free text by every test this tool has, and the
+   * closing form's A.1 was being turned into a word cloud of team
+   * numbers - or, since the cloud needs a canvas, into nothing at all.
+   * See `teamReports`.
+   */
+  /*
+   * Sixty teams on one axis is a wall; one chart per team type is a
+   * page that can be read, and every column the form prints a team
+   * number in is on it - the ones after the first draw nothing of
+   * their own rather than repeating the page.
+   */
+  if (isTeamQuestion(dataset, q)) {
+    const teams = teamReports(dataset, filter);
+    if (teams.length === 0) return null;
+    const first = teamQuestion(dataset);
+    if (first && first.columns[0] !== q.columns[0]) return null;
+    return { q, b, counts: [], parties: [], areas: [], teams, shares: null, full: true };
+  }
   // The constituency question is a list of places: it is charted, in
   // geographic order, not turned into a cloud of place names.
   if (q.kind === 'text' && !isConstituencyQuestion(dataset, q)) {
@@ -901,22 +929,6 @@ function plan(dataset: Dataset, q: Question, filter: boolean[] | undefined): Pla
     return { q, b, counts: [], parties: [], areas: [], words, shares: null, full: true };
   }
   if (b.total.length === 0) return null;
-  /*
-   * Sixty teams on one axis is a wall; one chart per team type is a page
-   * that can be read. See `teamReports`.
-   *
-   * Every column the form prints the team number in is on that page, so
-   * the ones after the first draw nothing of their own rather than
-   * repeating the page or charting a fifth of the teams on a slide of
-   * their own.
-   */
-  if (isTeamQuestion(dataset, q)) {
-    const teams = teamReports(dataset, filter);
-    if (teams.length === 0) return null;
-    const first = teamQuestion(dataset);
-    if (first && first.columns[0] !== q.columns[0]) return null;
-    return { q, b, counts: [], parties: [], areas: [], teams, shares: null, full: true };
-  }
   const { parties, areas } = slideBreakdown(q, b);
   return {
     q,
@@ -970,12 +982,14 @@ function addQuestionSlides(
     }
     const drawn = [first];
     i += 1;
-    if (countsNeeded(first)) {
+    if (countsNeeded(dataset, first)) {
       const second = planned[i];
       // Two share a slide only when neither needs the room, and only
       // where both have a page of counts to put on it.
       const pair =
-        !first.full && second && !second.full && countsNeeded(second) ? second : undefined;
+        !first.full && second && !second.full && countsNeeded(dataset, second)
+          ? second
+          : undefined;
       const slide = pptx.addSlide({ masterName: 'BASE' });
       if (pair) {
         const cols = columns(2);
@@ -998,7 +1012,7 @@ function addQuestionSlides(
      * draws no slide for it.
      */
     for (const p of drawn) {
-      const sharesFirst = !countsNeeded(p);
+      const sharesFirst = !countsNeeded(dataset, p);
       if (sharesFirst) addSharesSlide(pptx, p);
       if (canDrawMaps) {
         const kind = mapKindFor(dataset, p.q, p.b);
@@ -1066,6 +1080,10 @@ function title(word: string): string {
  * question twice.
  */
 export function answerHead(q: Question): string {
+  // A count's column is headed by what it counts off. "If Yes, how
+  // many approximately?" shortens to nothing a table can use, and the
+  // figures under it are plainly how many.
+  if (q.kind === 'numeric') return /how many/i.test(q.label) ? 'How many' : 'Number';
   const word = q.label
     // "If No to D.1" and no further, or the clause eats the sentence it
     // was meant to introduce and every table is headed "Answer".
